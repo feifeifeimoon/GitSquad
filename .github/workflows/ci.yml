@@ -7,8 +7,8 @@ on:
     branches: [main]
 
 jobs:
-  build:
-    name: Build & Test
+  backend:
+    name: Backend Build & Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -25,3 +25,30 @@ jobs:
 
       - name: Build
         run: go build ./...
+
+  web:
+    name: Web Lint, Test & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Test
+        run: bun run test
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Build
+        run: bun run build
