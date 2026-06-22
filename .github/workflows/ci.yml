@@ -12,19 +12,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
           cache: true
 
       - name: Test
-        run: go test -v -race ./...
+        run: go test -v -race $(go list ./... | grep -v '/web/')
 
       - name: Build
-        run: go build ./...
+        run: go build $(go list ./... | grep -v '/web/')
 
   web:
     name: Web Lint, Test & Build
@@ -34,7 +34,7 @@ jobs:
         working-directory: web
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
