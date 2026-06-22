@@ -1,0 +1,36 @@
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# goreleaser output
+dist/
+
+# CI / helpers
+.github/
+Makefile
+.dockerignore
+.goreleaser.yaml
+
+# Docs and assets
+docs/
+*.md
+*.png
+
+# OpenSpec planning
+openspec/
+
+# Web frontend
+web/
+
+# IDE / editor
+.idea/
+.vscode/
+.codex/
+
+# Go workspace
+go.work
+go.work.sum
+
+# Environment
+.env
