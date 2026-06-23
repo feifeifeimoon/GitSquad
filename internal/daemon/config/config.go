@@ -1,6 +1,10 @@
 package config
 
-import "os"
+import (
+	"os"
+
+	"github.com/joho/godotenv"
+)
 
 type Config struct {
 	APIURL  string
@@ -9,6 +13,8 @@ type Config struct {
 }
 
 func Load() Config {
+	_ = godotenv.Load()
+
 	return Config{
 		APIURL:  getEnv("GITSQUAD_API_URL", "http://localhost:8080"),
 		Token:   os.Getenv("GITSQUAD_DAEMON_TOKEN"),

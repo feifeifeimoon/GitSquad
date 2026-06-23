@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
+	"log"
 	"net/http"
 	"time"
 
@@ -17,21 +17,24 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	if cfg.DatabaseURL != "" {
-		pool, err := database.Open(ctx, cfg.DatabaseURL)
-		if err != nil {
-			panic(err)
-		}
-		defer pool.Close()
+	pool, err := database.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("open database: %v", err)
 	}
+	defer pool.Close()
 
-	fmt.Printf("GitSquad Server Start addr=%s env=%s\n", cfg.HTTPAddr, cfg.Environment)
+	if err := database.Migrate(ctx, pool); err != nil {
+		log.Fatalf("migrate database: %v", err)
+	}
+	log.Println("Database migrated successfully")
+
+	log.Printf("GitSquad Server Start addr=%s env=%s\n", cfg.HTTPAddr, cfg.Environment)
 	server := &http.Server{
 		Addr:    cfg.HTTPAddr,
-		Handler: router.New(),
+		Handler: router.New(cfg, pool),
 	}
 
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		panic(err)
+		log.Fatalf("server: %v", err)
 	}
 }
