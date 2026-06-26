@@ -36,16 +36,19 @@ async function fetchAPI<T = unknown>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError(
-      (body as { error?: string }).error || "Request failed",
-      res.status
-    );
+    const msg = body?.message || body?.error || "Request failed";
+    throw new ApiError(msg, res.status);
   }
 
   // 204 No Content
   if (res.status === 204) return undefined as T;
 
-  return res.json();
+  // Unwrap: if response uses { success, data } envelope, extract data.
+  const body = await res.json();
+  if (body && typeof body === "object" && "success" in body && "data" in body) {
+    return (body as { data: T }).data as T;
+  }
+  return body as T;
 }
 
 export const api = {

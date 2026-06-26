@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -13,10 +12,10 @@ type Config struct {
 	DatabaseURL string
 	Environment string
 
-	// GitHub OAuth
-	GitHubClientID     string
-	GitHubClientSecret string
-	GitHubCallbackURL  string
+	// Google OAuth
+	GoogleClientID     string
+	GoogleClientSecret string
+	GoogleCallbackURL  string
 
 	// JWT
 	JWTSecret string
@@ -25,8 +24,7 @@ type Config struct {
 	FrontendURL string
 }
 
-func Load() Config {
-	// Load .env file if present; ignore error (file is optional).
+func Load() (Config, error) {
 	_ = godotenv.Load()
 
 	cfg := Config{
@@ -34,29 +32,29 @@ func Load() Config {
 		DatabaseURL: os.Getenv("GITSQUAD_DATABASE_URL"),
 		Environment: getEnv("GITSQUAD_ENV", "development"),
 
-		GitHubClientID:     os.Getenv("GITSQUAD_GITHUB_CLIENT_ID"),
-		GitHubClientSecret: os.Getenv("GITSQUAD_GITHUB_CLIENT_SECRET"),
-		GitHubCallbackURL:  getEnv("GITSQUAD_GITHUB_CALLBACK_URL", "http://localhost:8080/api/v1/auth/github/callback"),
+		GoogleClientID:     os.Getenv("GITSQUAD_GOOGLE_CLIENT_ID"),
+		GoogleClientSecret: os.Getenv("GITSQUAD_GOOGLE_CLIENT_SECRET"),
+		GoogleCallbackURL:  getEnv("GITSQUAD_GOOGLE_CALLBACK_URL", "http://localhost:8080/api/v1/auth/google/callback"),
 		JWTSecret:          getEnv("GITSQUAD_JWT_SECRET", "gitsquad-dev-secret"),
 		FrontendURL:        getEnv("GITSQUAD_FRONTEND_URL", "http://localhost:3000"),
 	}
 
 	if err := cfg.validate(); err != nil {
-		log.Fatalf("invalid config: %v", err)
+		return Config{}, err
 	}
 
-	return cfg
+	return cfg, nil
 }
 
 func (c Config) validate() error {
 	if c.DatabaseURL == "" {
 		return fmt.Errorf("GITSQUAD_DATABASE_URL is required")
 	}
-	if c.GitHubClientID == "" {
-		return fmt.Errorf("GITSQUAD_GITHUB_CLIENT_ID is required")
+	if c.GoogleClientID == "" {
+		return fmt.Errorf("GITSQUAD_GOOGLE_CLIENT_ID is required")
 	}
-	if c.GitHubClientSecret == "" {
-		return fmt.Errorf("GITSQUAD_GITHUB_CLIENT_SECRET is required")
+	if c.GoogleClientSecret == "" {
+		return fmt.Errorf("GITSQUAD_GOOGLE_CLIENT_SECRET is required")
 	}
 	return nil
 }

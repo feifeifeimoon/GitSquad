@@ -1,29 +1,18 @@
 package main
 
-import (
-	"context"
-	"errors"
-	"os"
-	"os/signal"
-	"syscall"
-
-	"github.com/feifeifeimoon/GitSquad/internal/daemon/app"
-	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
-	"github.com/spf13/cobra"
-)
+import "github.com/spf13/cobra"
 
 var daemonCmd = &cobra.Command{
 	Use:   "daemon",
-	Short: "Run the GitSquad local daemon.",
-	Long:  "Run the GitSquad local daemon that connects local workspaces to GitSquad SaaS.",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
-		defer stop()
+	Short: "Manage the GitSquad local daemon.",
+	Long:  "Register, run, and inspect the daemon that connects your machine to GitSquad.",
+}
 
-		err := app.Run(ctx, daemonconfig.Load())
-		if errors.Is(err, context.Canceled) {
-			return nil
-		}
-		return err
-	},
+func init() {
+	daemonLoginCmd.Flags().StringVar(&loginToken, "token", "", "Daemon token for headless auth")
+	daemonLoginCmd.Flags().StringVar(&loginName, "name", "", "Custom device name")
+
+	daemonCmd.AddCommand(daemonRunCmd)
+	daemonCmd.AddCommand(daemonLoginCmd)
+	daemonCmd.AddCommand(daemonStatusCmd)
 }

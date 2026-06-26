@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import {
   ArrowRight,
@@ -8,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LiveAgentLog } from "@/components/live-agent-log";
 import { AuthButton } from "@/components/auth-button";
+import { LoginModal } from "@/components/login-modal";
 
 const navItems = ["Agents", "Security", "Pricing", "Docs"];
 
@@ -52,8 +56,17 @@ const agents = [
 
 
 export default function Home() {
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
   return (
     <main className="min-h-screen overflow-hidden bg-white text-zinc-950">
+      {/* Login modal */}
+      <LoginModal
+        mode="modal"
+        open={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
+
       <header className="border-b border-zinc-200/80 bg-white/95">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-5 sm:px-8">
           <a href="#" className="flex items-center gap-2 text-sm font-semibold">
@@ -77,7 +90,7 @@ export default function Home() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <AuthButton />
+            <AuthButton onLoginClick={() => setShowLoginModal(true)} />
           </div>
         </div>
       </header>
@@ -110,7 +123,10 @@ export default function Home() {
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-          <Button className="h-11 rounded-md px-5 text-sm font-semibold">
+          <Button
+            className="h-11 rounded-md px-5 text-sm font-semibold"
+            onClick={() => setShowLoginModal(true)}
+          >
             Get started free
             <ArrowRight className="size-4" />
           </Button>

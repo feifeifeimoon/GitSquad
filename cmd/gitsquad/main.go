@@ -3,15 +3,10 @@ package main
 import (
 	"fmt"
 	"os"
-	"runtime"
 
+	"github.com/feifeifeimoon/GitSquad/internal/server/logging"
+	"github.com/feifeifeimoon/GitSquad/internal/version"
 	"github.com/spf13/cobra"
-)
-
-var (
-	version = "dev"
-	commit  = "unknown"
-	date    = "unknown"
 )
 
 var rootCmd = &cobra.Command{
@@ -23,12 +18,13 @@ var rootCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.Version = fmt.Sprintf("%s (commit: %s, built: %s)\ngo: %s, os/arch: %s/%s", version, commit, date, runtime.Version(), runtime.GOOS, runtime.GOARCH)
+	rootCmd.Version = version.String()
 	rootCmd.SetVersionTemplate("gitsquad {{.Version}}\n")
 	rootCmd.AddCommand(daemonCmd)
 }
 
 func main() {
+	logging.InitCLI()
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)

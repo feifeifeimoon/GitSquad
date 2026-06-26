@@ -7,7 +7,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("GITSQUAD_DATABASE_URL", "")
 	t.Setenv("GITSQUAD_ENV", "")
 
-	cfg := Load()
+	cfg, _ := Load()
 
 	if cfg.HTTPAddr != ":8080" {
 		t.Fatalf("HTTPAddr = %q, want :8080", cfg.HTTPAddr)
@@ -25,7 +25,7 @@ func TestLoadReadsEnvironment(t *testing.T) {
 	t.Setenv("GITSQUAD_DATABASE_URL", "postgres://example")
 	t.Setenv("GITSQUAD_ENV", "test")
 
-	cfg := Load()
+	cfg, _ := Load()
 
 	if cfg.HTTPAddr != ":9090" {
 		t.Fatalf("HTTPAddr = %q, want :9090", cfg.HTTPAddr)

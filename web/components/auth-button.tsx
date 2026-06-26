@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut } from "lucide-react";
+import { LogOut, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface User {
@@ -11,7 +11,7 @@ interface User {
   avatar_url: string;
 }
 
-export function AuthButton() {
+export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [open, setOpen] = useState(false);
@@ -59,16 +59,23 @@ export function AuthButton() {
 
         {open && (
           <div className="absolute right-0 top-11 w-48 rounded-lg border border-zinc-200 bg-white py-1 shadow-lg z-50">
-            <div className="px-3 py-2 border-b border-zinc-100">
-              <p className="text-sm font-semibold text-zinc-950">@{user.login}</p>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 transition-colors"
-            >
-              <LogOut className="size-3.5" />
-              Logout
-            </button>
+              <div className="px-3 py-2 border-b border-zinc-100">
+                <p className="text-sm font-semibold text-zinc-950">@{user.login}</p>
+              </div>
+              <button
+                onClick={() => { router.push("/console"); setOpen(false); }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 transition-colors"
+              >
+                <LayoutDashboard className="size-3.5" />
+                Console
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-600 hover:bg-zinc-50 transition-colors"
+              >
+                <LogOut className="size-3.5" />
+                Logout
+              </button>
           </div>
         )}
       </div>
@@ -77,7 +84,13 @@ export function AuthButton() {
 
   return (
     <button
-      onClick={() => router.push("/login")}
+      onClick={() => {
+        if (onLoginClick) {
+          onLoginClick();
+        } else {
+          router.push("/login");
+        }
+      }}
       className="inline-flex items-center rounded-md bg-zinc-950 px-3 py-1.5 text-xs font-semibold text-white hover:bg-zinc-800 transition-colors"
     >
       Login
