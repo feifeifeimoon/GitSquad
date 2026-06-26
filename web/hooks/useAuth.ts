@@ -11,14 +11,14 @@ interface User {
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return !!localStorage.getItem("gitsquad_token");
+  });
 
   useEffect(() => {
     const token = localStorage.getItem("gitsquad_token");
-    if (!token) {
-      setLoading(false);
-      return;
-    }
+    if (!token) return;
 
     api
       .get<User>("/api/v1/me")

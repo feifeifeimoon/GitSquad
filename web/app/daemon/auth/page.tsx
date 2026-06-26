@@ -16,19 +16,21 @@ function DaemonAuthContent() {
   const code = searchParams.get("code");
 
   const [user, setUser] = useState<User | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [status, setStatus] = useState<"loading" | "need_login" | "confirm" | "confirming" | "confirmed" | "error">("loading");
+  const [authChecked, setAuthChecked] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return !localStorage.getItem("gitsquad_token");
+  });
+  const [status, setStatus] = useState<"loading" | "need_login" | "confirm" | "confirming" | "confirmed" | "error">(() => {
+    if (typeof window === "undefined") return "loading";
+    return localStorage.getItem("gitsquad_token") ? "loading" : "need_login";
+  });
   const [error, setError] = useState("");
   const [machineName, setMachineName] = useState("");
 
   // Check auth state.
   useEffect(() => {
     const token = localStorage.getItem("gitsquad_token");
-    if (!token) {
-      setAuthChecked(true);
-      setStatus("need_login");
-      return;
-    }
+    if (!token) return;
 
     api
       .get<User>("/api/v1/me")
@@ -53,9 +55,9 @@ function DaemonAuthContent() {
         setMachineName(data.machine_name || "Unknown device");
         setStatus("confirm");
       })
-      .catch((err: any) => {
+      .catch((err: unknown) => {
         setStatus("error");
-        setError(err?.message || "Invalid or expired pairing code.");
+        setError(err instanceof Error ? err.message : "Invalid or expired pairing code.");
       });
   }, [authChecked, code, user]);
 
@@ -64,9 +66,9 @@ function DaemonAuthContent() {
     try {
       await api.post(`/api/v1/daemon/auth/${code}/confirm`);
       setStatus("confirmed");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setStatus("error");
-      setError(err.message || "Failed to confirm pairing.");
+      setError(err instanceof Error ? err.message : "Failed to confirm pairing.");
     }
   }, [code]);
 

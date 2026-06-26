@@ -1,6 +1,10 @@
 package config
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestLoadUsesDefaults(t *testing.T) {
 	t.Setenv("GITSQUAD_API_URL", "")
@@ -12,9 +16,13 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.APIURL != "http://localhost:8080" {
 		t.Fatalf("APIURL = %q, want http://localhost:8080", cfg.APIURL)
 	}
-	if cfg.WorkDir != ".gitsquad/workspaces" {
-		t.Fatalf("WorkDir = %q, want .gitsquad/workspaces", cfg.WorkDir)
+
+	home, _ := os.UserHomeDir()
+	expectedWorkDir := filepath.Join(home, ".gitsquad", "workspaces")
+	if cfg.WorkDir != expectedWorkDir {
+		t.Fatalf("WorkDir = %q, want %q", cfg.WorkDir, expectedWorkDir)
 	}
+
 	if cfg.Token != "" {
 		t.Fatalf("Token = %q, want empty", cfg.Token)
 	}

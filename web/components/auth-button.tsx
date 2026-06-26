@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { LogOut, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
@@ -50,9 +51,11 @@ export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
           onClick={() => setOpen(!open)}
           className="flex items-center gap-2 rounded-full border border-zinc-200 p-0.5 transition-colors hover:border-zinc-300"
         >
-          <img
+          <Image
             src={user.avatar_url}
             alt={user.login}
+            width={28}
+            height={28}
             className="size-7 rounded-full"
           />
         </button>
