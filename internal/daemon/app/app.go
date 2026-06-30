@@ -8,6 +8,7 @@ import (
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon/client"
 	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 func Run(ctx context.Context, cfg daemonconfig.Config) error {
@@ -44,11 +45,11 @@ func Run(ctx context.Context, cfg daemonconfig.Config) error {
 			slog.Info("daemon shutting down")
 			return nil
 		case <-ticker.C:
-			if err := ws.SendHeartbeat(ctx, map[string]interface{}{
-				"status":          "online",
-				"daemon_version":  cfg.DaemonVersion,
-				"active_tasks":    []string{},
-				"runtime_summary": runtimeSummary(scanResult),
+			if err := ws.SendHeartbeat(ctx, v1.WSHeartbeatPayload{
+				Status:         "online",
+				DaemonVersion:  cfg.DaemonVersion,
+				ActiveTasks:    []string{},
+				RuntimeSummary: runtimeSummary(scanResult),
 			}); err != nil {
 				slog.Warn("heartbeat error", "error", err)
 			}

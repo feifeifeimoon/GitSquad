@@ -10,18 +10,18 @@ import (
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon/client"
 	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
-	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 type ScanResult struct {
-	MachineChecks map[string]string  `json:"machine_checks"`
-	Runtimes      []pkgtypes.Runtime `json:"runtimes"`
+	MachineChecks map[string]string `json:"machine_checks"`
+	Runtimes      []v1.Runtime      `json:"runtimes"`
 }
 
 func ScanCapabilities(cfg daemonconfig.Config) *ScanResult {
 	result := &ScanResult{
 		MachineChecks: make(map[string]string),
-		Runtimes:      make([]pkgtypes.Runtime, 0),
+		Runtimes:      make([]v1.Runtime, 0),
 	}
 
 	// Machine checks.
@@ -34,7 +34,7 @@ func ScanCapabilities(cfg daemonconfig.Config) *ScanResult {
 		ver, _ := runVersionCmd(gitPath, "--version")
 		result.MachineChecks["git_version"] = strings.TrimSpace(ver)
 		result.MachineChecks["git_available"] = "true"
-		result.Runtimes = append(result.Runtimes, pkgtypes.Runtime{
+		result.Runtimes = append(result.Runtimes, v1.Runtime{
 			Kind: "git", ExecutablePath: gitPath,
 			Version: strings.TrimSpace(ver), MaxConcurrency: 1,
 		})

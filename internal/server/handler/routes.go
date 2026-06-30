@@ -7,7 +7,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/middleware"
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
-	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -68,10 +68,10 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			daemon.GET("/:id", func(c *gin.Context) {
 				m := middleware.GetDaemon(c)
 				if m == nil {
-					c.JSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("unauthorized"))
+					c.JSON(http.StatusUnauthorized, v1.ErrorResponse("unauthorized"))
 					return
 				}
-				c.JSON(http.StatusOK, pkgtypes.SuccessResponse(m, 0))
+				c.JSON(http.StatusOK, v1.SuccessResponse(m, 0))
 			})
 			daemon.PUT("/:id/runtimes", daemonHandler.PutRuntimes)
 			daemon.POST("/:id/heartbeat", daemonHandler.Heartbeat)

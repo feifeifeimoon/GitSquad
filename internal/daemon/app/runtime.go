@@ -10,7 +10,7 @@ import (
 	"runtime"
 	"time"
 
-	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 // ── Executor (placeholder) ───────────────────────────────────────────
@@ -34,7 +34,7 @@ type Output struct {
 type Runtime interface {
 	// Detect checks whether the CLI is available on the given PATH directories.
 	// Returns nil if the CLI is not found or not working.
-	Detect(paths []string) *pkgtypes.Runtime
+	Detect(paths []string) *v1.Runtime
 
 	// Executor returns the execution driver for this runtime.
 	// Returns nil until execution is implemented.

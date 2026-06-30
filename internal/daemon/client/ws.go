@@ -7,16 +7,9 @@ import (
 	"net/http"
 	"strings"
 
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gorilla/websocket"
 )
-
-// Frame is a WebSocket message frame exchanged between daemon and server.
-type Frame struct {
-	Type      string          `json:"type"`
-	Seq       int64           `json:"seq,omitempty"`
-	Timestamp string          `json:"timestamp,omitempty"`
-	Payload   json.RawMessage `json:"payload,omitempty"`
-}
 
 // WSConn wraps a WebSocket connection with daemon-specific framing helpers.
 type WSConn struct {
@@ -41,8 +34,8 @@ func (c *Client) ConnectWS(ctx context.Context, daemonID string) (*WSConn, error
 	ws := &WSConn{conn: conn}
 
 	// Send auth frame — server validates both daemon_id and token.
-	authPayload, _ := json.Marshal(map[string]string{"daemon_id": daemonID, "token": c.Token})
-	if err := ws.WriteFrame(Frame{Type: "auth", Payload: authPayload}); err != nil {
+	authPayload, _ := json.Marshal(v1.WSAuthPayload{DaemonID: daemonID, Token: c.Token})
+	if err := ws.WriteFrame(v1.Frame{Type: v1.FrameTypeAuth, Payload: authPayload}); err != nil {
 		conn.Close()
 		return nil, fmt.Errorf("send auth frame: %w", err)
 	}
@@ -53,10 +46,8 @@ func (c *Client) ConnectWS(ctx context.Context, daemonID string) (*WSConn, error
 		conn.Close()
 		return nil, fmt.Errorf("read auth ack: %w", err)
 	}
-	if ack.Type == "error" {
-		var ep struct {
-			Message string `json:"message"`
-		}
+	if ack.Type == v1.FrameTypeError {
+		var ep v1.WSErrorPayload
 		json.Unmarshal(ack.Payload, &ep)
 		conn.Close()
 		return nil, fmt.Errorf("auth failed: %s", ep.Message)
@@ -66,20 +57,20 @@ func (c *Client) ConnectWS(ctx context.Context, daemonID string) (*WSConn, error
 }
 
 // ReadFrame reads the next text frame from the WebSocket.
-func (ws *WSConn) ReadFrame() (Frame, error) {
+func (ws *WSConn) ReadFrame() (v1.Frame, error) {
 	_, msg, err := ws.conn.ReadMessage()
 	if err != nil {
-		return Frame{}, err
+		return v1.Frame{}, err
 	}
-	var f Frame
+	var f v1.Frame
 	if err := json.Unmarshal(msg, &f); err != nil {
-		return Frame{}, err
+		return v1.Frame{}, err
 	}
 	return f, nil
 }
 
 // WriteFrame writes a text frame to the WebSocket.
-func (ws *WSConn) WriteFrame(f Frame) error {
+func (ws *WSConn) WriteFrame(f v1.Frame) error {
 	data, err := json.Marshal(f)
 	if err != nil {
 		return err
@@ -93,7 +84,7 @@ func (ws *WSConn) SendHeartbeat(ctx context.Context, payload any) error {
 	if err != nil {
 		return err
 	}
-	return ws.WriteFrame(Frame{Type: "heartbeat", Payload: b})
+	return ws.WriteFrame(v1.Frame{Type: v1.FrameTypeHeartbeat, Payload: b})
 }
 
 // Close closes the underlying WebSocket connection.

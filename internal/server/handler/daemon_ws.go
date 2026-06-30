@@ -7,6 +7,7 @@ import (
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
 	"github.com/feifeifeimoon/GitSquad/internal/server/ws"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -37,10 +38,7 @@ func NewDaemonWS(daemonSvc *service.DaemonService) gin.HandlerFunc {
 
 func authHandler(daemonSvc *service.DaemonService) ws.Handler {
 	return func(conn *ws.Conn, hub *ws.Hub, frame ws.Frame) *ws.Frame {
-		var payload struct {
-			DaemonID string `json:"daemon_id"`
-			Token    string `json:"token"`
-		}
+		var payload v1.WSAuthPayload
 		if err := json.Unmarshal(frame.Payload, &payload); err != nil {
 			return errorFrame("invalid auth payload")
 		}
@@ -64,9 +62,9 @@ func authHandler(daemonSvc *service.DaemonService) ws.Handler {
 		conn.UserID = daemon.UserID.String()
 		hub.Register(daemon.ID.String(), conn)
 
-		ackPayload, _ := json.Marshal(map[string]interface{}{
-			"server_time":           time.Now().Format(time.RFC3339),
-			"heartbeat_interval_ms": 30000,
+		ackPayload, _ := json.Marshal(v1.WSAuthAckPayload{
+			ServerTime:          time.Now().Format(time.RFC3339),
+			HeartbeatIntervalMs: 30000,
 		})
 		return &ws.Frame{
 			Type:    ws.TypeAuthAck,
@@ -88,9 +86,9 @@ func heartbeatHandler(daemonSvc *service.DaemonService) ws.Handler {
 		uid, _ := uuid.Parse(conn.DaemonID)
 		_ = daemonSvc.MarkOnline(ctx, uid)
 
-		ackPayload, _ := json.Marshal(map[string]interface{}{
-			"server_time":   time.Now().Format(time.RFC3339),
-			"pending_tasks": 0,
+		ackPayload, _ := json.Marshal(v1.WSHeartbeatAckPayload{
+			ServerTime:   time.Now().Format(time.RFC3339),
+			PendingTasks: 0,
 		})
 		return &ws.Frame{
 			Type:    ws.TypeHeartbeatAck,
@@ -131,6 +129,6 @@ func staleWatcher(hub *ws.Hub) {
 }
 
 func errorFrame(msg string) *ws.Frame {
-	payload, _ := json.Marshal(map[string]string{"message": msg})
+	payload, _ := json.Marshal(v1.WSErrorPayload{Message: msg})
 	return &ws.Frame{Type: ws.TypeError, Payload: payload}
 }

@@ -1,4 +1,5 @@
-package types
+// Package v1 holds shared API types for v1 endpoints.
+package v1
 
 // APIResponse is the standard envelope for all API responses.
 type APIResponse struct {

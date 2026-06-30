@@ -9,6 +9,7 @@ import (
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon/client"
 	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 func Login(ctx context.Context, cfg daemonconfig.Config, token string, name string) error {
@@ -27,7 +28,7 @@ func Login(ctx context.Context, cfg daemonconfig.Config, token string, name stri
 
 func loginByToken(ctx context.Context, cfg daemonconfig.Config, token string) error {
 	c := client.New(cfg.APIURL, token)
-	authResp, _, err := c.Auth(ctx, client.AuthRequest{
+	authResp, _, err := c.Auth(ctx, v1.DaemonAuthRequest{
 		MachineName:   cfg.DaemonName,
 		OS:            cfg.OS(),
 		Arch:          cfg.Arch(),
@@ -45,7 +46,7 @@ func loginByToken(ctx context.Context, cfg daemonconfig.Config, token string) er
 func loginByPairing(ctx context.Context, cfg daemonconfig.Config) error {
 	// 1. Initiate pairing.
 	c := client.New(cfg.APIURL, "")
-	_, pairResp, err := c.Auth(ctx, client.AuthRequest{
+	_, pairResp, err := c.Auth(ctx, v1.DaemonAuthRequest{
 		MachineName:   cfg.DaemonName,
 		OS:            cfg.OS(),
 		Arch:          cfg.Arch(),

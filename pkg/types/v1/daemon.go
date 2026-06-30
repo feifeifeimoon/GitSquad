@@ -1,4 +1,4 @@
-package types
+package v1
 
 import (
 	"time"
@@ -14,6 +14,7 @@ const (
 	DaemonStatusOffline    = "offline"
 )
 
+// Daemon represents a registered daemon machine.
 type Daemon struct {
 	ID            uuid.UUID  `json:"id"`
 	UserID        uuid.UUID  `json:"user_id"`
@@ -28,7 +29,13 @@ type Daemon struct {
 	RegisteredAt  time.Time  `json:"registered_at"`
 }
 
+// DaemonWithRuntimes embeds Daemon and adds its runtimes.
 type DaemonWithRuntimes struct {
 	Daemon
 	Runtimes []Runtime `json:"runtimes"`
+}
+
+// DeleteDaemonResponse is returned by DELETE /api/v1/daemons/:id.
+type DeleteDaemonResponse struct {
+	Deleted bool `json:"deleted"`
 }

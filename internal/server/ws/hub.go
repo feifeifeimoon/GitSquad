@@ -5,30 +5,28 @@ import (
 	"log/slog"
 	"sync"
 	"time"
+
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
-// Frame types.
+// Frame is a type alias for the canonical Frame in pkg/types/v1.
+type Frame = v1.Frame
+
+// Frame type constants — mirror v1 for convenience.
 const (
-	TypeAuth           = "auth"
-	TypeAuthAck        = "auth_ack"
-	TypeHeartbeat      = "heartbeat"
-	TypeHeartbeatAck   = "heartbeat_ack"
-	TypeTaskWake       = "task_wake"
-	TypeTaskWakeAck    = "task_wake_ack"
-	TypeRuntimeGone    = "runtime_gone"
-	TypeRuntimeGoneAck = "runtime_gone_ack"
-	TypeStatusUpdate   = "status_update"
-	TypeStatusAck      = "status_ack"
-	TypeServerShutdown = "server_shutdown"
-	TypeError          = "error"
+	TypeAuth           = v1.FrameTypeAuth
+	TypeAuthAck        = v1.FrameTypeAuthAck
+	TypeHeartbeat      = v1.FrameTypeHeartbeat
+	TypeHeartbeatAck   = v1.FrameTypeHeartbeatAck
+	TypeTaskWake       = v1.FrameTypeTaskWake
+	TypeTaskWakeAck    = v1.FrameTypeTaskWakeAck
+	TypeRuntimeGone    = v1.FrameTypeRuntimeGone
+	TypeRuntimeGoneAck = v1.FrameTypeRuntimeGoneAck
+	TypeStatusUpdate   = v1.FrameTypeStatusUpdate
+	TypeStatusAck      = v1.FrameTypeStatusAck
+	TypeServerShutdown = v1.FrameTypeServerShutdown
+	TypeError          = v1.FrameTypeError
 )
-
-type Frame struct {
-	Type      string          `json:"type"`
-	Seq       int64           `json:"seq,omitempty"`
-	Timestamp string          `json:"timestamp,omitempty"`
-	Payload   json.RawMessage `json:"payload,omitempty"`
-}
 
 // Hub is a connection pool of authenticated daemon WebSocket connections.
 type Hub struct {

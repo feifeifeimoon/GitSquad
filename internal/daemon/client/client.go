@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 // Client is a lightweight HTTP client for the GitSquad server API.
@@ -63,14 +63,14 @@ func (c *Client) Do(ctx context.Context, method, path string, body any, result a
 	}
 
 	if resp.StatusCode >= 300 {
-		var env pkgtypes.APIResponse
+		var env v1.APIResponse
 		if json.Unmarshal(respBytes, &env) == nil && env.Message != "" {
 			return fmt.Errorf("%s", env.Message)
 		}
 		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, strings.TrimSpace(string(respBytes)))
 	}
 
-	var env pkgtypes.APIResponse
+	var env v1.APIResponse
 	if err := json.Unmarshal(respBytes, &env); err != nil {
 		// Not an envelope — treat whole body as data for backward compat.
 		if result != nil {

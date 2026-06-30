@@ -3,13 +3,13 @@ package app
 import (
 	"strings"
 
-	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 // CodexRuntime detects the Codex CLI ("codex").
 type CodexRuntime struct{}
 
-func (r *CodexRuntime) Detect(paths []string) *pkgtypes.Runtime {
+func (r *CodexRuntime) Detect(paths []string) *v1.Runtime {
 	const kind = "codex"
 	exePath, err := findExe(kind, paths)
 	if err != nil {
@@ -21,7 +21,7 @@ func (r *CodexRuntime) Detect(paths []string) *pkgtypes.Runtime {
 		return nil
 	}
 
-	return &pkgtypes.Runtime{
+	return &v1.Runtime{
 		Kind: kind, ExecutablePath: exePath,
 		Version: strings.TrimSpace(ver), MaxConcurrency: 1,
 	}

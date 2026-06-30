@@ -7,12 +7,12 @@ import (
 	"strings"
 	"testing"
 
-	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 func TestDoSuccess(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := pkgtypes.APIResponse{Success: true, Data: map[string]string{"hello": "world"}}
+		resp := v1.APIResponse{Success: true, Data: map[string]string{"hello": "world"}}
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
@@ -33,7 +33,7 @@ func TestDoSendsAuthHeader(t *testing.T) {
 		if auth != "Bearer mytoken" {
 			t.Errorf("Authorization = %q, want Bearer mytoken", auth)
 		}
-		resp := pkgtypes.APIResponse{Success: true, Data: map[string]string{"ok": "yes"}}
+		resp := v1.APIResponse{Success: true, Data: map[string]string{"ok": "yes"}}
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
@@ -50,7 +50,7 @@ func TestDoSendsNoAuthWhenTokenEmpty(t *testing.T) {
 		if r.Header.Get("Authorization") != "" {
 			t.Error("Authorization header present, want absent")
 		}
-		resp := pkgtypes.APIResponse{Success: true}
+		resp := v1.APIResponse{Success: true}
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
@@ -66,7 +66,7 @@ func TestDoSetsContentType(t *testing.T) {
 		if ct := r.Header.Get("Content-Type"); ct != "application/json" {
 			t.Errorf("Content-Type = %q, want application/json", ct)
 		}
-		resp := pkgtypes.APIResponse{Success: true}
+		resp := v1.APIResponse{Success: true}
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
@@ -78,7 +78,7 @@ func TestDoSetsContentType(t *testing.T) {
 func TestDoServerError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusBadRequest)
-		resp := pkgtypes.APIResponse{Success: false, Message: "bad input"}
+		resp := v1.APIResponse{Success: false, Message: "bad input"}
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
@@ -106,7 +106,7 @@ func TestDoServerErrorNoEnvelope(t *testing.T) {
 
 func TestDoResultNil(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := pkgtypes.APIResponse{Success: true, Data: map[string]string{"unused": "data"}}
+		resp := v1.APIResponse{Success: true, Data: map[string]string{"unused": "data"}}
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()

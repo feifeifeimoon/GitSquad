@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/auth"
-	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 // OAuthProvider abstracts a third-party OAuth / OIDC identity provider.
@@ -33,7 +33,7 @@ type OAuthUserInfo struct {
 
 // AuthResult is the outcome of a successful OAuth callback.
 type AuthResult struct {
-	User  *pkgtypes.User `json:"user"`
+	User  *v1.User `json:"user"`
 	Token string         `json:"token"`
 }
 

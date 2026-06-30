@@ -7,18 +7,17 @@ import (
 	"strings"
 	"testing"
 
-	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 func TestAuthTokenMode(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Token mode: must have Authorization header.
 		if r.Header.Get("Authorization") != "Bearer secret-token" {
 			w.WriteHeader(http.StatusUnauthorized)
-			json.NewEncoder(w).Encode(pkgtypes.APIResponse{Success: false, Message: "unauthorized"})
+			json.NewEncoder(w).Encode(v1.APIResponse{Success: false, Message: "unauthorized"})
 			return
 		}
-		resp := pkgtypes.APIResponse{Success: true, Data: map[string]any{
+		resp := v1.APIResponse{Success: true, Data: map[string]any{
 			"daemon_id": "daemon-123",
 			"token":     "secret-token",
 			"status":    "active",
@@ -28,7 +27,7 @@ func TestAuthTokenMode(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL, "secret-token")
-	authResp, pairResp, err := c.Auth(t.Context(), AuthRequest{
+	authResp, pairResp, err := c.Auth(t.Context(), v1.DaemonAuthRequest{
 		MachineName:   "test-machine",
 		OS:            "linux",
 		Arch:          "amd64",
@@ -51,7 +50,7 @@ func TestAuthTokenMode(t *testing.T) {
 
 func TestAuthPairingMode(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		resp := pkgtypes.APIResponse{Success: true, Data: map[string]any{
+		resp := v1.APIResponse{Success: true, Data: map[string]any{
 			"pairing_code":     "ABC123",
 			"browser_url":      "https://app.example.com/daemon/auth?code=ABC123",
 			"expires_at":       "2026-06-30T12:00:00Z",
@@ -61,8 +60,8 @@ func TestAuthPairingMode(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := New(srv.URL, "") // no token → pairing mode
-	authResp, pairResp, err := c.Auth(t.Context(), AuthRequest{
+	c := New(srv.URL, "")
+	authResp, pairResp, err := c.Auth(t.Context(), v1.DaemonAuthRequest{
 		MachineName:   "test-machine",
 		OS:            "linux",
 		Arch:          "arm64",
@@ -85,7 +84,7 @@ func TestPollPairing(t *testing.T) {
 		if !strings.Contains(r.URL.Path, "/api/v1/daemon/auth/ABC123") {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		resp := pkgtypes.APIResponse{Success: true, Data: map[string]any{
+		resp := v1.APIResponse{Success: true, Data: map[string]any{
 			"status":       "confirmed",
 			"daemon_id":    "daemon-xyz",
 			"token":        "new-token-abc",
@@ -113,13 +112,13 @@ func TestPutRuntimes(t *testing.T) {
 	var receivedPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedPath = r.URL.Path
-		resp := pkgtypes.APIResponse{Success: true, Data: map[string]any{"accepted": 1}}
+		resp := v1.APIResponse{Success: true, Data: map[string]any{"accepted": 1}}
 		json.NewEncoder(w).Encode(resp)
 	}))
 	defer srv.Close()
 
 	c := New(srv.URL, "token")
-	err := c.PutRuntimes(t.Context(), "daemon-abc", []pkgtypes.Runtime{
+	err := c.PutRuntimes(t.Context(), "daemon-abc", []v1.Runtime{
 		{Kind: "claude", Version: "1.0.0", ExecutablePath: "/usr/bin/claude", MaxConcurrency: 1},
 	})
 	if err != nil {
