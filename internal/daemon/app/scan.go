@@ -9,51 +9,21 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
-	"time"
 
 	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
+	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 )
 
-type CLIDefinition struct {
-	DisplayName string
-	ExeName     string
-	VersionFlag string
-}
-
-var knownCLIs = []CLIDefinition{
-	{DisplayName: "Claude Code", ExeName: "claude", VersionFlag: "--version"},
-	{DisplayName: "Codex CLI", ExeName: "codex", VersionFlag: "version"},
-	{DisplayName: "GitHub Copilot", ExeName: "copilot", VersionFlag: "--version"},
-	{DisplayName: "Gemini CLI", ExeName: "gemini", VersionFlag: "--version"},
-	{DisplayName: "OpenCode", ExeName: "opencode", VersionFlag: "--version"},
-	{DisplayName: "Cursor CLI", ExeName: "cursor", VersionFlag: "--version"},
-	{DisplayName: "Windsurf", ExeName: "windsurf", VersionFlag: "--version"},
-	{DisplayName: "Aider", ExeName: "aider", VersionFlag: "--version"},
-	{DisplayName: "Cody CLI", ExeName: "cody", VersionFlag: "--version"},
-	{DisplayName: "Amazon Q", ExeName: "q", VersionFlag: "--version"},
-}
-
-type Capability struct {
-	Kind           string `json:"kind"`
-	Name           string `json:"name"`
-	ExecutablePath string `json:"executable_path,omitempty"`
-	Version        string `json:"version,omitempty"`
-	Status         string `json:"status"`
-	Diagnostics    string `json:"diagnostics,omitempty"`
-	MaxConcurrency int    `json:"max_concurrency"`
-}
-
 type ScanResult struct {
-	MachineChecks map[string]string `json:"machine_checks"`
-	Capabilities  []Capability      `json:"capabilities"`
+	MachineChecks map[string]string  `json:"machine_checks"`
+	Runtimes      []pkgtypes.Runtime `json:"runtimes"`
 }
 
 func ScanCapabilities(cfg daemonconfig.Config) *ScanResult {
 	result := &ScanResult{
 		MachineChecks: make(map[string]string),
-		Capabilities:  make([]Capability, 0, len(knownCLIs)+3),
+		Runtimes:      make([]pkgtypes.Runtime, 0),
 	}
 
 	// Machine checks.
@@ -63,21 +33,15 @@ func ScanCapabilities(cfg daemonconfig.Config) *ScanResult {
 
 	// Git check.
 	if gitPath, err := exec.LookPath("git"); err == nil {
-		ver, _ := runCmd(gitPath, "--version")
+		ver, _ := runVersionCmd(gitPath, "--version")
 		result.MachineChecks["git_version"] = strings.TrimSpace(ver)
 		result.MachineChecks["git_available"] = "true"
-		result.Capabilities = append(result.Capabilities, Capability{
-			Kind: "tool", Name: "git",
-			ExecutablePath: gitPath, Version: strings.TrimSpace(ver),
-			Status: "available", MaxConcurrency: 1,
+		result.Runtimes = append(result.Runtimes, pkgtypes.Runtime{
+			Kind: "git", ExecutablePath: gitPath,
+			Version: strings.TrimSpace(ver), MaxConcurrency: 1,
 		})
 	} else {
 		result.MachineChecks["git_available"] = "false"
-		result.Capabilities = append(result.Capabilities, Capability{
-			Kind: "tool", Name: "git",
-			Status: "missing", Diagnostics: "git not found on PATH",
-			MaxConcurrency: 1,
-		})
 	}
 
 	// Work dir check.
@@ -90,39 +54,15 @@ func ScanCapabilities(cfg daemonconfig.Config) *ScanResult {
 		result.MachineChecks["work_dir_writable"] = "false"
 	}
 
-	// Scan known CLI tools.
+	// Scan registered runtimes.
 	pathEnv := os.Getenv("PATH")
 	paths := filepath.SplitList(pathEnv)
 
-	for _, cli := range knownCLIs {
-		exePath, err := findInPath(cli.ExeName, paths)
-		if err != nil {
-			result.Capabilities = append(result.Capabilities, Capability{
-				Kind: "coder_backend", Name: cli.ExeName,
-				Status: "missing",
-				Diagnostics: fmt.Sprintf("%s not found on PATH", cli.DisplayName),
-				MaxConcurrency: 1,
-			})
-			continue
+	registry := DefaultRegistry()
+	for _, rt := range registry.All() {
+		if detected := rt.Detect(paths); detected != nil {
+			result.Runtimes = append(result.Runtimes, *detected)
 		}
-
-		ver, err := runCmd(exePath, cli.VersionFlag)
-		if err != nil {
-			result.Capabilities = append(result.Capabilities, Capability{
-				Kind: "coder_backend", Name: cli.ExeName,
-				ExecutablePath: exePath,
-				Status: "degraded",
-				Diagnostics: fmt.Sprintf("found but version check failed: %v", err),
-				MaxConcurrency: 1,
-			})
-			continue
-		}
-
-		result.Capabilities = append(result.Capabilities, Capability{
-			Kind: "coder_backend", Name: cli.ExeName,
-			ExecutablePath: exePath, Version: strings.TrimSpace(ver),
-			Status: "available", MaxConcurrency: 1,
-		})
 	}
 
 	return result
@@ -134,18 +74,11 @@ func (sr *ScanResult) Print() {
 		fmt.Printf("  %-16s %s\n", k+":", v)
 	}
 
-	fmt.Println("\nBackends:")
-	for _, cap := range sr.Capabilities {
-		if cap.Kind != "coder_backend" {
-			continue
-		}
-		mark := "✗"
-		if cap.Status == "available" {
-			mark = "✓"
-		}
-		fmt.Printf("  %-12s %s %s", cap.Name+":", mark, cap.Version)
-		if cap.ExecutablePath != "" {
-			fmt.Printf("  (%s)", cap.ExecutablePath)
+	fmt.Println("\nRuntimes:")
+	for _, rt := range sr.Runtimes {
+		fmt.Printf("  %-12s ✓ %s", rt.Kind+":", rt.Version)
+		if rt.ExecutablePath != "" {
+			fmt.Printf("  (%s)", rt.ExecutablePath)
 		}
 		fmt.Println()
 	}
@@ -154,17 +87,19 @@ func (sr *ScanResult) Print() {
 }
 
 func (sr *ScanResult) Upload(ctx context.Context, cfg daemonconfig.Config, daemonID string) error {
-	body, _ := json.Marshal(sr)
+	body, _ := json.Marshal(map[string]interface{}{
+		"runtimes": sr.Runtimes,
+	})
 
-	url := fmt.Sprintf("%s/api/v1/daemon/%s/capabilities", cfg.APIURL, daemonID)
+	url := fmt.Sprintf("%s/api/v1/daemon/%s/runtimes", cfg.APIURL, daemonID)
 	req, err := newDaemonRequest(ctx, "PUT", url, cfg.Token, body)
 	if err != nil {
-		return fmt.Errorf("upload capabilities: %w", err)
+		return fmt.Errorf("upload runtimes: %w", err)
 	}
 
 	resp, err := httpClient().Do(req)
 	if err != nil {
-		return fmt.Errorf("upload capabilities: %w", err)
+		return fmt.Errorf("upload runtimes: %w", err)
 	}
 	defer resp.Body.Close()
 
@@ -174,42 +109,14 @@ func (sr *ScanResult) Upload(ctx context.Context, cfg daemonconfig.Config, daemo
 			Message string `json:"message"`
 		}
 		json.NewDecoder(resp.Body).Decode(&errResp)
-		return fmt.Errorf("server rejected capabilities: %s", errResp.Message)
+		return fmt.Errorf("server rejected runtimes: %s", errResp.Message)
 	}
 
 	return nil
 }
 
-func findInPath(exeName string, paths []string) (string, error) {
-	exts := []string{""}
-	if runtime.GOOS == "windows" {
-		exts = []string{".exe", ".cmd", ".bat", ".ps1"}
-	}
+// ── Helpers ──────────────────────────────────────────────────────────
 
-	for _, dir := range paths {
-		for _, ext := range exts {
-			full := filepath.Join(dir, exeName+ext)
-			if info, err := os.Stat(full); err == nil && !info.IsDir() {
-				return full, nil
-			}
-		}
-	}
-	return "", fmt.Errorf("%s not found", exeName)
-}
-
-func runCmd(exe string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	var buf bytes.Buffer
-	cmd := exec.CommandContext(ctx, exe, args...)
-	cmd.Stdout = &buf
-	cmd.Stderr = &buf
-	// version commands don't need stdin.
-	return buf.String(), cmd.Run()
-}
-
-// Helpers for daemon HTTP requests.
 func httpClient() *http.Client {
 	return http.DefaultClient
 }
@@ -226,7 +133,6 @@ func newDaemonRequest(ctx context.Context, method, url, token string, body []byt
 	return req, nil
 }
 
-
 func Status(ctx context.Context, cfg daemonconfig.Config) error {
 	result := ScanCapabilities(cfg)
 	result.Print()
@@ -235,12 +141,11 @@ func Status(ctx context.Context, cfg daemonconfig.Config) error {
 		daemonID := cfg.ID
 		if daemonID != "" {
 			if err := result.Upload(ctx, cfg, daemonID); err != nil {
-				fmt.Printf("  Failed to upload capabilities: %v\n", err)
+				fmt.Printf("  Failed to upload runtimes: %v\n", err)
 			} else {
-				fmt.Println("  Capabilities uploaded to GitSquad")
+				fmt.Println("  Runtimes uploaded to GitSquad")
 			}
 		}
 	}
 	return nil
 }
-
