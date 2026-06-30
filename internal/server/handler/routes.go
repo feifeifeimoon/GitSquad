@@ -64,18 +64,18 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		// Protected daemon endpoints (daemon token auth).
 		daemon := api.Group("/daemon")
 		daemon.Use(middleware.RequireDaemonAuth(cfg, daemonSvc))
-			{
-				daemon.GET("/:id", func(c *gin.Context) {
-					m := middleware.GetDaemon(c)
-					if m == nil {
-						types.Unauthorized(c, "unauthorized")
-						return
-					}
-					types.OK(c, m)
-				})
-				daemon.PUT("/:id/capabilities", daemonHandler.PutCapabilities)
-				daemon.POST("/:id/heartbeat", daemonHandler.Heartbeat)
-			}
+		{
+			daemon.GET("/:id", func(c *gin.Context) {
+				m := middleware.GetDaemon(c)
+				if m == nil {
+					c.JSON(http.StatusUnauthorized, types.ErrorResponse("unauthorized"))
+					return
+				}
+				c.JSON(http.StatusOK, types.SuccessResponse(m, 0))
+			})
+			daemon.PUT("/:id/capabilities", daemonHandler.PutCapabilities)
+			daemon.POST("/:id/heartbeat", daemonHandler.Heartbeat)
+		}
 
 		// Protected user endpoints (user JWT auth).
 		protected := api.Group("")

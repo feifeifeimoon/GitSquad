@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"net/http"
 	"strings"
 
 	"github.com/feifeifeimoon/GitSquad/internal/crypto"
@@ -19,30 +20,26 @@ func RequireAuth(cfg config.Config, users *service.UserService) gin.HandlerFunc 
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			types.Unauthorized(c, "missing authorization header")
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("missing authorization header"))
 			return
 		}
 
 		token := strings.TrimPrefix(header, "Bearer ")
 		userID, err := auth.ParseToken(token, cfg.JWTSecret)
 		if err != nil {
-			types.Unauthorized(c, "invalid or expired token")
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("invalid or expired token"))
 			return
 		}
 
 		id, err := uuid.Parse(userID)
 		if err != nil {
-			types.Unauthorized(c, "invalid token subject")
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("invalid token subject"))
 			return
 		}
 
 		user, err := users.FindByID(c.Request.Context(), id)
 		if err != nil {
-			types.Unauthorized(c, "user not found")
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("user not found"))
 			return
 		}
 
@@ -67,29 +64,26 @@ func RequireDaemonAuth(cfg config.Config, daemonSvc *service.DaemonService) gin.
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			types.Unauthorized(c, "missing authorization header")
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("missing authorization header"))
 			return
 		}
 
 		rawToken := strings.TrimPrefix(header, "Bearer ")
 		if !strings.HasPrefix(rawToken, "gtsq_dm_") {
-			types.Unauthorized(c, "invalid token format")
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("invalid token format"))
 			return
 		}
 
 		tokenHash := crypto.Hash(rawToken)
 		tok, err := daemonSvc.FindTokenByHash(c.Request.Context(), tokenHash)
 		if err != nil || tok == nil || tok.DaemonID == nil {
-			types.Unauthorized(c, "invalid or revoked token")
-			c.Abort()
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("invalid or revoked token"))
 			return
 		}
 
 		machine, err := daemonSvc.FindByID(c.Request.Context(), *tok.DaemonID)
 		if err != nil {
-			types.Unauthorized(c, "daemon not found")
+			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("daemon not found"))
 			c.Abort()
 			return
 		}
