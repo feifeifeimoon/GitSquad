@@ -16,13 +16,21 @@ func NewDaemonWS(daemonSvc *service.DaemonService) gin.HandlerFunc {
 	hub := ws.NewHub()
 	disp := ws.NewDispatcher()
 
+	// When a daemon disconnects (for any reason), mark it offline in the DB.
+	hub.OnDisconnect = func(daemonID string) {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		uid, _ := uuid.Parse(daemonID)
+		_ = daemonSvc.MarkOffline(ctx, uid)
+	}
+
 	disp.On(ws.TypeAuth, authHandler(daemonSvc))
 	disp.On(ws.TypeHeartbeat, heartbeatHandler(daemonSvc))
 	disp.On(ws.TypeStatusUpdate, statusUpdateHandler(daemonSvc))
 	disp.On(ws.TypeTaskWakeAck, noopHandler)
 	disp.On(ws.TypeRuntimeGoneAck, noopHandler)
 
-	go staleWatcher(hub, daemonSvc)
+	go staleWatcher(hub)
 
 	return gin.WrapF(ws.HandleWS(hub, disp))
 }
@@ -111,16 +119,13 @@ func noopHandler(conn *ws.Conn, hub *ws.Hub, frame ws.Frame) *ws.Frame {
 
 // ── Helpers ────────────────────────────────────────────────────────────
 
-func staleWatcher(hub *ws.Hub, daemons *service.DaemonService) {
+func staleWatcher(hub *ws.Hub) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer ticker.Stop()
 	for range ticker.C {
 		for _, id := range hub.StaleDaemons(90 * time.Second) {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			uid, _ := uuid.Parse(id)
-			_ = daemons.MarkOffline(ctx, uid)
+			// OnDisconnect calls MarkOffline, so just unregister to trigger it.
 			hub.Unregister(id)
-			cancel()
 		}
 	}
 }

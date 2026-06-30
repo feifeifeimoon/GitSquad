@@ -85,16 +85,16 @@ func (s *UserService) CreateIdentity(ctx context.Context, userID uuid.UUID, prov
 	if accessToken != "" {
 		tokPtr = &accessToken
 	}
-		_, err := s.store.CreateIdentity(ctx, db.CreateIdentityParams{
-			UserID:         userID,
-			Provider:       provider,
-			ProviderUserID: providerUserID,
-			ProviderLogin:  login,
-			Email:          emailPtr,
-			AccessToken:    tokPtr,
-		})
-		return err
-	}
+	_, err := s.store.CreateIdentity(ctx, db.CreateIdentityParams{
+		UserID:         userID,
+		Provider:       provider,
+		ProviderUserID: providerUserID,
+		ProviderLogin:  login,
+		Email:          emailPtr,
+		AccessToken:    tokPtr,
+	})
+	return err
+}
 
 func (s *UserService) UpdateIdentityTokens(ctx context.Context, id uuid.UUID, accessToken string) error {
 	return s.store.UpdateIdentityTokens(ctx, db.UpdateIdentityTokensParams{
@@ -103,28 +103,28 @@ func (s *UserService) UpdateIdentityTokens(ctx context.Context, id uuid.UUID, ac
 	})
 }
 
-	// UpsertByIdentity finds an existing identity or creates a new user + identity.
-	func (s *UserService) UpsertByIdentity(ctx context.Context, provider, providerUserID, name, avatarURL, email, accessToken string) (*types.User, error) {
-		identity, err := s.FindByIdentity(ctx, provider, providerUserID)
-		if err == nil && identity != nil {
-			u, _ := s.FindByID(ctx, identity.UserID)
-			if u != nil && u.AvatarURL != avatarURL {
-				_ = s.UpdateAvatar(ctx, u.ID, avatarURL)
-				u.AvatarURL = avatarURL
-			}
-			_ = s.UpdateIdentityTokens(ctx, identity.ID, accessToken)
-			return u, nil
+// UpsertByIdentity finds an existing identity or creates a new user + identity.
+func (s *UserService) UpsertByIdentity(ctx context.Context, provider, providerUserID, name, avatarURL, email, accessToken string) (*types.User, error) {
+	identity, err := s.FindByIdentity(ctx, provider, providerUserID)
+	if err == nil && identity != nil {
+		u, _ := s.FindByID(ctx, identity.UserID)
+		if u != nil && u.AvatarURL != avatarURL {
+			_ = s.UpdateAvatar(ctx, u.ID, avatarURL)
+			u.AvatarURL = avatarURL
 		}
-
-		u, err := s.CreateUser(ctx, name, avatarURL)
-		if err != nil {
-			return nil, err
-		}
-		if err := s.CreateIdentity(ctx, u.ID, provider, providerUserID, name, email, accessToken); err != nil {
-			return nil, err
-		}
+		_ = s.UpdateIdentityTokens(ctx, identity.ID, accessToken)
 		return u, nil
 	}
+
+	u, err := s.CreateUser(ctx, name, avatarURL)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.CreateIdentity(ctx, u.ID, provider, providerUserID, name, email, accessToken); err != nil {
+		return nil, err
+	}
+	return u, nil
+}
 
 func strVal(s *string) string {
 	if s == nil {

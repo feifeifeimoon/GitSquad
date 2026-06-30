@@ -32,8 +32,9 @@ type Frame struct {
 
 // Hub is a connection pool of authenticated daemon WebSocket connections.
 type Hub struct {
-	mu    sync.RWMutex
-	conns map[string]*Conn // daemon_id → conn
+	mu           sync.RWMutex
+	conns        map[string]*Conn // daemon_id → conn
+	OnDisconnect func(daemonID string)
 }
 
 func NewHub() *Hub {
@@ -54,9 +55,15 @@ func (h *Hub) Register(daemonID string, conn *Conn) {
 
 func (h *Hub) Unregister(daemonID string) {
 	h.mu.Lock()
+	_, existed := h.conns[daemonID]
 	delete(h.conns, daemonID)
 	h.mu.Unlock()
-	slog.Info("WS daemon disconnected", "daemon_id", daemonID)
+	if existed {
+		slog.Info("WS daemon disconnected", "daemon_id", daemonID)
+		if h.OnDisconnect != nil {
+			h.OnDisconnect(daemonID)
+		}
+	}
 }
 
 func (h *Hub) Send(daemonID string, frame Frame) error {

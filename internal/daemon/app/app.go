@@ -47,7 +47,9 @@ func Run(ctx context.Context, cfg daemonconfig.Config) error {
 		return fmt.Errorf("read auth_ack: %w", err)
 	}
 	if ack.Type == "error" {
-		var ep struct{ Message string `json:"message"` }
+		var ep struct {
+			Message string `json:"message"`
+		}
 		json.Unmarshal(ack.Payload, &ep)
 		return fmt.Errorf("auth failed: %s", ep.Message)
 	}
@@ -69,9 +71,9 @@ func Run(ctx context.Context, cfg daemonconfig.Config) error {
 			return nil
 		case <-ticker.C:
 			hbPayload, _ := json.Marshal(map[string]interface{}{
-				"status":             "online",
-				"daemon_version":     cfg.DaemonVersion,
-				"active_tasks":       []string{},
+				"status":          "online",
+				"daemon_version":  cfg.DaemonVersion,
+				"active_tasks":    []string{},
 				"runtime_summary": runtimeSummary(scanResult),
 			})
 			if err := writeFrame(conn, wsFrame{Type: "heartbeat", Payload: hbPayload}); err != nil {
