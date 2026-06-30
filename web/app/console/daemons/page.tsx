@@ -6,9 +6,9 @@ import { api } from "@/lib/api";
 
 interface Runtime {
   kind: string;
-  name: string;
-  version: string;
-  status: string;
+  executable_path?: string;
+  version?: string;
+  max_concurrency: number;
 }
 
 interface Daemon {
@@ -115,10 +115,10 @@ export default function DaemonsPage() {
         <div className="rounded-lg border border-zinc-200 bg-white p-4">
           <div className="flex items-center gap-2 text-sm text-zinc-500 mb-1">
             <Cpu className="size-4" />
-            Backends
+            Runtimes
           </div>
           <p className="text-2xl font-bold text-zinc-950">
-            {daemons.reduce((s, d) => s + (Array.isArray(d.runtimes) ? d.runtimes : []).filter((c) => c.status === "available").length, 0)}
+            {daemons.reduce((s, d) => s + (Array.isArray(d.runtimes) ? d.runtimes.length : 0), 0)}
           </p>
         </div>
       </div>
@@ -162,29 +162,20 @@ export default function DaemonsPage() {
               {/* Capabilities */}
               <div className="border-t border-zinc-100 px-5 py-3">
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-2">
-                  Backends
+                  Runtimes
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {(Array.isArray(d.runtimes) ? d.runtimes : []).length === 0 ? (
                     <span className="text-xs text-zinc-400">No capabilities reported.</span>
                   ) : (
                     (Array.isArray(d.runtimes) ? d.runtimes : [])
-                      .filter((c) => c.kind === "coder_backend")
                       .map((c) => (
                         <span
-                          key={c.name}
-                          className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium ${
-                            c.status === "available"
-                              ? "bg-emerald-50 text-emerald-700"
-                              : "bg-zinc-100 text-zinc-400"
-                          }`}
+                          key={c.kind}
+                          className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium bg-emerald-50 text-emerald-700"
                         >
-                          {c.status === "available" ? (
-                            <CheckCircle2 className="size-3" />
-                          ) : (
-                            <XCircle className="size-3" />
-                          )}
-                          {c.name}
+                          <CheckCircle2 className="size-3" />
+                          {c.kind}
                           {c.version && (
                             <span className="text-[10px] opacity-60">{c.version}</span>
                           )}
