@@ -1,20 +1,14 @@
 package types
 
 import (
-	"time"
-
+	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 	"github.com/google/uuid"
 )
 
+// Runtime is the server-side view of a daemon runtime capability.
+// It embeds the shared pkg/types.Runtime and adds persistence fields.
 type Runtime struct {
-	ID             uuid.UUID `json:"id"`
-	DaemonID       uuid.UUID `json:"daemon_id"`
-	Kind           string    `json:"kind"`
-	Name           string    `json:"name"`
-	ExecutablePath string    `json:"executable_path,omitempty"`
-	Version        string    `json:"version,omitempty"`
-	Status         string    `json:"status"`
-	CheckedAt      time.Time `json:"checked_at"`
-	Diagnostics    string    `json:"diagnostics,omitempty"`
-	MaxConcurrency int       `json:"max_concurrency"`
+	pkgtypes.Runtime
+	ID       uuid.UUID `json:"id"`
+	DaemonID uuid.UUID `json:"daemon_id"`
 }
