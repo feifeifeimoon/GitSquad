@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/middleware"
-	"github.com/feifeifeimoon/GitSquad/internal/server/types"
+	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,11 +17,11 @@ func NewUserHandler() *UserHandler {
 func (h *UserHandler) Me(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse("unauthorized"))
+		c.JSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("unauthorized"))
 		return
 	}
 
-	c.JSON(http.StatusOK, types.SuccessResponse(gin.H{
+	c.JSON(http.StatusOK, pkgtypes.SuccessResponse(gin.H{
 		"id":         user.ID,
 		"login":      user.Login,
 		"avatar_url": user.AvatarURL,

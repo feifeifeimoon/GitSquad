@@ -5,7 +5,7 @@ import (
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
-	"github.com/feifeifeimoon/GitSquad/internal/server/types"
+	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 	"github.com/google/uuid"
 )
 
@@ -17,12 +17,12 @@ func NewUserService(s *store.Store) *UserService {
 	return &UserService{store: s}
 }
 
-func (s *UserService) FindByID(ctx context.Context, id uuid.UUID) (*types.User, error) {
+func (s *UserService) FindByID(ctx context.Context, id uuid.UUID) (*pkgtypes.User, error) {
 	u, err := s.store.FindUserByID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	return &types.User{
+	return &pkgtypes.User{
 		ID:        u.ID,
 		Login:     u.Login,
 		AvatarURL: strVal(u.AvatarUrl),
@@ -38,7 +38,7 @@ func (s *UserService) UpdateAvatar(ctx context.Context, id uuid.UUID, avatarURL 
 	})
 }
 
-func (s *UserService) FindByIdentity(ctx context.Context, provider, providerUserID string) (*types.UserIdentity, error) {
+func (s *UserService) FindByIdentity(ctx context.Context, provider, providerUserID string) (*UserIdentity, error) {
 	row, err := s.store.FindIdentityByProvider(ctx, db.FindIdentityByProviderParams{
 		Provider:       provider,
 		ProviderUserID: providerUserID,
@@ -46,7 +46,7 @@ func (s *UserService) FindByIdentity(ctx context.Context, provider, providerUser
 	if err != nil {
 		return nil, err
 	}
-	return &types.UserIdentity{
+	return &UserIdentity{
 		ID:             row.ID,
 		UserID:         row.UserID,
 		Provider:       row.Provider,
@@ -59,7 +59,7 @@ func (s *UserService) FindByIdentity(ctx context.Context, provider, providerUser
 	}, nil
 }
 
-func (s *UserService) CreateUser(ctx context.Context, login, avatarURL string) (*types.User, error) {
+func (s *UserService) CreateUser(ctx context.Context, login, avatarURL string) (*pkgtypes.User, error) {
 	u, err := s.store.CreateUser(ctx, db.CreateUserParams{
 		Login:     login,
 		AvatarUrl: &avatarURL,
@@ -67,7 +67,7 @@ func (s *UserService) CreateUser(ctx context.Context, login, avatarURL string) (
 	if err != nil {
 		return nil, err
 	}
-	return &types.User{
+	return &pkgtypes.User{
 		ID:        u.ID,
 		Login:     u.Login,
 		AvatarURL: strVal(u.AvatarUrl),
@@ -104,7 +104,7 @@ func (s *UserService) UpdateIdentityTokens(ctx context.Context, id uuid.UUID, ac
 }
 
 // UpsertByIdentity finds an existing identity or creates a new user + identity.
-func (s *UserService) UpsertByIdentity(ctx context.Context, provider, providerUserID, name, avatarURL, email, accessToken string) (*types.User, error) {
+func (s *UserService) UpsertByIdentity(ctx context.Context, provider, providerUserID, name, avatarURL, email, accessToken string) (*pkgtypes.User, error) {
 	identity, err := s.FindByIdentity(ctx, provider, providerUserID)
 	if err == nil && identity != nil {
 		u, _ := s.FindByID(ctx, identity.UserID)

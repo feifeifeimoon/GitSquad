@@ -9,7 +9,6 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/crypto"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
-	"github.com/feifeifeimoon/GitSquad/internal/server/types"
 	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -49,7 +48,7 @@ type PollPairingResult struct {
 
 // ── Token operations ──────────────────────────────────────────────────
 
-func (s *DaemonService) CreateToken(ctx context.Context, tokenHash, tokenPrefix, pairingCode, machineName string) (*types.DaemonToken, error) {
+func (s *DaemonService) CreateToken(ctx context.Context, tokenHash, tokenPrefix, pairingCode, machineName string) (*DaemonToken, error) {
 	t, err := s.store.CreateToken(ctx, db.CreateTokenParams{
 		TokenHash:   tokenHash,
 		TokenPrefix: tokenPrefix,
@@ -63,7 +62,7 @@ func (s *DaemonService) CreateToken(ctx context.Context, tokenHash, tokenPrefix,
 	return toToken(&t), nil
 }
 
-func (s *DaemonService) FindTokenByHash(ctx context.Context, hash string) (*types.DaemonToken, error) {
+func (s *DaemonService) FindTokenByHash(ctx context.Context, hash string) (*DaemonToken, error) {
 	t, err := s.store.FindTokenByHash(ctx, hash)
 	if err != nil {
 		return nil, err
@@ -71,7 +70,7 @@ func (s *DaemonService) FindTokenByHash(ctx context.Context, hash string) (*type
 	return toToken(&t), nil
 }
 
-func (s *DaemonService) FindTokenByPairingCode(ctx context.Context, code string) (*types.DaemonToken, error) {
+func (s *DaemonService) FindTokenByPairingCode(ctx context.Context, code string) (*DaemonToken, error) {
 	t, err := s.store.FindTokenByPairingCode(ctx, &code)
 	if err != nil {
 		return nil, err
@@ -133,7 +132,7 @@ func (s *DaemonService) PollPairing(ctx context.Context, code string) (*PollPair
 	}
 
 	switch tok.Status {
-	case types.TokenPending:
+	case TokenPending:
 		if tok.ExpiresAt != nil && time.Now().After(*tok.ExpiresAt) {
 			_ = s.ExpireToken(ctx, tok.ID)
 			return &PollPairingResult{Status: "expired", Message: "Pairing code expired."}, nil
@@ -143,7 +142,7 @@ func (s *DaemonService) PollPairing(ctx context.Context, code string) (*PollPair
 			MachineName: ptrVal(tok.MachineName),
 		}, nil
 
-	case types.TokenActive:
+	case TokenActive:
 		if tok.DaemonID == nil {
 			return nil, fmt.Errorf("active token missing daemon_id")
 		}
@@ -170,7 +169,7 @@ func (s *DaemonService) PollPairing(ctx context.Context, code string) (*PollPair
 			TokenPrefix: tokenPrefix,
 		}, nil
 
-	case types.TokenExpired:
+	case TokenExpired:
 		return &PollPairingResult{Status: "expired", Message: "Pairing code expired."}, nil
 
 	default:
@@ -180,9 +179,9 @@ func (s *DaemonService) PollPairing(ctx context.Context, code string) (*PollPair
 
 // ConfirmPairing is called by a logged-in user to approve a daemon pairing request.
 // It creates (or reuses) a daemon record and marks the token as active.
-func (s *DaemonService) ConfirmPairing(ctx context.Context, code string, userID uuid.UUID) (*types.Daemon, error) {
+func (s *DaemonService) ConfirmPairing(ctx context.Context, code string, userID uuid.UUID) (*pkgtypes.Daemon, error) {
 	tok, err := s.FindTokenByPairingCode(ctx, code)
-	if err != nil || tok.Status != types.TokenPending {
+	if err != nil || tok.Status != TokenPending {
 		return nil, ErrPairingNotFound
 	}
 
@@ -219,10 +218,10 @@ func (s *DaemonService) ConfirmPairing(ctx context.Context, code string, userID 
 
 // AuthenticateByToken validates a daemon bearer token and returns the
 // daemon it belongs to. It also bumps the last-used timestamp.
-func (s *DaemonService) AuthenticateByToken(ctx context.Context, rawToken string) (*types.Daemon, error) {
+func (s *DaemonService) AuthenticateByToken(ctx context.Context, rawToken string) (*pkgtypes.Daemon, error) {
 	tokenHash := crypto.Hash(rawToken)
 	tok, err := s.FindTokenByHash(ctx, tokenHash)
-	if err != nil || tok == nil || tok.Status != types.TokenActive {
+	if err != nil || tok == nil || tok.Status != TokenActive {
 		return nil, ErrTokenInvalid
 	}
 
@@ -242,7 +241,7 @@ func (s *DaemonService) AuthenticateByToken(ctx context.Context, rawToken string
 
 // ── Daemon operations ─────────────────────────────────────────────────
 
-func (s *DaemonService) CreateDaemon(ctx context.Context, userID uuid.UUID, name string) (*types.Daemon, error) {
+func (s *DaemonService) CreateDaemon(ctx context.Context, userID uuid.UUID, name string) (*pkgtypes.Daemon, error) {
 	d, err := s.store.CreateDaemon(ctx, db.CreateDaemonParams{UserID: userID, Name: name})
 	if err != nil {
 		return nil, err
@@ -250,7 +249,7 @@ func (s *DaemonService) CreateDaemon(ctx context.Context, userID uuid.UUID, name
 	return toDaemon(&d), nil
 }
 
-func (s *DaemonService) FindByID(ctx context.Context, id uuid.UUID) (*types.Daemon, error) {
+func (s *DaemonService) FindByID(ctx context.Context, id uuid.UUID) (*pkgtypes.Daemon, error) {
 	d, err := s.store.FindDaemonByID(ctx, id)
 	if err != nil {
 		return nil, err
@@ -258,7 +257,7 @@ func (s *DaemonService) FindByID(ctx context.Context, id uuid.UUID) (*types.Daem
 	return toDaemon(&d), nil
 }
 
-func (s *DaemonService) FindByUserAndName(ctx context.Context, userID uuid.UUID, name string) (*types.Daemon, error) {
+func (s *DaemonService) FindByUserAndName(ctx context.Context, userID uuid.UUID, name string) (*pkgtypes.Daemon, error) {
 	d, err := s.store.FindDaemonByUserAndName(ctx, db.FindDaemonByUserAndNameParams{UserID: userID, Name: name})
 	if err != nil {
 		return nil, err
@@ -278,17 +277,17 @@ func (s *DaemonService) MarkOffline(ctx context.Context, id uuid.UUID) error {
 	return s.store.DaemonOffline(ctx, id)
 }
 
-func (s *DaemonService) FindByUserID(ctx context.Context, userID uuid.UUID) ([]types.DaemonWithRuntimes, error) {
+func (s *DaemonService) FindByUserID(ctx context.Context, userID uuid.UUID) ([]pkgtypes.DaemonWithRuntimes, error) {
 	rows, err := s.store.ListDaemonsByUser(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	result := make([]types.DaemonWithRuntimes, 0)
-	var current *types.DaemonWithRuntimes
+	result := make([]pkgtypes.DaemonWithRuntimes, 0)
+	var current *pkgtypes.DaemonWithRuntimes
 	for _, row := range rows {
 		d := toDaemonFromRow(row)
 		if current == nil || current.ID != d.ID {
-			result = append(result, types.DaemonWithRuntimes{Daemon: *d})
+			result = append(result, pkgtypes.DaemonWithRuntimes{Daemon: *d})
 			current = &result[len(result)-1]
 		}
 		if rt, ok := toRuntime(row); ok {
@@ -323,13 +322,6 @@ func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID,
 	})
 }
 
-// ── Types ─────────────────────────────────────────────────────────────
-
-type DaemonWithRuntimes struct {
-	types.Daemon
-	Runtimes []types.Runtime `json:"runtimes"`
-}
-
 // ── Helpers ────────────────────────────────────────────────────────────
 
 func generatePairingCode() (string, error) {
@@ -352,44 +344,27 @@ func generateDaemonToken() (string, error) {
 	return "gtsq_dm_" + raw, nil
 }
 
-func toToken(t *db.DaemonToken) *types.DaemonToken {
-	return &types.DaemonToken{
-		ID:          t.ID,
-		UserID:      nullUUIDToPtr(t.UserID),
-		DaemonID:    nullUUIDToPtr(t.DaemonID),
-		TokenHash:   t.TokenHash,
-		TokenPrefix: t.TokenPrefix,
-		PairingCode: t.PairingCode,
-		MachineName: t.MachineName,
-		Status:      t.Status,
-		ExpiresAt:   pgTimePtr(t.ExpiresAt),
-		IssuedAt:    t.IssuedAt.Time,
-		ConfirmedAt: pgTimePtr(t.ConfirmedAt),
-		LastUsedAt:  pgTimePtr(t.LastUsedAt),
-	}
-}
-
-func toDaemon(d *db.Daemon) *types.Daemon {
-	return &types.Daemon{
+func toDaemon(d *db.Daemon) *pkgtypes.Daemon {
+	return &pkgtypes.Daemon{
 		ID: d.ID, UserID: d.UserID, Name: d.Name, OS: d.Os, Arch: d.Arch,
 		DaemonVersion: d.DaemonVersion, Status: d.Status,
 		LastSeenAt: pgTimePtr(d.LastSeenAt), ConnectedAt: pgTimePtr(d.ConnectedAt), RegisteredAt: d.RegisteredAt.Time,
 	}
 }
 
-func toDaemonFromRow(row db.ListDaemonsByUserRow) *types.Daemon {
-	return &types.Daemon{
+func toDaemonFromRow(row db.ListDaemonsByUserRow) *pkgtypes.Daemon {
+	return &pkgtypes.Daemon{
 		ID: row.ID, UserID: row.UserID, Name: row.Name, OS: row.Os, Arch: row.Arch,
 		DaemonVersion: row.DaemonVersion, Status: row.Status,
 		LastSeenAt: pgTimePtr(row.LastSeenAt), ConnectedAt: pgTimePtr(row.ConnectedAt), RegisteredAt: row.RegisteredAt.Time,
 	}
 }
 
-func toRuntime(row db.ListDaemonsByUserRow) (*types.Runtime, bool) {
+func toRuntime(row db.ListDaemonsByUserRow) (*pkgtypes.Runtime, bool) {
 	if !row.RID.Valid {
 		return nil, false
 	}
-	rt := &types.Runtime{
+	rt := &pkgtypes.Runtime{
 		ID:       row.RID.UUID,
 		DaemonID: row.ID,
 	}

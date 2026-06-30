@@ -10,7 +10,6 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
 	"github.com/feifeifeimoon/GitSquad/internal/server/middleware"
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
-	"github.com/feifeifeimoon/GitSquad/internal/server/types"
 	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -45,21 +44,21 @@ func (h *DaemonHandler) Auth(c *gin.Context) {
 func (h *DaemonHandler) authByPairing(c *gin.Context) {
 	var req daemonAuthReq
 	if err := c.ShouldBindJSON(&req); err != nil || req.MachineName == "" {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse("machine_name is required"))
+		c.JSON(http.StatusBadRequest, pkgtypes.ErrorResponse("machine_name is required"))
 		return
 	}
 
 	result, err := h.daemons.InitiatePairing(c.Request.Context(), req.MachineName)
 	if err != nil {
 		slog.Error("initiate pairing", "error", err)
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse("failed to create pairing"))
+		c.JSON(http.StatusInternalServerError, pkgtypes.ErrorResponse("failed to create pairing"))
 		return
 	}
 
 	slog.Info("pairing created", "code", result.PairingCode, "machine", req.MachineName)
 
 	browserURL := h.cfg.FrontendURL + "/daemon/auth?code=" + result.PairingCode
-	c.JSON(http.StatusCreated, types.SuccessResponse(gin.H{
+	c.JSON(http.StatusCreated, pkgtypes.SuccessResponse(gin.H{
 		"pairing_code":     result.PairingCode,
 		"browser_url":      browserURL,
 		"expires_at":       result.ExpiresAt.Format(time.RFC3339),
@@ -73,11 +72,11 @@ func (h *DaemonHandler) authByToken(c *gin.Context, rawToken string) {
 
 	daemon, err := h.daemons.AuthenticateByToken(c.Request.Context(), rawToken)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse("invalid or revoked token"))
+		c.JSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("invalid or revoked token"))
 		return
 	}
 
-	c.JSON(http.StatusOK, types.SuccessResponse(gin.H{
+	c.JSON(http.StatusOK, pkgtypes.SuccessResponse(gin.H{
 		"daemon_id": daemon.ID,
 		"token":     rawToken,
 		"status":    "active",
@@ -90,15 +89,15 @@ func (h *DaemonHandler) PollPairing(c *gin.Context) {
 	result, err := h.daemons.PollPairing(c.Request.Context(), code)
 	if err != nil {
 		if errors.Is(err, service.ErrPairingNotFound) {
-			c.JSON(http.StatusNotFound, types.ErrorResponse("pairing not found"))
+			c.JSON(http.StatusNotFound, pkgtypes.ErrorResponse("pairing not found"))
 		} else {
 			slog.Error("poll pairing", "error", err, "code", code)
-			c.JSON(http.StatusInternalServerError, types.ErrorResponse("failed to poll pairing"))
+			c.JSON(http.StatusInternalServerError, pkgtypes.ErrorResponse("failed to poll pairing"))
 		}
 		return
 	}
 
-	c.JSON(http.StatusOK, types.SuccessResponse(gin.H{
+	c.JSON(http.StatusOK, pkgtypes.SuccessResponse(gin.H{
 		"status":       result.Status,
 		"machine_name": result.MachineName,
 		"daemon_id":    result.DaemonID,
@@ -113,7 +112,7 @@ func (h *DaemonHandler) ConfirmPairing(c *gin.Context) {
 
 	user := middleware.GetUser(c)
 	if user == nil {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse("login required"))
+		c.JSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("login required"))
 		return
 	}
 
@@ -121,48 +120,48 @@ func (h *DaemonHandler) ConfirmPairing(c *gin.Context) {
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrPairingNotFound):
-			c.JSON(http.StatusNotFound, types.ErrorResponse(err.Error()))
+			c.JSON(http.StatusNotFound, pkgtypes.ErrorResponse(err.Error()))
 		case errors.Is(err, service.ErrPairingExpired):
-			c.JSON(http.StatusGone, types.ErrorResponse(err.Error()))
+			c.JSON(http.StatusGone, pkgtypes.ErrorResponse(err.Error()))
 		default:
 			slog.Error("confirm pairing", "error", err)
-			c.JSON(http.StatusInternalServerError, types.ErrorResponse("failed to confirm pairing"))
+			c.JSON(http.StatusInternalServerError, pkgtypes.ErrorResponse("failed to confirm pairing"))
 		}
 		return
 	}
 
 	slog.Info("pairing confirmed", "code", code, "user", user.Login, "daemon", daemon.ID)
-	c.JSON(http.StatusOK, types.SuccessResponse(gin.H{"status": "confirmed"}, 0))
+	c.JSON(http.StatusOK, pkgtypes.SuccessResponse(gin.H{"status": "confirmed"}, 0))
 }
 
 func (h *DaemonHandler) ListDaemons(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse("login required"))
+		c.JSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("login required"))
 		return
 	}
 	list, err := h.daemons.FindByUserID(c.Request.Context(), user.ID)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse("failed to list daemons"))
+		c.JSON(http.StatusInternalServerError, pkgtypes.ErrorResponse("failed to list daemons"))
 		return
 	}
-	c.JSON(http.StatusOK, types.SuccessResponse(list, 0))
+	c.JSON(http.StatusOK, pkgtypes.SuccessResponse(list, 0))
 }
 
 func (h *DaemonHandler) DeleteDaemon(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
-		c.JSON(http.StatusUnauthorized, types.ErrorResponse("login required"))
+		c.JSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("login required"))
 		return
 	}
 	id, _ := uuid.Parse(c.Param("id"))
 	d, err := h.daemons.FindByID(c.Request.Context(), id)
 	if err != nil || d.UserID != user.ID {
-		c.JSON(http.StatusNotFound, types.ErrorResponse("daemon not found"))
+		c.JSON(http.StatusNotFound, pkgtypes.ErrorResponse("daemon not found"))
 		return
 	}
 	_ = h.daemons.DeleteDaemon(c.Request.Context(), id)
-	c.JSON(http.StatusOK, types.SuccessResponse(gin.H{"deleted": true}, 0))
+	c.JSON(http.StatusOK, pkgtypes.SuccessResponse(gin.H{"deleted": true}, 0))
 }
 
 func (h *DaemonHandler) PutRuntimes(c *gin.Context) {
@@ -171,18 +170,18 @@ func (h *DaemonHandler) PutRuntimes(c *gin.Context) {
 		Runtimes []pkgtypes.Runtime `json:"runtimes"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, types.ErrorResponse("invalid request"))
+		c.JSON(http.StatusBadRequest, pkgtypes.ErrorResponse("invalid request"))
 		return
 	}
 	if err := h.daemons.ReplaceRuntimes(c.Request.Context(), id, req.Runtimes); err != nil {
-		c.JSON(http.StatusInternalServerError, types.ErrorResponse("failed to update runtimes"))
+		c.JSON(http.StatusInternalServerError, pkgtypes.ErrorResponse("failed to update runtimes"))
 		return
 	}
-	c.JSON(http.StatusOK, types.SuccessResponse(gin.H{"accepted": len(req.Runtimes)}, 0))
+	c.JSON(http.StatusOK, pkgtypes.SuccessResponse(gin.H{"accepted": len(req.Runtimes)}, 0))
 }
 
 func (h *DaemonHandler) Heartbeat(c *gin.Context) {
 	id, _ := uuid.Parse(c.Param("id"))
 	_ = h.daemons.MarkOnline(c.Request.Context(), id)
-	c.JSON(http.StatusOK, types.SuccessResponse(gin.H{"server_time": time.Now().Format(time.RFC3339), "pending_tasks": 0}, 0))
+	c.JSON(http.StatusOK, pkgtypes.SuccessResponse(gin.H{"server_time": time.Now().Format(time.RFC3339), "pending_tasks": 0}, 0))
 }

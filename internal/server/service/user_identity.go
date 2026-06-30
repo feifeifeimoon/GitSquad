@@ -1,4 +1,4 @@
-package types
+package service
 
 import (
 	"time"
@@ -6,14 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-type User struct {
-	ID        uuid.UUID `json:"id"`
-	Login     string    `json:"login"`
-	AvatarURL string    `json:"avatar_url"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
+// UserIdentity is the server-internal OAuth identity model.
+// AccessToken and RefreshToken are never serialized in API responses.
 type UserIdentity struct {
 	ID             uuid.UUID `json:"id"`
 	UserID         uuid.UUID `json:"user_id"`

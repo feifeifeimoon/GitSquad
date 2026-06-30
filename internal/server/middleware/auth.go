@@ -8,7 +8,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/auth"
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
-	"github.com/feifeifeimoon/GitSquad/internal/server/types"
+	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -20,26 +20,26 @@ func RequireAuth(cfg config.Config, users *service.UserService) gin.HandlerFunc 
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("missing authorization header"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("missing authorization header"))
 			return
 		}
 
 		token := strings.TrimPrefix(header, "Bearer ")
 		userID, err := auth.ParseToken(token, cfg.JWTSecret)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("invalid or expired token"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("invalid or expired token"))
 			return
 		}
 
 		id, err := uuid.Parse(userID)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("invalid token subject"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("invalid token subject"))
 			return
 		}
 
 		user, err := users.FindByID(c.Request.Context(), id)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("user not found"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("user not found"))
 			return
 		}
 
@@ -49,12 +49,12 @@ func RequireAuth(cfg config.Config, users *service.UserService) gin.HandlerFunc 
 }
 
 // GetUser extracts the authenticated User from context.
-func GetUser(c *gin.Context) *types.User {
+func GetUser(c *gin.Context) *pkgtypes.User {
 	user, exists := c.Get(userContextKey)
 	if !exists {
 		return nil
 	}
-	return user.(*types.User)
+	return user.(*pkgtypes.User)
 }
 
 const daemonContextKey = "daemon_machine"
@@ -64,26 +64,26 @@ func RequireDaemonAuth(cfg config.Config, daemonSvc *service.DaemonService) gin.
 	return func(c *gin.Context) {
 		header := c.GetHeader("Authorization")
 		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("missing authorization header"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("missing authorization header"))
 			return
 		}
 
 		rawToken := strings.TrimPrefix(header, "Bearer ")
 		if !strings.HasPrefix(rawToken, "gtsq_dm_") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("invalid token format"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("invalid token format"))
 			return
 		}
 
 		tokenHash := crypto.Hash(rawToken)
 		tok, err := daemonSvc.FindTokenByHash(c.Request.Context(), tokenHash)
 		if err != nil || tok == nil || tok.DaemonID == nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("invalid or revoked token"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("invalid or revoked token"))
 			return
 		}
 
 		machine, err := daemonSvc.FindByID(c.Request.Context(), *tok.DaemonID)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, types.ErrorResponse("daemon not found"))
+			c.AbortWithStatusJSON(http.StatusUnauthorized, pkgtypes.ErrorResponse("daemon not found"))
 			c.Abort()
 			return
 		}
@@ -94,10 +94,10 @@ func RequireDaemonAuth(cfg config.Config, daemonSvc *service.DaemonService) gin.
 }
 
 // GetDaemon extracts the authenticated Daemon from context.
-func GetDaemon(c *gin.Context) *types.Daemon {
+func GetDaemon(c *gin.Context) *pkgtypes.Daemon {
 	d, exists := c.Get(daemonContextKey)
 	if !exists {
 		return nil
 	}
-	return d.(*types.Daemon)
+	return d.(*pkgtypes.Daemon)
 }
