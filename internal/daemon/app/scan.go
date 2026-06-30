@@ -1,16 +1,14 @@
 package app
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 
+	"github.com/feifeifeimoon/GitSquad/internal/daemon/client"
 	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
 	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 )
@@ -87,50 +85,8 @@ func (sr *ScanResult) Print() {
 }
 
 func (sr *ScanResult) Upload(ctx context.Context, cfg daemonconfig.Config, daemonID string) error {
-	body, _ := json.Marshal(map[string]interface{}{
-		"runtimes": sr.Runtimes,
-	})
-
-	url := fmt.Sprintf("%s/api/v1/daemon/%s/runtimes", cfg.APIURL, daemonID)
-	req, err := newDaemonRequest(ctx, "PUT", url, cfg.Token, body)
-	if err != nil {
-		return fmt.Errorf("upload runtimes: %w", err)
-	}
-
-	resp, err := httpClient().Do(req)
-	if err != nil {
-		return fmt.Errorf("upload runtimes: %w", err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode >= 300 {
-		var errResp struct {
-			Success bool   `json:"success"`
-			Message string `json:"message"`
-		}
-		json.NewDecoder(resp.Body).Decode(&errResp)
-		return fmt.Errorf("server rejected runtimes: %s", errResp.Message)
-	}
-
-	return nil
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────
-
-func httpClient() *http.Client {
-	return http.DefaultClient
-}
-
-func newDaemonRequest(ctx context.Context, method, url, token string, body []byte) (*http.Request, error) {
-	req, err := http.NewRequestWithContext(ctx, method, url, bytes.NewReader(body))
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-	return req, nil
+	c := client.New(cfg.APIURL, cfg.Token)
+	return c.PutRuntimes(ctx, daemonID, sr.Runtimes)
 }
 
 func Status(ctx context.Context, cfg daemonconfig.Config) error {
