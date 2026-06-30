@@ -72,7 +72,7 @@ func Run(ctx context.Context, cfg daemonconfig.Config) error {
 				"status":             "online",
 				"daemon_version":     cfg.DaemonVersion,
 				"active_tasks":       []string{},
-				"capability_summary": capabilitySummary(scanResult),
+				"runtime_summary": runtimeSummary(scanResult),
 			})
 			if err := writeFrame(conn, wsFrame{Type: "heartbeat", Payload: hbPayload}); err != nil {
 				slog.Warn("heartbeat error", "error", err)
@@ -105,21 +105,13 @@ func wsURL(apiURL string) string {
 }
 
 func countAvailable(result *ScanResult) int {
-	n := 0
-	for _, cap := range result.Capabilities {
-		if cap.Status == "available" && cap.Kind == "coder_backend" {
-			n++
-		}
-	}
-	return n
+	return len(result.Runtimes)
 }
 
-func capabilitySummary(result *ScanResult) map[string]string {
+func runtimeSummary(result *ScanResult) map[string]string {
 	m := make(map[string]string)
-	for _, cap := range result.Capabilities {
-		if cap.Kind == "coder_backend" {
-			m[cap.Name] = cap.Status
-		}
+	for _, rt := range result.Runtimes {
+		m[rt.Kind] = rt.Version
 	}
 	return m
 }
