@@ -62,7 +62,6 @@ func (s *DaemonService) CreateToken(ctx context.Context, tokenHash, tokenPrefix,
 	return toToken(&t), nil
 }
 
-
 func (s *DaemonService) FindTokenByHash(ctx context.Context, hash string) (*types.DaemonToken, error) {
 	t, err := s.store.FindTokenByHash(ctx, hash)
 	if err != nil {
@@ -270,7 +269,6 @@ func (s *DaemonService) DeleteDaemon(ctx context.Context, id uuid.UUID) error {
 	return s.store.DeleteDaemon(ctx, id)
 }
 
-
 func (s *DaemonService) MarkOnline(ctx context.Context, id uuid.UUID) error {
 	return s.store.DaemonOnline(ctx, id)
 }
@@ -284,8 +282,8 @@ func (s *DaemonService) FindByUserID(ctx context.Context, userID uuid.UUID) ([]t
 	if err != nil {
 		return nil, err
 	}
-		result := make([]types.DaemonWithRuntimes, 0)
-		var current *types.DaemonWithRuntimes
+	result := make([]types.DaemonWithRuntimes, 0)
+	var current *types.DaemonWithRuntimes
 	for _, row := range rows {
 		d := toDaemonFromRow(row)
 		if current == nil || current.ID != d.ID {
@@ -350,10 +348,18 @@ func generateDaemonToken() (string, error) {
 
 func toToken(t *db.DaemonToken) *types.DaemonToken {
 	return &types.DaemonToken{
-		ID: t.ID, TokenPrefix: t.TokenPrefix,
-		PairingCode: t.PairingCode, MachineName: t.MachineName, Status: t.Status,
-		ExpiresAt: pgTimePtr(t.ExpiresAt), IssuedAt: t.IssuedAt.Time,
-		ConfirmedAt: pgTimePtr(t.ConfirmedAt), LastUsedAt: pgTimePtr(t.LastUsedAt),
+		ID:          t.ID,
+		UserID:      nullUUIDToPtr(t.UserID),
+		DaemonID:    nullUUIDToPtr(t.DaemonID),
+		TokenHash:   t.TokenHash,
+		TokenPrefix: t.TokenPrefix,
+		PairingCode: t.PairingCode,
+		MachineName: t.MachineName,
+		Status:      t.Status,
+		ExpiresAt:   pgTimePtr(t.ExpiresAt),
+		IssuedAt:    t.IssuedAt.Time,
+		ConfirmedAt: pgTimePtr(t.ConfirmedAt),
+		LastUsedAt:  pgTimePtr(t.LastUsedAt),
 	}
 }
 
@@ -415,6 +421,13 @@ func strPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+func nullUUIDToPtr(nu uuid.NullUUID) *uuid.UUID {
+	if nu.Valid {
+		return &nu.UUID
+	}
+	return nil
 }
 
 func uu2n(id uuid.UUID) uuid.NullUUID { return uuid.NullUUID{UUID: id, Valid: true} }

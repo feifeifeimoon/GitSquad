@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle, Monitor, Cpu, Trash2, Plus, Laptop, Cloud, Copy, Terminal, Check } from "lucide-react";
 import { api } from "@/lib/api";
 
-interface Capability {
+interface Runtime {
   kind: string;
   name: string;
   version: string;
@@ -20,7 +20,7 @@ interface Daemon {
   daemon_version: string;
   last_seen_at: string | null;
   registered_at: string;
-  capabilities: Capability[];
+  runtimes: Runtime[];
 }
 
 function timeAgo(dateStr: string | null): string {
@@ -118,7 +118,7 @@ export default function DaemonsPage() {
             Backends
           </div>
           <p className="text-2xl font-bold text-zinc-950">
-            {daemons.reduce((s, d) => s + d.capabilities.filter((c) => c.status === "available").length, 0)}
+            {daemons.reduce((s, d) => s + (Array.isArray(d.runtimes) ? d.runtimes : []).filter((c) => c.status === "available").length, 0)}
           </p>
         </div>
       </div>
@@ -165,10 +165,10 @@ export default function DaemonsPage() {
                   Backends
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {d.capabilities.length === 0 ? (
+                  {(Array.isArray(d.runtimes) ? d.runtimes : []).length === 0 ? (
                     <span className="text-xs text-zinc-400">No capabilities reported.</span>
                   ) : (
-                    d.capabilities
+                    (Array.isArray(d.runtimes) ? d.runtimes : [])
                       .filter((c) => c.kind === "coder_backend")
                       .map((c) => (
                         <span

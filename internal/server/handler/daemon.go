@@ -88,7 +88,12 @@ func (h *DaemonHandler) PollPairing(c *gin.Context) {
 
 	result, err := h.daemons.PollPairing(c.Request.Context(), code)
 	if err != nil {
-		types.NotFound(c, "pairing not found")
+		if errors.Is(err, service.ErrPairingNotFound) {
+			types.NotFound(c, "pairing not found")
+		} else {
+			slog.Error("poll pairing", "error", err, "code", code)
+			types.InternalError(c, "failed to poll pairing")
+		}
 		return
 	}
 
