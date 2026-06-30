@@ -10,6 +10,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
 	"github.com/feifeifeimoon/GitSquad/internal/server/types"
+	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
@@ -299,16 +300,21 @@ func (s *DaemonService) FindByUserID(ctx context.Context, userID uuid.UUID) ([]t
 
 // ── Runtime operations ────────────────────────────────────────────────
 
-func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID, runtimes []types.Runtime) error {
+func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID, runtimes []pkgtypes.Runtime) error {
 	return s.store.ExecTx(ctx, func(q *db.Queries) error {
 		if err := q.ClearRuntimes(ctx, daemonID); err != nil {
 			return err
 		}
 		for _, rt := range runtimes {
 			if err := q.InsertRuntime(ctx, db.InsertRuntimeParams{
-				DaemonID: daemonID, Kind: rt.Kind, Name: rt.Name,
-				ExecutablePath: strPtr(rt.ExecutablePath), Version: strPtr(rt.Version),
-				Status: rt.Status, Diagnostics: strPtr(rt.Diagnostics), MaxConcurrency: int32(rt.MaxConcurrency),
+				DaemonID:       daemonID,
+				Kind:           rt.Kind,
+				Name:           rt.Kind, // Name mirrors Kind since the shared type has no Name field
+				ExecutablePath: strPtr(rt.ExecutablePath),
+				Version:        strPtr(rt.Version),
+				Status:         "available",
+				Diagnostics:    nil,
+				MaxConcurrency: int32(rt.MaxConcurrency),
 			}); err != nil {
 				return err
 			}
@@ -383,12 +389,15 @@ func toRuntime(row db.ListDaemonsByUserRow) (*types.Runtime, bool) {
 	if !row.RID.Valid {
 		return nil, false
 	}
-	return &types.Runtime{
-		ID: row.RID.UUID, DaemonID: row.ID, Kind: ptrVal(row.RKind),
-		Name: ptrVal(row.RName), ExecutablePath: ptrVal(row.RExecutablePath),
-		Version: ptrVal(row.RVersion), Status: ptrVal(row.RStatus),
-		Diagnostics: ptrVal(row.RDiagnostics), MaxConcurrency: int(ptrInt32(row.RMaxConcurrency)),
-	}, true
+	rt := &types.Runtime{
+		ID:       row.RID.UUID,
+		DaemonID: row.ID,
+	}
+	rt.Kind = ptrVal(row.RKind)
+	rt.ExecutablePath = ptrVal(row.RExecutablePath)
+	rt.Version = ptrVal(row.RVersion)
+	rt.MaxConcurrency = int(ptrInt32(row.RMaxConcurrency))
+	return rt, true
 }
 
 func pgTimePtr(t pgtype.Timestamptz) *time.Time {

@@ -11,6 +11,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/middleware"
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
 	"github.com/feifeifeimoon/GitSquad/internal/server/types"
+	pkgtypes "github.com/feifeifeimoon/GitSquad/pkg/types"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
@@ -164,10 +165,10 @@ func (h *DaemonHandler) DeleteDaemon(c *gin.Context) {
 	c.JSON(http.StatusOK, types.SuccessResponse(gin.H{"deleted": true}, 0))
 }
 
-func (h *DaemonHandler) PutCapabilities(c *gin.Context) {
+func (h *DaemonHandler) PutRuntimes(c *gin.Context) {
 	id, _ := uuid.Parse(c.Param("id"))
 	var req struct {
-		Runtimes []types.Runtime `json:"runtimes"`
+		Runtimes []pkgtypes.Runtime `json:"runtimes"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, types.ErrorResponse("invalid request"))

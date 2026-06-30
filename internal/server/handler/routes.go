@@ -73,7 +73,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 				}
 				c.JSON(http.StatusOK, types.SuccessResponse(m, 0))
 			})
-			daemon.PUT("/:id/capabilities", daemonHandler.PutCapabilities)
+			daemon.PUT("/:id/runtimes", daemonHandler.PutRuntimes)
 			daemon.POST("/:id/heartbeat", daemonHandler.Heartbeat)
 		}
 
