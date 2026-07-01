@@ -56,6 +56,17 @@ func NewRegistry(items ...Runtime) *Registry {
 // All returns every registered runtime.
 func (r *Registry) All() []Runtime { return r.items }
 
+// DetectAll runs Detect on every registered runtime against the given PATH directories.
+func (r *Registry) DetectAll(paths []string) []v1.Runtime {
+	var result []v1.Runtime
+	for _, rt := range r.items {
+		if detected := rt.Detect(paths); detected != nil {
+			result = append(result, *detected)
+		}
+	}
+	return result
+}
+
 // DefaultRegistry returns the MVP set: Claude Code + Codex.
 func DefaultRegistry() *Registry {
 	return NewRegistry(
