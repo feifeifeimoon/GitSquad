@@ -58,7 +58,7 @@ func (r *Registry) All() []Runtime { return r.items }
 
 // DetectAll runs Detect on every registered runtime against the given PATH directories.
 func (r *Registry) DetectAll(paths []string) []v1.Runtime {
-	var result []v1.Runtime
+	result := make([]v1.Runtime, 0)
 	for _, rt := range r.items {
 		if detected := rt.Detect(paths); detected != nil {
 			result = append(result, *detected)
