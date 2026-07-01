@@ -8,56 +8,55 @@ import (
 	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon/client"
-	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
-func Login(ctx context.Context, cfg daemonconfig.Config, token string, name string) error {
+// Login authenticates this machine with GitSquad.
+// When token is non-empty, it performs direct token auth.
+// Otherwise it opens a browser for OAuth pairing.
+func (d *Daemon) Login(ctx context.Context, token string, name string) error {
 	if name != "" {
-		cfg.DaemonName = name
+		d.cfg.DaemonName = name
 	}
 
-	// Token mode: direct auth with pre-generated token.
 	if token != "" {
-		return loginByToken(ctx, cfg, token)
+		return d.loginByToken(ctx, token)
 	}
-
-	// Pairing mode: browser OAuth flow.
-	return loginByPairing(ctx, cfg)
+	return d.loginByPairing(ctx)
 }
 
-func loginByToken(ctx context.Context, cfg daemonconfig.Config, token string) error {
-	c := client.New(cfg.APIURL, token)
-	authResp, _, err := c.Auth(ctx, v1.DaemonAuthRequest{
-		MachineName:   cfg.DaemonName,
-		OS:            cfg.OS(),
-		Arch:          cfg.Arch(),
-		DaemonVersion: cfg.DaemonVersion,
+func (d *Daemon) loginByToken(ctx context.Context, token string) error {
+	d.client = client.New(d.cfg.APIURL, token)
+
+	resp, _, err := d.client.Auth(ctx, v1.DaemonAuthRequest{
+		MachineName:   d.cfg.DaemonName,
+		OS:            d.cfg.OS(),
+		Arch:          d.cfg.Arch(),
+		DaemonVersion: d.cfg.DaemonVersion,
 		Mode:          "token",
 	})
 	if err != nil {
 		return fmt.Errorf("token auth failed: %w", err)
 	}
 
-	fmt.Printf("✓ Authenticated as daemon %s\n", authResp.DaemonID)
-	return saveCfgAndReturn(cfg, authResp.DaemonID, token)
+	fmt.Printf("✓ Authenticated as daemon %s\n", resp.DaemonID)
+	return d.saveIdentity(resp.DaemonID, token)
 }
 
-func loginByPairing(ctx context.Context, cfg daemonconfig.Config) error {
-	// 1. Initiate pairing.
-	c := client.New(cfg.APIURL, "")
-	_, pairResp, err := c.Auth(ctx, v1.DaemonAuthRequest{
-		MachineName:   cfg.DaemonName,
-		OS:            cfg.OS(),
-		Arch:          cfg.Arch(),
-		DaemonVersion: cfg.DaemonVersion,
+func (d *Daemon) loginByPairing(ctx context.Context) error {
+	d.client = client.New(d.cfg.APIURL, "")
+
+	_, pairResp, err := d.client.Auth(ctx, v1.DaemonAuthRequest{
+		MachineName:   d.cfg.DaemonName,
+		OS:            d.cfg.OS(),
+		Arch:          d.cfg.Arch(),
+		DaemonVersion: d.cfg.DaemonVersion,
 		Mode:          "pairing",
 	})
 	if err != nil {
 		return fmt.Errorf("pairing init failed: %w", err)
 	}
 
-	// 2. Open browser.
 	if pairResp.BrowserURL == "" {
 		return fmt.Errorf("server returned empty browser URL")
 	}
@@ -65,10 +64,9 @@ func loginByPairing(ctx context.Context, cfg daemonconfig.Config) error {
 	fmt.Printf("If the browser doesn't open, visit:\n  %s\n\n", pairResp.BrowserURL)
 	_ = openBrowser(pairResp.BrowserURL)
 
-	// 3. Poll for confirmation.
 	interval := time.Duration(pairResp.PollIntervalMs) * time.Millisecond
-	if interval < 2*time.Second {
-		interval = 2 * time.Second
+	if interval < d.cfg.PollInterval {
+		interval = d.cfg.PollInterval
 	}
 
 	fmt.Print("Waiting for confirmation")
@@ -80,7 +78,7 @@ func loginByPairing(ctx context.Context, cfg daemonconfig.Config) error {
 			fmt.Print(".")
 		}
 
-		pr, err := c.PollPairing(ctx, pairResp.PairingCode)
+		pr, err := d.client.PollPairing(ctx, pairResp.PairingCode)
 		if err != nil {
 			continue
 		}
@@ -90,7 +88,7 @@ func loginByPairing(ctx context.Context, cfg daemonconfig.Config) error {
 			continue
 		case "confirmed":
 			fmt.Printf("\n✓ Authenticated as daemon %s\n", pr.DaemonID)
-			return saveCfgAndReturn(cfg, pr.DaemonID, pr.Token)
+			return d.saveIdentity(pr.DaemonID, pr.Token)
 		case "expired":
 			fmt.Println()
 			return fmt.Errorf("pairing expired: %s", pr.Message)
@@ -120,8 +118,8 @@ func openBrowser(url string) error {
 	}
 }
 
-func saveCfgAndReturn(cfg daemonconfig.Config, id, token string) error {
-	cfg.ID = id
-	cfg.Token = token
-	return cfg.Save()
+func (d *Daemon) saveIdentity(id, token string) error {
+	d.cfg.ID = id
+	d.cfg.Token = token
+	return d.cfg.Save()
 }
