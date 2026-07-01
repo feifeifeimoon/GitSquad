@@ -27,8 +27,8 @@ func (c *Client) Auth(ctx context.Context, req v1.DaemonAuthRequest) (*v1.Daemon
 }
 
 // PollPairing checks the status of a pairing code.
-func (c *Client) PollPairing(ctx context.Context, code string) (*v1.DaemonPollResponse, error) {
-	var result v1.DaemonPollResponse
+func (c *Client) PollPairing(ctx context.Context, code string) (*v1.PairingPollResponse, error) {
+	var result v1.PairingPollResponse
 	if err := c.Do(ctx, "GET", "/api/v1/daemon/auth/"+code, nil, &result); err != nil {
 		return nil, fmt.Errorf("poll pairing: %w", err)
 	}

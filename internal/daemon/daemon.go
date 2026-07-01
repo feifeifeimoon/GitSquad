@@ -1,4 +1,4 @@
-package app
+package daemon
 
 import (
 	"context"
@@ -115,7 +115,7 @@ func (d *Daemon) handleFrame(ctx context.Context, f v1.Frame) {
 	case v1.FrameTypeHeartbeatAck:
 		// Server confirms connectivity.
 
-	case "task":
+	case v1.FrameTypeTaskWake:
 		slog.Info("task received", "payload", string(f.Payload))
 
 	default:

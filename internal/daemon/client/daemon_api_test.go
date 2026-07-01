@@ -100,7 +100,7 @@ func TestPollPairing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PollPairing() = %v, want nil", err)
 	}
-	if pr.Status != "confirmed" {
+	if pr.Status != v1.PairingStatusConfirmed {
 		t.Fatalf("Status = %q, want confirmed", pr.Status)
 	}
 	if pr.DaemonID != "daemon-xyz" {

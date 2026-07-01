@@ -28,8 +28,16 @@ type DaemonAuthTokenResponse struct {
 	Status   string `json:"status"`
 }
 
-// DaemonPollResponse is returned when polling a pairing code's status.
-type DaemonPollResponse struct {
+// Pairing status values returned by the pairing poll endpoint.
+const (
+	PairingStatusPending   = "pending"
+	PairingStatusConfirmed = "confirmed"
+	PairingStatusExpired   = "expired"
+	PairingStatusClaimed   = "claimed"
+)
+
+// PairingPollResponse is returned when polling a pairing code's status.
+type PairingPollResponse struct {
 	Status      string `json:"status"`
 	DaemonID    string `json:"daemon_id"`
 	Token       string `json:"token"`

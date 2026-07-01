@@ -1,4 +1,4 @@
-package app
+package daemon
 
 import (
 	"context"
@@ -84,18 +84,15 @@ func (d *Daemon) loginByPairing(ctx context.Context) error {
 		}
 
 		switch pr.Status {
-		case "pending":
+		case v1.PairingStatusPending:
 			continue
-		case "confirmed":
+		case v1.PairingStatusConfirmed:
 			fmt.Printf("\n✓ Authenticated as daemon %s\n", pr.DaemonID)
 			return d.saveIdentity(pr.DaemonID, pr.Token)
-		case "expired":
+		case v1.PairingStatusExpired:
 			fmt.Println()
 			return fmt.Errorf("pairing expired: %s", pr.Message)
-		case "rejected":
-			fmt.Println()
-			return fmt.Errorf("pairing rejected")
-		case "consumed":
+		case v1.PairingStatusClaimed:
 			fmt.Println()
 			return fmt.Errorf("token already claimed")
 		default:

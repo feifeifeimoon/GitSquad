@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/feifeifeimoon/GitSquad/internal/daemon/app"
+	"github.com/feifeifeimoon/GitSquad/internal/daemon"
 	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
 	"github.com/spf13/cobra"
 )
@@ -11,7 +11,7 @@ var daemonStatusCmd = &cobra.Command{
 	Short: "Scan PATH and show daemon capabilities.",
 	Long:  "Scan this machine for available AI CLI tools and display capabilities.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		d := app.New(daemonconfig.Load())
+		d := daemon.New(daemonconfig.Load())
 		return d.Status(cmd.Context())
 	},
 }

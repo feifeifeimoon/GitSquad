@@ -1,4 +1,4 @@
-package app
+package daemon
 
 import (
 	"strings"
@@ -6,17 +6,17 @@ import (
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
-// CodexRuntime detects the Codex CLI ("codex").
-type CodexRuntime struct{}
+// ClaudeRuntime detects the Claude Code CLI ("claude").
+type ClaudeRuntime struct{}
 
-func (r *CodexRuntime) Detect(paths []string) *v1.Runtime {
-	const kind = "codex"
+func (r *ClaudeRuntime) Detect(paths []string) *v1.Runtime {
+	const kind = "claude"
 	exePath, err := findExe(kind, paths)
 	if err != nil {
 		return nil
 	}
 
-	ver, err := runVersionCmd(exePath, "version")
+	ver, err := runVersionCmd(exePath, "--version")
 	if err != nil {
 		return nil
 	}
@@ -27,4 +27,4 @@ func (r *CodexRuntime) Detect(paths []string) *v1.Runtime {
 	}
 }
 
-func (r *CodexRuntime) Executor() Executor { return nil }
+func (r *ClaudeRuntime) Executor() Executor { return nil }

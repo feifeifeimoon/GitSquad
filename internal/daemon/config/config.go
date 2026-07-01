@@ -33,6 +33,11 @@ const (
 	configDirName    = ".gitsquad"
 	configFileName   = "config.yaml"
 	workspaceDirName = "workspaces"
+
+	// tunable defaults.
+	defaultHeartbeatInterval = 30 * time.Second
+	defaultVersionCmdTimeout = 5 * time.Second
+	defaultPollInterval      = 2 * time.Second
 )
 
 func configPath() string {
@@ -57,9 +62,9 @@ func Load() Config {
 		WorkDir:       workspacePath(),
 	}
 
-	cfg.HeartbeatInterval = 30 * time.Second
-	cfg.VersionCmdTimeout = 5 * time.Second
-	cfg.PollInterval = 2 * time.Second
+	cfg.HeartbeatInterval = defaultHeartbeatInterval
+	cfg.VersionCmdTimeout = defaultVersionCmdTimeout
+	cfg.PollInterval = defaultPollInterval
 
 	// load config.yaml
 	if data, err := os.ReadFile(configPath()); err == nil {
