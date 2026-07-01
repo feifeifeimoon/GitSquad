@@ -20,7 +20,8 @@ var daemonRunCmd = &cobra.Command{
 		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
-		err := app.Run(ctx, daemonconfig.Load())
+		d := app.New(daemonconfig.Load())
+		err := d.Run(ctx)
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}

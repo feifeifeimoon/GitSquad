@@ -11,6 +11,7 @@ var daemonStatusCmd = &cobra.Command{
 	Short: "Scan PATH and show daemon capabilities.",
 	Long:  "Scan this machine for available AI CLI tools and display capabilities.",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		return app.Status(cmd.Context(), daemonconfig.Load())
+		d := app.New(daemonconfig.Load())
+		return d.Status(cmd.Context())
 	},
 }
