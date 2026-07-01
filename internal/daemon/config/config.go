@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/version"
 	"github.com/joho/godotenv"
@@ -20,6 +21,11 @@ type Config struct {
 	DaemonName    string
 	DaemonVersion string
 	WorkDir       string
+
+	// tunables with sensible defaults.
+	HeartbeatInterval time.Duration
+	VersionCmdTimeout  time.Duration
+	PollInterval       time.Duration
 }
 
 const (
@@ -50,6 +56,10 @@ func Load() Config {
 		DaemonVersion: version.Short(),
 		WorkDir:       workspacePath(),
 	}
+
+	cfg.HeartbeatInterval = 30 * time.Second
+	cfg.VersionCmdTimeout = 5 * time.Second
+	cfg.PollInterval = 2 * time.Second
 
 	// load config.yaml
 	if data, err := os.ReadFile(configPath()); err == nil {

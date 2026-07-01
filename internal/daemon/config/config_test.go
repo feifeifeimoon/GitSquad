@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestLoadUsesDefaults(t *testing.T) {
@@ -43,5 +44,22 @@ func TestLoadReadsEnvironment(t *testing.T) {
 	}
 	if cfg.WorkDir != "D:/tmp/gitsquad" {
 		t.Fatalf("WorkDir = %q, want D:/tmp/gitsquad", cfg.WorkDir)
+	}
+}
+
+func TestLoadDurationDefaults(t *testing.T) {
+	t.Setenv("GITSQUAD_API_URL", "")
+	t.Setenv("GITSQUAD_DAEMON_TOKEN", "")
+
+	cfg := Load()
+
+	if cfg.HeartbeatInterval != 30*time.Second {
+		t.Fatalf("HeartbeatInterval = %v, want 30s", cfg.HeartbeatInterval)
+	}
+	if cfg.VersionCmdTimeout != 5*time.Second {
+		t.Fatalf("VersionCmdTimeout = %v, want 5s", cfg.VersionCmdTimeout)
+	}
+	if cfg.PollInterval != 2*time.Second {
+		t.Fatalf("PollInterval = %v, want 2s", cfg.PollInterval)
 	}
 }
