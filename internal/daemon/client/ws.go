@@ -80,6 +80,9 @@ func (ws *WSConn) WriteFrame(f v1.Frame) error {
 
 // SendHeartbeat sends a heartbeat frame with the given payload.
 func (ws *WSConn) SendHeartbeat(ctx context.Context, payload any) error {
+	if deadline, ok := ctx.Deadline(); ok {
+		ws.conn.SetWriteDeadline(deadline)
+	}
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return err

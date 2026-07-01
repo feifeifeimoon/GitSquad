@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
@@ -24,7 +25,7 @@ func New(baseURL, token string) *Client {
 	return &Client{
 		BaseURL:    strings.TrimRight(baseURL, "/"),
 		Token:      token,
-		HTTPClient: http.DefaultClient,
+		HTTPClient: &http.Client{Timeout: 10 * time.Second},
 	}
 }
 
