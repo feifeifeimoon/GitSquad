@@ -12,7 +12,6 @@ type DaemonAuthRequest struct {
 	OS            string `json:"os"`
 	Arch          string `json:"arch"`
 	DaemonVersion string `json:"daemon_version"`
-	Mode          string `json:"mode"` // "token" or "pairing"
 }
 
 // ── Responses ─────────────────────────────────────────────────────────

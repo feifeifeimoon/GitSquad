@@ -33,7 +33,6 @@ func (d *Daemon) loginByToken(ctx context.Context, token string) error {
 		OS:            d.cfg.OS(),
 		Arch:          d.cfg.Arch(),
 		DaemonVersion: d.cfg.DaemonVersion,
-		Mode:          "token",
 	})
 	if err != nil {
 		return fmt.Errorf("token auth failed: %w", err)
@@ -51,7 +50,6 @@ func (d *Daemon) loginByPairing(ctx context.Context) error {
 		OS:            d.cfg.OS(),
 		Arch:          d.cfg.Arch(),
 		DaemonVersion: d.cfg.DaemonVersion,
-		Mode:          "pairing",
 	})
 	if err != nil {
 		return fmt.Errorf("pairing init failed: %w", err)

@@ -28,12 +28,11 @@ func TestAuthTokenMode(t *testing.T) {
 
 	c := New(srv.URL, "secret-token")
 	authResp, pairResp, err := c.Auth(t.Context(), v1.DaemonAuthRequest{
-		MachineName:   "test-machine",
-		OS:            "linux",
-		Arch:          "amd64",
-		DaemonVersion: "0.1.0",
-		Mode:          "token",
-	})
+			MachineName:   "test-machine",
+			OS:            "linux",
+			Arch:          "amd64",
+			DaemonVersion: "0.1.0",
+		})
 	if err != nil {
 		t.Fatalf("Auth() = %v, want nil", err)
 	}
@@ -62,12 +61,11 @@ func TestAuthPairingMode(t *testing.T) {
 
 	c := New(srv.URL, "")
 	authResp, pairResp, err := c.Auth(t.Context(), v1.DaemonAuthRequest{
-		MachineName:   "test-machine",
-		OS:            "linux",
-		Arch:          "arm64",
-		DaemonVersion: "0.1.0",
-		Mode:          "pairing",
-	})
+			MachineName:   "test-machine",
+			OS:            "linux",
+			Arch:          "arm64",
+			DaemonVersion: "0.1.0",
+		})
 	if err != nil {
 		t.Fatalf("Auth() = %v, want nil", err)
 	}
