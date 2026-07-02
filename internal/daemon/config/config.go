@@ -40,9 +40,16 @@ const (
 	defaultPollInterval      = 2 * time.Second
 )
 
-func configPath() string {
+func configDir() string {
+	if dir := os.Getenv("GITSQUAD_CONFIG_DIR"); dir != "" {
+		return dir
+	}
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, configDirName, configFileName)
+	return filepath.Join(home, configDirName)
+}
+
+func configPath() string {
+	return filepath.Join(configDir(), configFileName)
 }
 
 func workspacePath() string {

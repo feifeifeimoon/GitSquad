@@ -7,9 +7,9 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createIdentity = `-- name: CreateIdentity :one
@@ -89,21 +89,21 @@ type FindIdentityByProviderParams struct {
 }
 
 type FindIdentityByProviderRow struct {
-	ID             uuid.UUID          `json:"id"`
-	UserID         uuid.UUID          `json:"user_id"`
-	Provider       string             `json:"provider"`
-	ProviderUserID string             `json:"provider_user_id"`
-	ProviderLogin  string             `json:"provider_login"`
-	Email          *string            `json:"email"`
-	AccessToken    *string            `json:"access_token"`
-	RefreshToken   *string            `json:"refresh_token"`
-	CreatedAt      pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt      pgtype.Timestamptz `json:"updated_at"`
-	UserID_2       uuid.UUID          `json:"user_id_2"`
-	UserLogin      string             `json:"user_login"`
-	UserAvatarUrl  *string            `json:"user_avatar_url"`
-	UserCreatedAt  pgtype.Timestamptz `json:"user_created_at"`
-	UserUpdatedAt  pgtype.Timestamptz `json:"user_updated_at"`
+	ID             uuid.UUID `json:"id"`
+	UserID         uuid.UUID `json:"user_id"`
+	Provider       string    `json:"provider"`
+	ProviderUserID string    `json:"provider_user_id"`
+	ProviderLogin  string    `json:"provider_login"`
+	Email          *string   `json:"email"`
+	AccessToken    *string   `json:"access_token"`
+	RefreshToken   *string   `json:"refresh_token"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	UserID_2       uuid.UUID `json:"user_id_2"`
+	UserLogin      string    `json:"user_login"`
+	UserAvatarUrl  *string   `json:"user_avatar_url"`
+	UserCreatedAt  time.Time `json:"user_created_at"`
+	UserUpdatedAt  time.Time `json:"user_updated_at"`
 }
 
 func (q *Queries) FindIdentityByProvider(ctx context.Context, arg FindIdentityByProviderParams) (FindIdentityByProviderRow, error) {

@@ -88,7 +88,7 @@ func TestPollPairing(t *testing.T) {
 			"status":       "confirmed",
 			"daemon_id":    "daemon-xyz",
 			"token":        "new-token-abc",
-			"token_prefix": "gtsq_dm_",
+			"token_prefix": "gitsquad_dm_",
 			"message":      "paired",
 		}}
 		json.NewEncoder(w).Encode(resp)
@@ -118,9 +118,9 @@ func TestPutRuntimes(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL, "token")
-	err := c.PutRuntimes(t.Context(), "daemon-abc", []v1.Runtime{
-		{Kind: "claude", Version: "1.0.0", ExecutablePath: "/usr/bin/claude", MaxConcurrency: 1},
-	})
+		err := c.PutRuntimes(t.Context(), "daemon-abc", []v1.Runtime{
+			{Kind: "claude", Version: "1.0.0", ExecutablePath: "/usr/bin/claude", MaxConcurrency: 1},
+		})
 	if err != nil {
 		t.Fatalf("PutRuntimes() = %v, want nil", err)
 	}

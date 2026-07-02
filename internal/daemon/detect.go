@@ -73,9 +73,13 @@ func detectGit() string {
 }
 
 // ensureWorkDir creates the daemon work directory and returns its path.
+// If workDir is already absolute it is used as-is; otherwise it is resolved
+// relative to the user's home directory.
 func ensureWorkDir(workDir string) string {
-	home, _ := os.UserHomeDir()
-	full := filepath.Join(home, workDir)
-	_ = os.MkdirAll(full, 0755)
-	return full
+	if !filepath.IsAbs(workDir) {
+		home, _ := os.UserHomeDir()
+		workDir = filepath.Join(home, workDir)
+	}
+	_ = os.MkdirAll(workDir, 0755)
+	return workDir
 }

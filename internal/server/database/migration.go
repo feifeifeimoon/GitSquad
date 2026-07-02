@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -24,24 +25,24 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			UNIQUE(provider, provider_user_id)
 		)`},
 		{name: "003_user_identities_idx", sql: `CREATE INDEX IF NOT EXISTS idx_user_identities_user_id ON user_identities(user_id)`},
-		{name: "004_create_daemon_tokens", sql: `CREATE TABLE IF NOT EXISTS daemon_tokens (
+		{name: "004_create_daemon_tokens", sql: fmt.Sprintf(`CREATE TABLE IF NOT EXISTS daemon_tokens (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID REFERENCES users(id),
-			daemon_id UUID, token_hash TEXT UNIQUE NOT NULL, token_prefix TEXT NOT NULL DEFAULT 'gtsq_dm_',
+			daemon_id UUID, token_hash TEXT UNIQUE NOT NULL, token_prefix TEXT NOT NULL DEFAULT '%s',
 			pairing_code TEXT UNIQUE, machine_name TEXT, status TEXT NOT NULL DEFAULT 'pending',
 			expires_at TIMESTAMPTZ, issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			confirmed_at TIMESTAMPTZ, last_used_at TIMESTAMPTZ
-		)`},
+		)`, v1.DaemonTokenPrefix)},
 		{name: "005_create_daemons", sql: `CREATE TABLE IF NOT EXISTS daemons (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES users(id),
 			token_id UUID REFERENCES daemon_tokens(id), name TEXT NOT NULL,
 			os TEXT NOT NULL DEFAULT '', arch TEXT NOT NULL DEFAULT '',
-			daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'registered',
+			daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'offline',
 			last_seen_at TIMESTAMPTZ, connected_at TIMESTAMPTZ,
 			registered_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`},
 		{name: "006_create_runtimes", sql: `CREATE TABLE IF NOT EXISTS runtimes (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(), daemon_id UUID NOT NULL REFERENCES daemons(id),
-			kind TEXT NOT NULL, name TEXT NOT NULL, executable_path TEXT, version TEXT,
+			kind TEXT NOT NULL, name TEXT NOT NULL, executable_path TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '',
 			status TEXT NOT NULL DEFAULT 'unknown', checked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			diagnostics TEXT, max_concurrency INT NOT NULL DEFAULT 1,
 			UNIQUE(daemon_id, kind, name)

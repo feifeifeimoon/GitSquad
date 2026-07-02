@@ -32,21 +32,21 @@ type DaemonToken struct {
 	LastUsedAt  *time.Time `json:"last_used_at,omitempty"`
 }
 
-// Conversion helpers for server-internal types.
-
+// toToken converts a sqlc-generated db.DaemonToken to the server-internal model.
+// All fields are now Go-native — no pgtype or NullUUID helpers needed.
 func toToken(t *db.DaemonToken) *DaemonToken {
 	return &DaemonToken{
 		ID:          t.ID,
-		UserID:      nullUUIDToPtr(t.UserID),
-		DaemonID:    nullUUIDToPtr(t.DaemonID),
+		UserID:      t.UserID,
+		DaemonID:    t.DaemonID,
 		TokenHash:   t.TokenHash,
 		TokenPrefix: t.TokenPrefix,
 		PairingCode: t.PairingCode,
 		MachineName: t.MachineName,
 		Status:      t.Status,
-		ExpiresAt:   pgTimePtr(t.ExpiresAt),
-		IssuedAt:    t.IssuedAt.Time,
-		ConfirmedAt: pgTimePtr(t.ConfirmedAt),
-		LastUsedAt:  pgTimePtr(t.LastUsedAt),
+		ExpiresAt:   t.ExpiresAt,
+		IssuedAt:    t.IssuedAt,
+		ConfirmedAt: t.ConfirmedAt,
+		LastUsedAt:  t.LastUsedAt,
 	}
 }

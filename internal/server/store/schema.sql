@@ -23,14 +23,14 @@ CREATE TABLE daemons (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES users(id),
     token_id UUID REFERENCES daemon_tokens(id), name TEXT NOT NULL,
     os TEXT NOT NULL DEFAULT '', arch TEXT NOT NULL DEFAULT '',
-    daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'registered',
+    daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'offline',
     last_seen_at TIMESTAMPTZ, connected_at TIMESTAMPTZ,
     registered_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE TABLE runtimes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), daemon_id UUID NOT NULL REFERENCES daemons(id),
-    kind TEXT NOT NULL, name TEXT NOT NULL, executable_path TEXT, version TEXT,
+    kind TEXT NOT NULL, name TEXT NOT NULL, executable_path TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'unknown', checked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     diagnostics TEXT, max_concurrency INT NOT NULL DEFAULT 1,
     UNIQUE(daemon_id, kind, name)

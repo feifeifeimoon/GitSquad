@@ -11,7 +11,6 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type DaemonService struct {
@@ -49,12 +48,13 @@ type PollPairingResult struct {
 // ── Token operations ──────────────────────────────────────────────────
 
 func (s *DaemonService) CreateToken(ctx context.Context, tokenHash, tokenPrefix, pairingCode, machineName string) (*DaemonToken, error) {
+	expires := time.Now().Add(10 * time.Minute)
 	t, err := s.store.CreateToken(ctx, db.CreateTokenParams{
 		TokenHash:   tokenHash,
 		TokenPrefix: tokenPrefix,
 		PairingCode: &pairingCode,
 		MachineName: &machineName,
-		ExpiresAt:   toPgtimestamp(time.Now().Add(10 * time.Minute)),
+		ExpiresAt:   &expires,
 	})
 	if err != nil {
 		return nil, err
@@ -79,7 +79,9 @@ func (s *DaemonService) FindTokenByPairingCode(ctx context.Context, code string)
 }
 
 func (s *DaemonService) ConfirmToken(ctx context.Context, tokenID, userID, daemonID uuid.UUID) error {
-	return s.store.ConfirmToken(ctx, db.ConfirmTokenParams{ID: tokenID, UserID: uu2n(userID), DaemonID: uu2n(daemonID)})
+	return s.store.ConfirmToken(ctx, db.ConfirmTokenParams{
+		ID: tokenID, UserID: &userID, DaemonID: &daemonID,
+	})
 }
 
 func (s *DaemonService) TouchToken(ctx context.Context, id uuid.UUID) error {
@@ -135,11 +137,15 @@ func (s *DaemonService) PollPairing(ctx context.Context, code string) (*PollPair
 	case TokenPending:
 		if tok.ExpiresAt != nil && time.Now().After(*tok.ExpiresAt) {
 			_ = s.ExpireToken(ctx, tok.ID)
-			return &PollPairingResult{Status: "expired", Message: "Pairing code expired."}, nil
+			return &PollPairingResult{Status: v1.PairingStatusExpired, Message: "Pairing code expired."}, nil
+		}
+		mn := ""
+		if tok.MachineName != nil {
+			mn = *tok.MachineName
 		}
 		return &PollPairingResult{
-			Status:      "pending",
-			MachineName: ptrVal(tok.MachineName),
+			Status:      v1.PairingStatusPending,
+			MachineName: mn,
 		}, nil
 
 	case TokenActive:
@@ -147,13 +153,14 @@ func (s *DaemonService) PollPairing(ctx context.Context, code string) (*PollPair
 			return nil, fmt.Errorf("active token missing daemon_id")
 		}
 
-		rawToken, err := generateDaemonToken()
+		secret, err := generateDaemonSecret()
 		if err != nil {
 			return nil, fmt.Errorf("generate daemon token: %w", err)
 		}
 
+		rawToken := v1.DaemonTokenPrefix + secret
 		tokenHash := crypto.Hash(rawToken)
-		tokenPrefix := "gtsq_dm_" + rawToken[:8]
+		tokenPrefix := v1.DaemonTokenPrefix + secret[:8]
 
 		if err := s.SetTokenHash(ctx, tok.ID, tokenHash, tokenPrefix); err != nil {
 			return nil, fmt.Errorf("set token hash: %w", err)
@@ -163,17 +170,17 @@ func (s *DaemonService) PollPairing(ctx context.Context, code string) (*PollPair
 		}
 
 		return &PollPairingResult{
-			Status:      "confirmed",
+			Status:      v1.PairingStatusConfirmed,
 			DaemonID:    tok.DaemonID.String(),
 			Token:       rawToken,
 			TokenPrefix: tokenPrefix,
 		}, nil
 
 	case TokenExpired:
-		return &PollPairingResult{Status: "expired", Message: "Pairing code expired."}, nil
+		return &PollPairingResult{Status: v1.PairingStatusExpired, Message: "Pairing code expired."}, nil
 
 	default:
-		return &PollPairingResult{Status: "claimed", Message: "Token already claimed"}, nil
+		return &PollPairingResult{Status: v1.PairingStatusClaimed, Message: "Token already claimed"}, nil
 	}
 }
 
@@ -190,7 +197,10 @@ func (s *DaemonService) ConfirmPairing(ctx context.Context, code string, userID 
 		return nil, ErrPairingExpired
 	}
 
-	machineName := ptrVal(tok.MachineName)
+	machineName := ""
+	if tok.MachineName != nil {
+		machineName = *tok.MachineName
+	}
 
 	// Reuse an existing daemon with the same name, or create a new one.
 	existing, _ := s.FindByUserAndName(ctx, userID, machineName)
@@ -309,8 +319,8 @@ func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID,
 				DaemonID:       daemonID,
 				Kind:           rt.Kind,
 				Name:           rt.Kind, // Name mirrors Kind since the shared type has no Name field
-				ExecutablePath: strPtr(rt.ExecutablePath),
-				Version:        strPtr(rt.Version),
+				ExecutablePath: rt.ExecutablePath,
+				Version:        rt.Version,
 				Status:         "available",
 				Diagnostics:    nil,
 				MaxConcurrency: int32(rt.MaxConcurrency),
@@ -322,7 +332,63 @@ func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID,
 	})
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────
+// ── DB → API conversions ──────────────────────────────────────────────
+
+// toDaemon converts a sqlc-generated db.Daemon to the API type.
+// Fields differ only in Go casing (Os → OS); all nullable columns are
+// now Go-native (*time.Time, *uuid.UUID) thanks to sqlc overrides.
+func toDaemon(d *db.Daemon) *v1.Daemon {
+	return &v1.Daemon{
+		ID:            d.ID,
+		UserID:        d.UserID,
+		Name:          d.Name,
+		OS:            d.Os,
+		Arch:          d.Arch,
+		DaemonVersion: d.DaemonVersion,
+		Status:        d.Status,
+		LastSeenAt:    d.LastSeenAt,
+		ConnectedAt:   d.ConnectedAt,
+		RegisteredAt:  d.RegisteredAt,
+	}
+}
+
+// toDaemonFromRow converts a joined query row to the API daemon type.
+func toDaemonFromRow(row db.ListDaemonsByUserRow) *v1.Daemon {
+	return &v1.Daemon{
+		ID:            row.ID,
+		UserID:        row.UserID,
+		Name:          row.Name,
+		OS:            row.Os,
+		Arch:          row.Arch,
+		DaemonVersion: row.DaemonVersion,
+		Status:        row.Status,
+		LastSeenAt:    row.LastSeenAt,
+		ConnectedAt:   row.ConnectedAt,
+		RegisteredAt:  row.RegisteredAt,
+	}
+}
+
+// toRuntime extracts a Runtime from a joined query row when runtime columns
+// are present (non-nil RID).
+func toRuntime(row db.ListDaemonsByUserRow) (*v1.Runtime, bool) {
+	if row.RID == nil {
+		return nil, false
+	}
+	mc := 0
+	if row.RMaxConcurrency != nil {
+		mc = int(*row.RMaxConcurrency)
+	}
+	return &v1.Runtime{
+			ID:             *row.RID,
+			DaemonID:       row.ID,
+			Kind:           *row.RKind,
+			ExecutablePath: *row.RExecutablePath,
+			Version:        *row.RVersion,
+			MaxConcurrency: mc,
+		}, true
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────
 
 func generatePairingCode() (string, error) {
 	a, err := crypto.RandomString(4)
@@ -336,82 +402,8 @@ func generatePairingCode() (string, error) {
 	return a + "-" + b, nil
 }
 
-func generateDaemonToken() (string, error) {
-	raw, err := crypto.RandomString(32)
-	if err != nil {
-		return "", err
-	}
-	return "gtsq_dm_" + raw, nil
+// generateDaemonSecret returns a cryptographically random string for use as
+// a daemon token secret. The DaemonTokenPrefix is added by the caller.
+func generateDaemonSecret() (string, error) {
+	return crypto.RandomString(32)
 }
-
-func toDaemon(d *db.Daemon) *v1.Daemon {
-	return &v1.Daemon{
-		ID: d.ID, UserID: d.UserID, Name: d.Name, OS: d.Os, Arch: d.Arch,
-		DaemonVersion: d.DaemonVersion, Status: d.Status,
-		LastSeenAt: pgTimePtr(d.LastSeenAt), ConnectedAt: pgTimePtr(d.ConnectedAt), RegisteredAt: d.RegisteredAt.Time,
-	}
-}
-
-func toDaemonFromRow(row db.ListDaemonsByUserRow) *v1.Daemon {
-	return &v1.Daemon{
-		ID: row.ID, UserID: row.UserID, Name: row.Name, OS: row.Os, Arch: row.Arch,
-		DaemonVersion: row.DaemonVersion, Status: row.Status,
-		LastSeenAt: pgTimePtr(row.LastSeenAt), ConnectedAt: pgTimePtr(row.ConnectedAt), RegisteredAt: row.RegisteredAt.Time,
-	}
-}
-
-func toRuntime(row db.ListDaemonsByUserRow) (*v1.Runtime, bool) {
-	if !row.RID.Valid {
-		return nil, false
-	}
-	rt := &v1.Runtime{
-		ID:       row.RID.UUID,
-		DaemonID: row.ID,
-	}
-	rt.Kind = ptrVal(row.RKind)
-	rt.ExecutablePath = ptrVal(row.RExecutablePath)
-	rt.Version = ptrVal(row.RVersion)
-	rt.MaxConcurrency = int(ptrInt32(row.RMaxConcurrency))
-	return rt, true
-}
-
-func pgTimePtr(t pgtype.Timestamptz) *time.Time {
-	if !t.Valid {
-		return nil
-	}
-	return &t.Time
-}
-
-func toPgtimestamp(t time.Time) pgtype.Timestamptz {
-	return pgtype.Timestamptz{Time: t, Valid: true}
-}
-
-func ptrVal(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
-}
-
-func ptrInt32(v *int32) int32 {
-	if v == nil {
-		return 0
-	}
-	return *v
-}
-
-func strPtr(s string) *string {
-	if s == "" {
-		return nil
-	}
-	return &s
-}
-
-func nullUUIDToPtr(nu uuid.NullUUID) *uuid.UUID {
-	if nu.Valid {
-		return &nu.UUID
-	}
-	return nil
-}
-
-func uu2n(id uuid.UUID) uuid.NullUUID { return uuid.NullUUID{UUID: id, Valid: true} }

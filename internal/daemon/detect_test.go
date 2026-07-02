@@ -68,9 +68,9 @@ func TestPrintRuntimes(t *testing.T) {
 		WorkDir:       "/home/user/.gitsquad/workspaces",
 	}
 
-	runtimes := []v1.Runtime{
-		{Kind: "claude", Version: "1.5.0", ExecutablePath: "/usr/bin/claude"},
-	}
+		runtimes := []v1.Runtime{
+			{Kind: "claude", Version: "1.5.0", ExecutablePath: "/usr/bin/claude"},
+		}
 
 	var buf bytes.Buffer
 	PrintRuntimes(&buf, info, runtimes)

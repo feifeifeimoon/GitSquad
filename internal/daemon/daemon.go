@@ -131,7 +131,7 @@ func (d *Daemon) sendHeartbeat(ctx context.Context) {
 	}
 
 	payload := v1.WSHeartbeatPayload{
-		Status:         "online",
+		Status:         v1.DaemonStatusOnline,
 		DaemonVersion:  d.cfg.DaemonVersion,
 		ActiveTasks:    []string{},
 		RuntimeSummary: summary,

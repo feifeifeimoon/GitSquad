@@ -7,9 +7,9 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const clearRuntimes = `-- name: ClearRuntimes :exec
@@ -28,9 +28,9 @@ WHERE id = $1 AND status = 'pending'
 `
 
 type ConfirmTokenParams struct {
-	ID       uuid.UUID     `json:"id"`
-	UserID   uuid.NullUUID `json:"user_id"`
-	DaemonID uuid.NullUUID `json:"daemon_id"`
+	ID       uuid.UUID  `json:"id"`
+	UserID   *uuid.UUID `json:"user_id"`
+	DaemonID *uuid.UUID `json:"daemon_id"`
 }
 
 func (q *Queries) ConfirmToken(ctx context.Context, arg ConfirmTokenParams) error {
@@ -53,9 +53,9 @@ VALUES ($1, $2, $3, 'active') RETURNING id, user_id, daemon_id, token_hash, toke
 `
 
 type CreateActiveTokenParams struct {
-	UserID      uuid.NullUUID `json:"user_id"`
-	TokenHash   string        `json:"token_hash"`
-	TokenPrefix string        `json:"token_prefix"`
+	UserID      *uuid.UUID `json:"user_id"`
+	TokenHash   string     `json:"token_hash"`
+	TokenPrefix string     `json:"token_prefix"`
 }
 
 func (q *Queries) CreateActiveToken(ctx context.Context, arg CreateActiveTokenParams) (DaemonToken, error) {
@@ -113,11 +113,11 @@ VALUES ($1, $2, $3, $4, 'pending', $5) RETURNING id, user_id, daemon_id, token_h
 `
 
 type CreateTokenParams struct {
-	TokenHash   string             `json:"token_hash"`
-	TokenPrefix string             `json:"token_prefix"`
-	PairingCode *string            `json:"pairing_code"`
-	MachineName *string            `json:"machine_name"`
-	ExpiresAt   pgtype.Timestamptz `json:"expires_at"`
+	TokenHash   string     `json:"token_hash"`
+	TokenPrefix string     `json:"token_prefix"`
+	PairingCode *string    `json:"pairing_code"`
+	MachineName *string    `json:"machine_name"`
+	ExpiresAt   *time.Time `json:"expires_at"`
 }
 
 // daemon_tokens
@@ -295,8 +295,8 @@ type InsertRuntimeParams struct {
 	DaemonID       uuid.UUID `json:"daemon_id"`
 	Kind           string    `json:"kind"`
 	Name           string    `json:"name"`
-	ExecutablePath *string   `json:"executable_path"`
-	Version        *string   `json:"version"`
+	ExecutablePath string    `json:"executable_path"`
+	Version        string    `json:"version"`
 	Status         string    `json:"status"`
 	Diagnostics    *string   `json:"diagnostics"`
 	MaxConcurrency int32     `json:"max_concurrency"`
@@ -328,25 +328,25 @@ ORDER BY d.registered_at DESC, r.kind, r.name
 `
 
 type ListDaemonsByUserRow struct {
-	ID              uuid.UUID          `json:"id"`
-	UserID          uuid.UUID          `json:"user_id"`
-	TokenID         uuid.NullUUID      `json:"token_id"`
-	Name            string             `json:"name"`
-	Os              string             `json:"os"`
-	Arch            string             `json:"arch"`
-	DaemonVersion   string             `json:"daemon_version"`
-	Status          string             `json:"status"`
-	LastSeenAt      pgtype.Timestamptz `json:"last_seen_at"`
-	ConnectedAt     pgtype.Timestamptz `json:"connected_at"`
-	RegisteredAt    pgtype.Timestamptz `json:"registered_at"`
-	RID             uuid.NullUUID      `json:"r_id"`
-	RKind           *string            `json:"r_kind"`
-	RName           *string            `json:"r_name"`
-	RExecutablePath *string            `json:"r_executable_path"`
-	RVersion        *string            `json:"r_version"`
-	RStatus         *string            `json:"r_status"`
-	RDiagnostics    *string            `json:"r_diagnostics"`
-	RMaxConcurrency *int32             `json:"r_max_concurrency"`
+	ID              uuid.UUID  `json:"id"`
+	UserID          uuid.UUID  `json:"user_id"`
+	TokenID         *uuid.UUID `json:"token_id"`
+	Name            string     `json:"name"`
+	Os              string     `json:"os"`
+	Arch            string     `json:"arch"`
+	DaemonVersion   string     `json:"daemon_version"`
+	Status          string     `json:"status"`
+	LastSeenAt      *time.Time `json:"last_seen_at"`
+	ConnectedAt     *time.Time `json:"connected_at"`
+	RegisteredAt    time.Time  `json:"registered_at"`
+	RID             *uuid.UUID `json:"r_id"`
+	RKind           *string    `json:"r_kind"`
+	RName           *string    `json:"r_name"`
+	RExecutablePath *string    `json:"r_executable_path"`
+	RVersion        *string    `json:"r_version"`
+	RStatus         *string    `json:"r_status"`
+	RDiagnostics    *string    `json:"r_diagnostics"`
+	RMaxConcurrency *int32     `json:"r_max_concurrency"`
 }
 
 func (q *Queries) ListDaemonsByUser(ctx context.Context, userID uuid.UUID) ([]ListDaemonsByUserRow, error) {

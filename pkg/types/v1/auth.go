@@ -1,5 +1,9 @@
 package v1
 
+// DaemonTokenPrefix is the standard prefix for all daemon bearer tokens.
+// Tokens are formatted as "gitsquad_dm_" + 32 random alphanumeric characters.
+const DaemonTokenPrefix = "gitsquad_dm_"
+
 // ── Request ───────────────────────────────────────────────────────────
 
 // DaemonAuthRequest is the body for POST /api/v1/daemon/auth.

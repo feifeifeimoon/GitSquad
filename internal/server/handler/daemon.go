@@ -125,7 +125,7 @@ func (h *DaemonHandler) ConfirmPairing(c *gin.Context) {
 	}
 
 	slog.Info("pairing confirmed", "code", code, "user", user.Login, "daemon", daemon.ID)
-	c.JSON(http.StatusOK, v1.SuccessResponse(v1.ConfirmPairingResponse{Status: "confirmed"}, 0))
+	c.JSON(http.StatusOK, v1.SuccessResponse(v1.ConfirmPairingResponse{Status: v1.PairingStatusConfirmed}, 0))
 }
 
 func (h *DaemonHandler) ListDaemons(c *gin.Context) {

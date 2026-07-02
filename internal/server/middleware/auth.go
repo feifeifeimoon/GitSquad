@@ -69,7 +69,7 @@ func RequireDaemonAuth(cfg config.Config, daemonSvc *service.DaemonService) gin.
 		}
 
 		rawToken := strings.TrimPrefix(header, "Bearer ")
-		if !strings.HasPrefix(rawToken, "gtsq_dm_") {
+		if !strings.HasPrefix(rawToken, v1.DaemonTokenPrefix) {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, v1.ErrorResponse("invalid token format"))
 			return
 		}

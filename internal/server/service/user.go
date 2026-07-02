@@ -26,8 +26,8 @@ func (s *UserService) FindByID(ctx context.Context, id uuid.UUID) (*v1.User, err
 		ID:        u.ID,
 		Login:     u.Login,
 		AvatarURL: strVal(u.AvatarUrl),
-		CreatedAt: u.CreatedAt.Time,
-		UpdatedAt: u.UpdatedAt.Time,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
 	}, nil
 }
 
@@ -54,8 +54,8 @@ func (s *UserService) FindByIdentity(ctx context.Context, provider, providerUser
 		ProviderLogin:  row.ProviderLogin,
 		Email:          strVal(row.Email),
 		AccessToken:    strVal(row.AccessToken),
-		CreatedAt:      row.CreatedAt.Time,
-		UpdatedAt:      row.UpdatedAt.Time,
+		CreatedAt:      row.CreatedAt,
+		UpdatedAt:      row.UpdatedAt,
 	}, nil
 }
 
@@ -71,8 +71,8 @@ func (s *UserService) CreateUser(ctx context.Context, login, avatarURL string) (
 		ID:        u.ID,
 		Login:     u.Login,
 		AvatarURL: strVal(u.AvatarUrl),
-		CreatedAt: u.CreatedAt.Time,
-		UpdatedAt: u.UpdatedAt.Time,
+		CreatedAt: u.CreatedAt,
+		UpdatedAt: u.UpdatedAt,
 	}, nil
 }
 

@@ -8,6 +8,7 @@ import (
 )
 
 func TestLoadUsesDefaults(t *testing.T) {
+	t.Setenv("GITSQUAD_CONFIG_DIR", t.TempDir())
 	t.Setenv("GITSQUAD_API_URL", "")
 	t.Setenv("GITSQUAD_DAEMON_TOKEN", "")
 	t.Setenv("GITSQUAD_DAEMON_WORK_DIR", "")
@@ -30,6 +31,7 @@ func TestLoadUsesDefaults(t *testing.T) {
 }
 
 func TestLoadReadsEnvironment(t *testing.T) {
+	t.Setenv("GITSQUAD_CONFIG_DIR", t.TempDir())
 	t.Setenv("GITSQUAD_API_URL", "https://api.example.com")
 	t.Setenv("GITSQUAD_DAEMON_TOKEN", "secret")
 	t.Setenv("GITSQUAD_DAEMON_WORK_DIR", "D:/tmp/gitsquad")
@@ -48,6 +50,7 @@ func TestLoadReadsEnvironment(t *testing.T) {
 }
 
 func TestLoadDurationDefaults(t *testing.T) {
+	t.Setenv("GITSQUAD_CONFIG_DIR", t.TempDir())
 	t.Setenv("GITSQUAD_API_URL", "")
 	t.Setenv("GITSQUAD_DAEMON_TOKEN", "")
 

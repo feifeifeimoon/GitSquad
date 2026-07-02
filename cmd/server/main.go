@@ -5,6 +5,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
@@ -44,8 +47,29 @@ func main() {
 		Handler: handler.SetupRoutes(cfg, pool),
 	}
 
+	// Graceful shutdown on SIGINT / SIGTERM.
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		sig := <-quit
+		slog.Info("shutting down", "signal", sig.String())
+
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		server.SetKeepAlivesEnabled(false)
+		if err := server.Shutdown(ctx); err != nil {
+			slog.Error("graceful shutdown failed", "error", err)
+		}
+		close(idleConnsClosed)
+	}()
+
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server", "error", err)
 		panic(err)
 	}
+
+	<-idleConnsClosed
+	slog.Info("server stopped")
 }
