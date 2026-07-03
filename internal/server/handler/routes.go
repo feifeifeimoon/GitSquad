@@ -62,10 +62,11 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		}
 
 		// Protected daemon endpoints (daemon token auth).
+		// Daemon identity is resolved from the token — no :id in the URL.
 		daemon := api.Group("/daemon")
 		daemon.Use(middleware.RequireDaemonAuth(cfg, daemonSvc))
 		{
-			daemon.GET("/:id", func(c *gin.Context) {
+			daemon.GET("", func(c *gin.Context) {
 				m := middleware.GetDaemon(c)
 				if m == nil {
 					c.JSON(http.StatusUnauthorized, v1.ErrorResponse("unauthorized"))
@@ -73,7 +74,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 				}
 				c.JSON(http.StatusOK, v1.SuccessResponse(m, 0))
 			})
-			daemon.PUT("/:id/runtimes", daemonHandler.PutRuntimes)
+			daemon.PUT("/runtimes", daemonHandler.PutRuntimes)
 		}
 
 		// Protected user endpoints (user JWT auth).

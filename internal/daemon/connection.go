@@ -39,7 +39,7 @@ func (d *Daemon) runWithReconnect(ctx context.Context) error {
 		_, runtimes := d.DetectRuntimes()
 		d.lastRuntime = runtimes
 		slog.Info("runtimes detected", "count", len(runtimes))
-		if err := d.client.PutRuntimes(ctx, d.cfg.ID, runtimes); err != nil {
+		if err := d.client.PutRuntimes(ctx, runtimes); err != nil {
 			slog.Warn("upload runtimes failed", "error", err)
 		}
 

@@ -30,7 +30,7 @@
 │   │   ├── ci.yml             # CI: go test/build + bun test/lint/build
 │   │   └── release.yml        # GoReleaser on v* tags
 │   └── dependabot.yml         # Auto-deps: bun + github-actions, weekly
-├── bin/                       # Compiled CLI binary (gitsquad.exe)
+├── bin/                       # Local build output (gitignored)
 ├── cmd/
 │   ├── server/main.go         # Entrypoint: HTTP API server (Gin)
 │   └── gitsquad/main.go       # Entrypoint: CLI daemon (Cobra)
@@ -47,13 +47,22 @@
 │   │   ├── middleware/        # JWT auth, CORS, request logging
 │   │   ├── ws/                # WebSocket hub, dispatcher, connection management
 │   │   ├── auth/              # JWT token generation + validation
-│   │   ├── types/             # Shared structs (user, daemon, runtime, response envelope)
 │   │   └── logging/           # slog init (JSON for prod, text for dev/CLI)
 │   ├── daemon/
-│   │   ├── app/               # CLI daemon logic (run, WS heartbeat, pairing, PATH scan)
-│   │   └── config/            # CLI config (YAML file + env overrides, ~/.gitsquad/)
-│   ├── crypto/                # Shared crypto utilities
+│   │   ├── client/            # HTTP + WebSocket client for server API
+│   │   ├── config/            # Daemon config (YAML file + env overrides, ~/.gitsquad/)
+│   │   ├── daemon.go          # Core Daemon struct (Run, eventLoop, Status)
+│   │   ├── connection.go      # Reconnect loop with exponential backoff
+│   │   ├── detect.go          # Runtime detection (scan PATH for Claude/Codex)
+│   │   ├── login.go           # Login flow (pairing + token)
+│   │   ├── runtime.go         # Runtime interface definition
+│   │   ├── runtime_claude.go  # Claude runtime adapter
+│   │   └── runtime_codex.go   # Codex runtime adapter
+│   ├── crypto/                # Shared crypto utilities (SHA-256 hashing)
 │   └── version/               # Build version info (ldflags-injected)
+├── pkg/
+│   └── types/
+│       └── v1/                # Shared API types (auth, daemon, runtime, user, ws)
 ├── web/                       # Next.js frontend
 │   ├── app/
 │   │   ├── page.tsx           # Landing page ("use client", agent dashboard mock)

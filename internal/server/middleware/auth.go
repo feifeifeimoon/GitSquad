@@ -81,14 +81,14 @@ func RequireDaemonAuth(cfg config.Config, daemonSvc *service.DaemonService) gin.
 			return
 		}
 
-		machine, err := daemonSvc.FindByID(c.Request.Context(), *tok.DaemonID)
+		daemon, err := daemonSvc.FindByID(c.Request.Context(), *tok.DaemonID)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, v1.ErrorResponse("daemon not found"))
 			c.Abort()
 			return
 		}
 
-		c.Set(daemonContextKey, machine)
+		c.Set(daemonContextKey, daemon)
 		c.Next()
 	}
 }

@@ -116,13 +116,13 @@ func TestPutRuntimes(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL, "token")
-		err := c.PutRuntimes(t.Context(), "daemon-abc", []v1.Runtime{
-			{Kind: "claude", Version: "1.0.0", ExecutablePath: "/usr/bin/claude", MaxConcurrency: 1},
-		})
+	err := c.PutRuntimes(t.Context(), []v1.Runtime{
+		{Kind: "claude", Version: "1.0.0", ExecutablePath: "/usr/bin/claude", MaxConcurrency: 1},
+	})
 	if err != nil {
 		t.Fatalf("PutRuntimes() = %v, want nil", err)
 	}
-	if receivedPath != "/api/v1/daemon/daemon-abc/runtimes" {
-		t.Fatalf("path = %q, want /api/v1/daemon/daemon-abc/runtimes", receivedPath)
+	if receivedPath != "/api/v1/daemon/runtimes" {
+		t.Fatalf("path = %q, want /api/v1/daemon/runtimes", receivedPath)
 	}
 }

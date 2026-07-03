@@ -36,9 +36,10 @@ func (c *Client) PollPairing(ctx context.Context, code string) (*v1.PairingPollR
 }
 
 // PutRuntimes uploads the daemon's runtime capabilities to the server.
-func (c *Client) PutRuntimes(ctx context.Context, daemonID string, runtimes []v1.Runtime) error {
+// The daemon identity is resolved from the Authorization token — no daemon ID in the URL.
+func (c *Client) PutRuntimes(ctx context.Context, runtimes []v1.Runtime) error {
 	body := v1.PutRuntimesRequest{Runtimes: runtimes}
-	if err := c.Do(ctx, "PUT", "/api/v1/daemon/"+daemonID+"/runtimes", body, nil); err != nil {
+	if err := c.Do(ctx, "PUT", "/api/v1/daemon/runtimes", body, nil); err != nil {
 		return fmt.Errorf("put runtimes: %w", err)
 	}
 	return nil

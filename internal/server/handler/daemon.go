@@ -63,8 +63,6 @@ func (h *DaemonHandler) authByPairing(c *gin.Context) {
 }
 
 func (h *DaemonHandler) authByToken(c *gin.Context, rawToken string) {
-	c.ShouldBindJSON(&struct{}{}) // consume body, no fields needed for token mode
-
 	daemon, err := h.daemons.AuthenticateByToken(c.Request.Context(), rawToken)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("invalid or revoked token"))
@@ -159,13 +157,18 @@ func (h *DaemonHandler) DeleteDaemon(c *gin.Context) {
 }
 
 func (h *DaemonHandler) PutRuntimes(c *gin.Context) {
-	id, _ := uuid.Parse(c.Param("id"))
+	daemon := middleware.GetDaemon(c)
+	if daemon == nil {
+		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("unauthorized"))
+		return
+	}
+
 	var req v1.PutRuntimesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid request"))
 		return
 	}
-	if err := h.daemons.ReplaceRuntimes(c.Request.Context(), id, req.Runtimes); err != nil {
+	if err := h.daemons.ReplaceRuntimes(c.Request.Context(), daemon.ID, req.Runtimes); err != nil {
 		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to update runtimes"))
 		return
 	}

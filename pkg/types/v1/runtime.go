@@ -14,7 +14,7 @@ type Runtime struct {
 	DaemonID       uuid.UUID `json:"daemon_id,omitempty"`
 }
 
-// PutRuntimesRequest is the body for PUT /api/v1/daemon/:id/runtimes.
+// PutRuntimesRequest is the body for PUT /api/v1/daemon/runtimes.
 type PutRuntimesRequest struct {
 	Runtimes []Runtime `json:"runtimes"`
 }
