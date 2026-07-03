@@ -156,6 +156,15 @@ func (q *Queries) DaemonOffline(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const daemonHeartbeat = `-- name: DaemonHeartbeat :exec
+UPDATE daemons SET last_seen_at = now() WHERE id = $1
+`
+
+func (q *Queries) DaemonHeartbeat(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, daemonHeartbeat, id)
+	return err
+}
+
 const daemonOnline = `-- name: DaemonOnline :exec
 UPDATE daemons SET last_seen_at = now(), status = 'online', connected_at = COALESCE(connected_at, now()) WHERE id = $1
 `

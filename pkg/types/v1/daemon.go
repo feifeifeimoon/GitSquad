@@ -9,8 +9,7 @@ import (
 type DaemonStatus = string
 
 const (
-	DaemonStatusOnline  = "online"
-	DaemonStatusOffline = "offline"
+	DaemonStatusOnline = "online"
 )
 
 // Daemon represents a registered daemon machine.

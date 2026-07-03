@@ -172,11 +172,3 @@ func (h *DaemonHandler) PutRuntimes(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(v1.PutRuntimesResponse{Accepted: len(req.Runtimes)}, 0))
 }
 
-func (h *DaemonHandler) Heartbeat(c *gin.Context) {
-	id, _ := uuid.Parse(c.Param("id"))
-	_ = h.daemons.MarkOnline(c.Request.Context(), id)
-	c.JSON(http.StatusOK, v1.SuccessResponse(v1.HeartbeatResponse{
-		ServerTime:   time.Now().Format(time.RFC3339),
-		PendingTasks: 0,
-	}, 0))
-}

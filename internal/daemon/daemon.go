@@ -2,6 +2,7 @@ package daemon
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"os"
@@ -33,7 +34,8 @@ func New(cfg daemonconfig.Config) *Daemon {
 }
 
 // Run starts the daemon: connects to the server via WebSocket, uploads
-// detected runtimes, and enters the event loop.
+// detected runtimes, and enters the event loop. On connection loss it
+// reconnects automatically with exponential backoff until ctx is cancelled.
 func (d *Daemon) Run(ctx context.Context) error {
 	if d.cfg.Token == "" {
 		return fmt.Errorf("not logged in. Run 'gitsquad daemon login' first")
@@ -42,25 +44,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 		return fmt.Errorf("daemon id missing. Run 'gitsquad daemon login' first")
 	}
 
-	slog.Info("connecting", "url", d.cfg.APIURL)
-
-	ws, err := d.client.ConnectWS(ctx, d.cfg.ID)
-	if err != nil {
-		return fmt.Errorf("connect: %w", err)
-	}
-	defer ws.Close()
-	d.ws = ws
-
-	slog.Info("daemon online")
-
-	_, runtimes := d.DetectRuntimes()
-	d.lastRuntime = runtimes
-	slog.Info("runtimes detected", "count", len(runtimes))
-	if err := d.client.PutRuntimes(ctx, d.cfg.ID, runtimes); err != nil {
-		slog.Warn("upload runtimes failed", "error", err)
-	}
-
-	return d.eventLoop(ctx)
+	return d.runWithReconnect(ctx)
 }
 
 // eventLoop is the main event-driven loop: reads WebSocket frames,
@@ -113,10 +97,40 @@ func (d *Daemon) readFrames(ctx context.Context, frames chan<- v1.Frame, errs ch
 func (d *Daemon) handleFrame(ctx context.Context, f v1.Frame) {
 	switch f.Type {
 	case v1.FrameTypeHeartbeatAck:
-		// Server confirms connectivity.
+		// Parse pending actions from server.
+		var ack v1.WSHeartbeatAckPayload
+		if err := json.Unmarshal(f.Payload, &ack); err != nil {
+			slog.Warn("bad heartbeat_ack", "error", err)
+			return
+		}
+		for _, action := range ack.PendingActions {
+			switch action.Type {
+			case v1.ActionTaskAvailable:
+				var tasks v1.TaskAvailablePayload
+				if err := json.Unmarshal(action.Payload, &tasks); err != nil {
+					slog.Warn("bad task_available payload", "error", err)
+					continue
+				}
+				for _, t := range tasks.Tasks {
+					slog.Info("task available via heartbeat", "task_id", t.TaskID)
+					// TODO: claim and execute task via HTTP.
+				}
+			case v1.ActionShutdown:
+				slog.Info("server requested shutdown")
+				// TODO: trigger graceful daemon shutdown.
+			default:
+				slog.Info("heartbeat action", "type", action.Type)
+			}
+		}
 
 	case v1.FrameTypeTaskWake:
-		slog.Info("task received", "payload", string(f.Payload))
+		var p v1.WSTaskWakePayload
+		if err := json.Unmarshal(f.Payload, &p); err != nil {
+			slog.Warn("bad task_wake payload", "error", err)
+			return
+		}
+		slog.Info("task wake received", "task_id", p.TaskID, "priority", p.Priority)
+		// TODO: claim and execute task via HTTP.
 
 	default:
 		slog.Warn("unknown frame type", "type", f.Type)
@@ -131,7 +145,6 @@ func (d *Daemon) sendHeartbeat(ctx context.Context) {
 	}
 
 	payload := v1.WSHeartbeatPayload{
-		Status:         v1.DaemonStatusOnline,
 		DaemonVersion:  d.cfg.DaemonVersion,
 		ActiveTasks:    []string{},
 		RuntimeSummary: summary,

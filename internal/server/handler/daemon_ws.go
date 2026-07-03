@@ -14,10 +14,12 @@ import (
 
 // NewDaemonWS wires up the WS hub, dispatcher, message handlers, and stale detection.
 func NewDaemonWS(daemonSvc *service.DaemonService) gin.HandlerFunc {
-	hub := ws.NewHub()
+	// Hub with built-in stale detection: connections untouched for 60s (2 heartbeat
+	// cycles) are unregistered, which triggers OnDisconnect → MarkOffline.
+	hub := ws.NewHub(60 * time.Second)
+
 	disp := ws.NewDispatcher()
 
-	// When a daemon disconnects (for any reason), mark it offline in the DB.
 	hub.OnDisconnect = func(daemonID string) {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
@@ -25,15 +27,16 @@ func NewDaemonWS(daemonSvc *service.DaemonService) gin.HandlerFunc {
 		_ = daemonSvc.MarkOffline(ctx, uid)
 	}
 
+	// HeartbeatScheduler batches last_seen_at DB writes every 60s.
+	scheduler := NewHeartbeatScheduler(context.Background(), daemonSvc)
+
 	disp.On(ws.TypeAuth, authHandler(daemonSvc))
-	disp.On(ws.TypeHeartbeat, heartbeatHandler(daemonSvc))
+	disp.On(ws.TypeHeartbeat, heartbeatHandler(daemonSvc, scheduler))
 	disp.On(ws.TypeStatusUpdate, statusUpdateHandler(daemonSvc))
 	disp.On(ws.TypeTaskWakeAck, noopHandler)
 	disp.On(ws.TypeRuntimeGoneAck, noopHandler)
 
-	go staleWatcher(hub)
-
-	return gin.WrapF(ws.HandleWS(hub, disp))
+	return gin.WrapF(ws.Upgrade(hub, disp))
 }
 
 func authHandler(daemonSvc *service.DaemonService) ws.Handler {
@@ -51,15 +54,18 @@ func authHandler(daemonSvc *service.DaemonService) ws.Handler {
 			return errorFrame("invalid token")
 		}
 
-		// Verify the claimed daemon ID matches the token's daemon.
 		if daemon.ID.String() != payload.DaemonID {
 			return errorFrame("daemon_id mismatch")
 		}
 
 		_ = daemonSvc.MarkOnline(ctx, daemon.ID)
 
-		conn.DaemonID = daemon.ID.String()
-		conn.UserID = daemon.UserID.String()
+		// Reconnect: silently drop the old connection so OnDisconnect does
+		// not fire and flip the daemon to offline between unregister/register.
+		if hub.Has(daemon.ID.String()) {
+			hub.UnregisterSilent(daemon.ID.String())
+		}
+
 		hub.Register(daemon.ID.String(), conn)
 
 		ackPayload, _ := json.Marshal(v1.WSAuthAckPayload{
@@ -74,7 +80,7 @@ func authHandler(daemonSvc *service.DaemonService) ws.Handler {
 	}
 }
 
-func heartbeatHandler(daemonSvc *service.DaemonService) ws.Handler {
+func heartbeatHandler(daemonSvc *service.DaemonService, scheduler *HeartbeatScheduler) ws.Handler {
 	return func(conn *ws.Conn, _ *ws.Hub, frame ws.Frame) *ws.Frame {
 		if !conn.Authenticated {
 			return nil
@@ -84,11 +90,14 @@ func heartbeatHandler(daemonSvc *service.DaemonService) ws.Handler {
 		defer cancel()
 
 		uid, _ := uuid.Parse(conn.DaemonID)
-		_ = daemonSvc.MarkOnline(ctx, uid)
+
+		// Batched last_seen_at update — avoids a DB write on every single heartbeat.
+		scheduler.RecordHeartbeat(uid)
+
+		actions := daemonSvc.PendingActions(ctx, uid)
 
 		ackPayload, _ := json.Marshal(v1.WSHeartbeatAckPayload{
-			ServerTime:   time.Now().Format(time.RFC3339),
-			PendingTasks: 0,
+			PendingActions: actions,
 		})
 		return &ws.Frame{
 			Type:    ws.TypeHeartbeatAck,
@@ -113,19 +122,6 @@ func statusUpdateHandler(daemons *service.DaemonService) ws.Handler {
 
 func noopHandler(conn *ws.Conn, hub *ws.Hub, frame ws.Frame) *ws.Frame {
 	return nil
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────
-
-func staleWatcher(hub *ws.Hub) {
-	ticker := time.NewTicker(30 * time.Second)
-	defer ticker.Stop()
-	for range ticker.C {
-		for _, id := range hub.StaleDaemons(90 * time.Second) {
-			// OnDisconnect calls MarkOffline, so just unregister to trigger it.
-			hub.Unregister(id)
-		}
-	}
 }
 
 func errorFrame(msg string) *ws.Frame {

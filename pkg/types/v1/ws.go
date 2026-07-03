@@ -42,18 +42,51 @@ type WSAuthAckPayload struct {
 
 // WS Heartbeat payloads.
 
-// WSHeartbeatPayload is sent periodically by the daemon.
+// WSHeartbeatPayload is sent periodically by the daemon to report liveness
+// and current machine state. The mere arrival of this frame proves the
+// daemon is online — no separate Status field is needed.
 type WSHeartbeatPayload struct {
-	Status         string            `json:"status"`
 	DaemonVersion  string            `json:"daemon_version"`
 	ActiveTasks    []string          `json:"active_tasks"`
 	RuntimeSummary map[string]string `json:"runtime_summary"`
 }
 
 // WSHeartbeatAckPayload is the server's response to a heartbeat frame.
+// PendingActions is an extensible command channel: the server can piggyback
+// instructions (task_available, runtime_rescan, shutdown, etc.) on the ack.
 type WSHeartbeatAckPayload struct {
-	ServerTime   string `json:"server_time"`
-	PendingTasks int    `json:"pending_tasks"`
+	PendingActions []PendingAction `json:"pending_actions,omitempty"`
+}
+
+// PendingAction is a command the server sends to a daemon via heartbeat ack.
+type PendingAction struct {
+	Type    string          `json:"type"`
+	Payload json.RawMessage `json:"payload,omitempty"`
+}
+
+// PendingAction type constants.
+const (
+	ActionTaskAvailable = "task_available"
+	ActionRuntimeRescan = "runtime_rescan"
+	ActionShutdown      = "shutdown"
+)
+
+// TaskAvailablePayload lists tasks the daemon should claim.
+type TaskAvailablePayload struct {
+	Tasks []TaskHint `json:"tasks"`
+}
+
+// TaskHint is a minimal reference to a pending task.
+type TaskHint struct {
+	TaskID   string `json:"task_id"`
+	Priority int    `json:"priority,omitempty"`
+}
+
+// WSTaskWakePayload is sent in a task_wake frame to notify the daemon
+// that a specific task is ready to be claimed via HTTP.
+type WSTaskWakePayload struct {
+	TaskID   string `json:"task_id"`
+	Priority int    `json:"priority,omitempty"`
 }
 
 // WSErrorPayload is sent in an error frame.

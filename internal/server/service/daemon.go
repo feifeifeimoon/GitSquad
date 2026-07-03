@@ -287,6 +287,19 @@ func (s *DaemonService) MarkOffline(ctx context.Context, id uuid.UUID) error {
 	return s.store.DaemonOffline(ctx, id)
 }
 
+// DaemonHeartbeat updates only last_seen_at — used by the HeartbeatScheduler
+// for batched, lower-cost liveness refresh (no status flip).
+func (s *DaemonService) DaemonHeartbeat(ctx context.Context, id uuid.UUID) error {
+	return s.store.DaemonHeartbeat(ctx, id)
+}
+
+// PendingActions returns the list of server-to-daemon commands that should be
+// delivered in the next heartbeat ack. MVP returns an empty slice; task
+// wakeup actions will be populated when task dispatch is implemented.
+func (s *DaemonService) PendingActions(ctx context.Context, id uuid.UUID) []v1.PendingAction {
+	return nil
+}
+
 func (s *DaemonService) FindByUserID(ctx context.Context, userID uuid.UUID) ([]v1.DaemonWithRuntimes, error) {
 	rows, err := s.store.ListDaemonsByUser(ctx, userID)
 	if err != nil {

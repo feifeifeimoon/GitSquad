@@ -45,6 +45,9 @@ UPDATE daemons SET name = $2, os = $3, arch = $4, daemon_version = $5 WHERE id =
 -- name: DaemonOnline :exec
 UPDATE daemons SET last_seen_at = now(), status = 'online', connected_at = COALESCE(connected_at, now()) WHERE id = $1;
 
+-- name: DaemonHeartbeat :exec
+UPDATE daemons SET last_seen_at = now() WHERE id = $1;
+
 -- name: DaemonOffline :exec
 UPDATE daemons SET status = 'offline' WHERE id = $1;
 
