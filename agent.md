@@ -203,3 +203,7 @@ If ANY step fails:
 | `GITSQUAD_API_URL` | No | `http://localhost:8080` | Daemon → server API URL |
 | `GITSQUAD_DAEMON_TOKEN` | No | — | Daemon pairing token |
 | `GITSQUAD_DAEMON_WORK_DIR` | No | `~/.gitsquad/workspaces` | Daemon workspace root |
+| `GITSQUAD_GITHUB_APP_ID` | No | — | GitHub App ID (required for repo features) |
+| `GITSQUAD_GITHUB_APP_PRIVATE_KEY` | No | — | GitHub App private key PEM (required for repo features) |
+| `GITSQUAD_GITHUB_APP_NAME` | No | `gitsquad` | GitHub App name |
+| `GITSQUAD_GITHUB_WEBHOOK_SECRET` | No | — | GitHub webhook HMAC secret |
