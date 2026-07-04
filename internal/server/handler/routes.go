@@ -32,6 +32,11 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	userHandler := NewUserHandler()
 	daemonHandler := NewDaemonHandler(cfg, daemonSvc)
 
+	githubSvc := service.NewGitHubAppService(s, cfg)
+	workspaceSvc := service.NewWorkspaceService(s)
+	githubHandler := NewGitHubHandler(cfg, githubSvc)
+	workspaceHandler := NewWorkspaceHandler(workspaceSvc)
+
 	r.GET("/healthz", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
@@ -58,10 +63,19 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		daemonConfirm := api.Group("/daemon/auth")
 		daemonConfirm.Use(middleware.RequireAuth(cfg, userSvc))
 		{
-			daemonConfirm.POST("/:code/confirm", daemonHandler.ConfirmPairing)
+		daemonConfirm.POST("/:code/confirm", daemonHandler.ConfirmPairing)
+	}
+
+		// GitHub App callback and installation management (requires user login).
+		github := api.Group("/github")
+		github.Use(middleware.RequireAuth(cfg, userSvc))
+		{
+			github.GET("/callback", githubHandler.Callback)
+			github.GET("/installations", githubHandler.ListInstallations)
+			github.GET("/installations/:id", githubHandler.GetInstallation)
 		}
 
-		// Protected daemon endpoints (daemon token auth).
+	// Protected daemon endpoints (daemon token auth).
 		// Daemon identity is resolved from the token — no :id in the URL.
 		daemon := api.Group("/daemon")
 		daemon.Use(middleware.RequireDaemonAuth(cfg, daemonSvc))
@@ -83,9 +97,18 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		{
 			protected.GET("/me", userHandler.Me)
 			protected.GET("/daemons", daemonHandler.ListDaemons)
-			protected.DELETE("/daemons/:id", daemonHandler.DeleteDaemon)
-		}
+		protected.DELETE("/daemons/:id", daemonHandler.DeleteDaemon)
+
+			// Workspace management
+			protected.POST("/workspaces", workspaceHandler.Create)
+			protected.GET("/workspaces", workspaceHandler.List)
+			protected.GET("/workspaces/:id", workspaceHandler.Get)
+			protected.DELETE("/workspaces/:id", workspaceHandler.Archive)
 	}
+}
+
+	// Webhook endpoint — public, HMAC-verified, no user auth required.
+	r.POST("/api/v1/github/webhook", githubHandler.Webhook)
 
 	return r
 }
