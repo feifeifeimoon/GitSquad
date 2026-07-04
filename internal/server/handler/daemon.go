@@ -156,14 +156,14 @@ func (h *DaemonHandler) DeleteDaemon(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(v1.DeleteDaemonResponse{Deleted: true}, 0))
 }
 
-func (h *DaemonHandler) PutRuntimes(c *gin.Context) {
+func (h *DaemonHandler) Register(c *gin.Context) {
 	daemon := middleware.GetDaemon(c)
 	if daemon == nil {
 		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("unauthorized"))
 		return
 	}
 
-	var req v1.PutRuntimesRequest
+	var req v1.RegisterRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid request"))
 		return
@@ -172,6 +172,6 @@ func (h *DaemonHandler) PutRuntimes(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to update runtimes"))
 		return
 	}
-	c.JSON(http.StatusOK, v1.SuccessResponse(v1.PutRuntimesResponse{Accepted: len(req.Runtimes)}, 0))
+	c.JSON(http.StatusOK, v1.SuccessResponse(v1.RegisterResponse{Accepted: len(req.Runtimes)}, 0))
 }
 

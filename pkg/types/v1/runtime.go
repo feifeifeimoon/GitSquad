@@ -14,12 +14,12 @@ type Runtime struct {
 	DaemonID       uuid.UUID `json:"daemon_id,omitempty"`
 }
 
-// PutRuntimesRequest is the body for PUT /api/v1/daemon/runtimes.
-type PutRuntimesRequest struct {
+// RegisterRequest is the body for PUT /api/v1/daemon/runtimes.
+type RegisterRequest struct {
 	Runtimes []Runtime `json:"runtimes"`
 }
 
-// PutRuntimesResponse is the data returned on successful runtimes upload.
-type PutRuntimesResponse struct {
+// RegisterResponse is the data returned on successful runtimes registration.
+type RegisterResponse struct {
 	Accepted int `json:"accepted"`
 }

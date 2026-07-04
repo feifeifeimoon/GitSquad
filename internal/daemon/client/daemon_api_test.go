@@ -106,7 +106,7 @@ func TestPollPairing(t *testing.T) {
 	}
 }
 
-func TestPutRuntimes(t *testing.T) {
+func TestRegister(t *testing.T) {
 	var receivedPath string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		receivedPath = r.URL.Path
@@ -116,11 +116,11 @@ func TestPutRuntimes(t *testing.T) {
 	defer srv.Close()
 
 	c := New(srv.URL, "token")
-	err := c.PutRuntimes(t.Context(), []v1.Runtime{
+	err := c.Register(t.Context(), []v1.Runtime{
 		{Kind: "claude", Version: "1.0.0", ExecutablePath: "/usr/bin/claude", MaxConcurrency: 1},
 	})
 	if err != nil {
-		t.Fatalf("PutRuntimes() = %v, want nil", err)
+		t.Fatalf("Register() = %v, want nil", err)
 	}
 	if receivedPath != "/api/v1/daemon/runtimes" {
 		t.Fatalf("path = %q, want /api/v1/daemon/runtimes", receivedPath)

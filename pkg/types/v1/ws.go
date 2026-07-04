@@ -42,13 +42,11 @@ type WSAuthAckPayload struct {
 
 // WS Heartbeat payloads.
 
-// WSHeartbeatPayload is sent periodically by the daemon to report liveness
-// and current machine state. The mere arrival of this frame proves the
-// daemon is online — no separate Status field is needed.
+// WSHeartbeatPayload is sent periodically by the daemon to prove liveness.
+// Runtime capabilities are reported once at registration, not in heartbeats.
 type WSHeartbeatPayload struct {
-	DaemonVersion  string            `json:"daemon_version"`
-	ActiveTasks    []string          `json:"active_tasks"`
-	RuntimeSummary map[string]string `json:"runtime_summary"`
+	DaemonVersion string   `json:"daemon_version"`
+	ActiveTasks   []string `json:"active_tasks"`
 }
 
 // WSHeartbeatAckPayload is the server's response to a heartbeat frame.

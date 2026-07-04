@@ -74,7 +74,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 				}
 				c.JSON(http.StatusOK, v1.SuccessResponse(m, 0))
 			})
-			daemon.PUT("/runtimes", daemonHandler.PutRuntimes)
+			daemon.PUT("/runtimes", daemonHandler.Register)
 		}
 
 		// Protected user endpoints (user JWT auth).
