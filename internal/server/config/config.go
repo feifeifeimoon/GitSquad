@@ -22,6 +22,12 @@ type Config struct {
 
 	// Frontend URL for OAuth redirect callback
 	FrontendURL string
+
+	// GitHub App
+	GitHubAppID         string
+	GitHubAppPrivateKey string
+	GitHubWebhookSecret string
+	GitHubAppName       string
 }
 
 func Load() (Config, error) {
@@ -37,6 +43,11 @@ func Load() (Config, error) {
 		GoogleCallbackURL:  getEnv("GITSQUAD_GOOGLE_CALLBACK_URL", "http://localhost:8080/api/v1/auth/google/callback"),
 		JWTSecret:          getEnv("GITSQUAD_JWT_SECRET", "gitsquad-dev-secret"),
 		FrontendURL:        getEnv("GITSQUAD_FRONTEND_URL", "http://localhost:3000"),
+
+		GitHubAppID:         os.Getenv("GITSQUAD_GITHUB_APP_ID"),
+		GitHubAppPrivateKey: os.Getenv("GITSQUAD_GITHUB_APP_PRIVATE_KEY"),
+		GitHubWebhookSecret: os.Getenv("GITSQUAD_GITHUB_WEBHOOK_SECRET"),
+		GitHubAppName:       getEnv("GITSQUAD_GITHUB_APP_NAME", "gitsquad"),
 	}
 
 	if err := cfg.validate(); err != nil {
