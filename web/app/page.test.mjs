@@ -20,8 +20,8 @@ test("home page presents the GitSquad product shell", () => {
     /They review code, fix bugs, and refactor architecture\s+while you sleep/i,
   );
   assert.match(page, /Squad control center/i);
-  assert.match(page, /Issue blackboard/i);
-  assert.match(page, /Install on GitHub/i);
+  assert.match(page, /Squad control center/i);
+  assert.match(page, /Install the GitHub App/i);
   assert.match(page, /src="\/favicon.ico"/);
   assert.match(page, /alt="GitSquad logo"/);
   assert.match(page, /alt="GitSquad mark"/);

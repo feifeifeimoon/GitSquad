@@ -1,21 +1,75 @@
 package main
 
 import (
+	"context"
 	"errors"
-	"fmt"
+	"log/slog"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/feifeifeimoon/GitSquad/internal/server/router"
+	"github.com/feifeifeimoon/GitSquad/internal/server/config"
+	"github.com/feifeifeimoon/GitSquad/internal/server/database"
+	"github.com/feifeifeimoon/GitSquad/internal/server/handler"
+	"github.com/feifeifeimoon/GitSquad/internal/server/logging"
+	"github.com/feifeifeimoon/GitSquad/internal/version"
 )
 
 func main() {
-	fmt.Println("GitSquad Server Start")
-	server := &http.Server{
-		Addr:    ":8080",
-		Handler: router.New(),
-	}
-
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	cfg, err := config.Load()
+	if err != nil {
+		slog.Error("config", "error", err)
 		panic(err)
 	}
+	logging.Init(cfg.Environment)
+	slog.Info("GitSquad server", "version", version.Short())
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	pool, err := database.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		slog.Error("open database", "error", err)
+		panic(err)
+	}
+	defer pool.Close()
+
+	if err := database.Migrate(ctx, pool); err != nil {
+		slog.Error("migrate database", "error", err)
+		panic(err)
+	}
+	slog.Info("database migrated")
+
+	slog.Info("server starting", "addr", cfg.HTTPAddr, "env", cfg.Environment)
+	server := &http.Server{
+		Addr:    cfg.HTTPAddr,
+		Handler: handler.SetupRoutes(cfg, pool),
+	}
+
+	// Graceful shutdown on SIGINT / SIGTERM.
+	idleConnsClosed := make(chan struct{})
+	go func() {
+		quit := make(chan os.Signal, 1)
+		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		sig := <-quit
+		slog.Info("shutting down", "signal", sig.String())
+
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+
+		server.SetKeepAlivesEnabled(false)
+		if err := server.Shutdown(ctx); err != nil {
+			slog.Error("graceful shutdown failed", "error", err)
+		}
+		close(idleConnsClosed)
+	}()
+
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		slog.Error("server", "error", err)
+		panic(err)
+	}
+
+	<-idleConnsClosed
+	slog.Info("server stopped")
 }

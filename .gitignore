@@ -13,9 +13,12 @@ build
 # test coverage
 coverage
 
-# goreleaser output
+# build output
+bin/
 dist/
 
 # Editor/IDE
 .idea/
 .vscode/
+
+# generated Windows resource

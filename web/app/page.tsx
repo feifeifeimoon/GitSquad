@@ -1,15 +1,17 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import {
   ArrowRight,
-  Bot,
-  GitPullRequestArrow,
-  LockKeyhole,
   Sparkles,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { LiveAgentLog } from "@/components/live-agent-log";
+import { AuthButton } from "@/components/auth-button";
+import { LoginModal } from "@/components/login-modal";
 
 const navItems = ["Agents", "Security", "Pricing", "Docs"];
 
@@ -54,8 +56,17 @@ const agents = [
 
 
 export default function Home() {
+  const [showLoginModal, setShowLoginModal] = useState(false);
+
   return (
     <main className="min-h-screen overflow-hidden bg-white text-zinc-950">
+      {/* Login modal */}
+      <LoginModal
+        mode="modal"
+        open={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
+
       <header className="border-b border-zinc-200/80 bg-white/95">
         <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-5 sm:px-8">
           <a href="#" className="flex items-center gap-2 text-sm font-semibold">
@@ -78,10 +89,9 @@ export default function Home() {
             ))}
           </nav>
 
-          <Button size="sm" className="h-9 rounded-md px-4 text-xs font-semibold">
-            <ArrowRight className="size-3.5" />
-            Install on GitHub
-          </Button>
+          <div className="flex items-center gap-3">
+            <AuthButton onLoginClick={() => setShowLoginModal(true)} />
+          </div>
         </div>
       </header>
 
@@ -113,13 +123,20 @@ export default function Home() {
         </p>
 
         <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-          <Button className="h-11 rounded-md px-5 text-sm font-semibold">
-            Open workspace
+          <Button
+            className="h-11 rounded-md px-5 text-sm font-semibold"
+            onClick={() => setShowLoginModal(true)}
+          >
+            Get started free
             <ArrowRight className="size-4" />
           </Button>
-          <Button variant="outline" className="h-11 rounded-md px-5 text-sm font-semibold">
-            View agent docs
-          </Button>
+          <a
+            href="/docs"
+            className="inline-flex items-center gap-1 text-sm font-medium text-zinc-500 hover:text-zinc-950 transition-colors"
+          >
+            Read the docs
+            <ArrowRight className="size-3.5" />
+          </a>
         </div>
 
         <div className="mt-16 w-full max-w-6xl rounded-xl border border-zinc-800 bg-[#111214] p-3 text-left shadow-[0_34px_100px_rgba(15,23,42,0.22)]">
@@ -193,26 +210,59 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="mt-10 grid w-full max-w-5xl grid-cols-1 gap-3 text-left sm:grid-cols-3">
-          <div className="rounded-lg border border-zinc-200 bg-white p-4">
-            <LockKeyhole className="mb-4 size-4 text-zinc-500" />
-            <p className="text-sm font-semibold">GitHub App first</p>
+      </section>
+
+      {/* ── How it works ── */}
+      <section className="mx-auto max-w-7xl px-5 pb-24 sm:px-8">
+        <div className="mb-12 text-center">
+          <p className="text-xs font-semibold uppercase tracking-[0.2em] text-orange-600">
+            How it works
+          </p>
+          <h2 className="mt-3 text-3xl font-bold tracking-tight text-zinc-950 sm:text-4xl">
+            From issue to pull request in minutes
+          </h2>
+          <p className="mt-3 text-sm text-zinc-500">
+            Set up in 60 seconds. Your first AI teammate ships code today.
+          </p>
+        </div>
+
+        <div className="grid gap-6 sm:grid-cols-3">
+          <div className="group relative rounded-xl border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md">
+            <span className="mb-4 inline-flex size-8 items-center justify-center rounded-lg bg-zinc-950 text-xs font-bold text-white">
+              1
+            </span>
+            <h3 className="text-base font-semibold text-zinc-950">
+              Install the GitHub App
+            </h3>
             <p className="mt-2 text-sm leading-6 text-zinc-500">
-              Install once, bind repos like Vercel, and keep tokens scoped per workspace.
+              Install GitSquad on your repositories in one click. Choose which repos
+              your agents can access, just like you&apos;d connect Vercel.
             </p>
           </div>
-          <div className="rounded-lg border border-zinc-200 bg-white p-4">
-            <Bot className="mb-4 size-4 text-zinc-500" />
-            <p className="text-sm font-semibold">Issue blackboard</p>
+
+          <div className="group relative rounded-xl border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md">
+            <span className="mb-4 inline-flex size-8 items-center justify-center rounded-lg bg-zinc-950 text-xs font-bold text-white">
+              2
+            </span>
+            <h3 className="text-base font-semibold text-zinc-950">
+              @mention an agent
+            </h3>
             <p className="mt-2 text-sm leading-6 text-zinc-500">
-              Humans and agents coordinate through one auditable comment stream.
+              Create an issue and tag @coder, @reviewer, or @planner. Agents pick up
+              tasks, discuss with you, and get to work.
             </p>
           </div>
-          <div className="rounded-lg border border-zinc-200 bg-white p-4">
-            <GitPullRequestArrow className="mb-4 size-4 text-zinc-500" />
-            <p className="text-sm font-semibold">PR loop closed</p>
+
+          <div className="group relative rounded-xl border border-zinc-200 bg-white p-6 transition-shadow hover:shadow-md">
+            <span className="mb-4 inline-flex size-8 items-center justify-center rounded-lg bg-zinc-950 text-xs font-bold text-white">
+              3
+            </span>
+            <h3 className="text-base font-semibold text-zinc-950">
+              Merge the pull request
+            </h3>
             <p className="mt-2 text-sm leading-6 text-zinc-500">
-              Pull request events flow back to the platform issue without mirroring GitHub.
+              Agents push code to a branch and open a PR. Review the diff, leave
+              feedback, and merge when it&apos;s ready.
             </p>
           </div>
         </div>
