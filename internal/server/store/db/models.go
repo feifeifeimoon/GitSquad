@@ -39,6 +39,28 @@ type DaemonToken struct {
 	LastUsedAt  *time.Time `json:"last_used_at"`
 }
 
+type GithubInstallation struct {
+	ID                  uuid.UUID `json:"id"`
+	UserID              uuid.UUID `json:"user_id"`
+	InstallationID      int64     `json:"installation_id"`
+	AccountLogin        string    `json:"account_login"`
+	AccountType         string    `json:"account_type"`
+	RepositorySelection string    `json:"repository_selection"`
+	Status              string    `json:"status"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+type GithubRepo struct {
+	ID             uuid.UUID `json:"id"`
+	InstallationID uuid.UUID `json:"installation_id"`
+	GithubRepoID   int64     `json:"github_repo_id"`
+	Owner          string    `json:"owner"`
+	Name           string    `json:"name"`
+	FullName       string    `json:"full_name"`
+	Private        bool      `json:"private"`
+}
+
 type Runtime struct {
 	ID             uuid.UUID `json:"id"`
 	DaemonID       uuid.UUID `json:"daemon_id"`
@@ -69,6 +91,27 @@ type UserIdentity struct {
 	Email          *string   `json:"email"`
 	AccessToken    *string   `json:"access_token"`
 	RefreshToken   *string   `json:"refresh_token"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type WebhookEvent struct {
+	ID               uuid.UUID `json:"id"`
+	GithubDeliveryID *string   `json:"github_delivery_id"`
+	EventType        string    `json:"event_type"`
+	Action           *string   `json:"action"`
+	Payload          []byte    `json:"payload"`
+	Processed        bool      `json:"processed"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+type Workspace struct {
+	ID             uuid.UUID `json:"id"`
+	UserID         uuid.UUID `json:"user_id"`
+	InstallationID uuid.UUID `json:"installation_id"`
+	GithubRepoID   uuid.UUID `json:"github_repo_id"`
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 }
