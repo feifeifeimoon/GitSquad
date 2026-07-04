@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/feifeifeimoon/GitSquad/internal/daemon"
-	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +24,7 @@ Examples:
   gitsquad daemon login --token gitsquad_dm_xxxxx  # Token auth
   gitsquad daemon login --name "Mac Mini"        # Custom device name`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		d := daemon.New(daemonconfig.Load())
+		d := daemon.New()
 		return d.Login(cmd.Context(), loginToken, loginName)
 	},
 }

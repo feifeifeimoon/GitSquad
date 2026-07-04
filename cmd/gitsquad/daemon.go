@@ -12,6 +12,8 @@ func init() {
 	daemonLoginCmd.Flags().StringVar(&loginToken, "token", "", "Daemon token for headless auth")
 	daemonLoginCmd.Flags().StringVar(&loginName, "name", "", "Custom device name")
 
+	daemonCmd.AddCommand(daemonStartCmd)
+	daemonCmd.AddCommand(daemonStopCmd)
 	daemonCmd.AddCommand(daemonRunCmd)
 	daemonCmd.AddCommand(daemonLoginCmd)
 	daemonCmd.AddCommand(daemonStatusCmd)

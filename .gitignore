@@ -20,3 +20,5 @@ dist/
 # Editor/IDE
 .idea/
 .vscode/
+
+# generated Windows resource

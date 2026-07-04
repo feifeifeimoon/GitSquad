@@ -8,7 +8,6 @@ import (
 	"syscall"
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon"
-	daemonconfig "github.com/feifeifeimoon/GitSquad/internal/daemon/config"
 	"github.com/spf13/cobra"
 )
 
@@ -20,7 +19,7 @@ var daemonRunCmd = &cobra.Command{
 		ctx, stop := signal.NotifyContext(cmd.Context(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
 
-		d := daemon.New(daemonconfig.Load())
+		d := daemon.New()
 		err := d.Run(ctx)
 		if errors.Is(err, context.Canceled) {
 			return nil
