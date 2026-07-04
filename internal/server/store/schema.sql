@@ -35,3 +35,47 @@ CREATE TABLE runtimes (
     diagnostics TEXT, max_concurrency INT NOT NULL DEFAULT 1,
     UNIQUE(daemon_id, kind, name)
 );
+
+CREATE TABLE github_installations (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    installation_id BIGINT NOT NULL UNIQUE,
+    account_login TEXT NOT NULL,
+    account_type TEXT NOT NULL,
+    repository_selection TEXT NOT NULL DEFAULT 'selected',
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE github_repos (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    installation_id UUID NOT NULL REFERENCES github_installations(id),
+    github_repo_id BIGINT NOT NULL,
+    owner TEXT NOT NULL,
+    name TEXT NOT NULL,
+    full_name TEXT NOT NULL,
+    private BOOLEAN NOT NULL DEFAULT false,
+    UNIQUE(installation_id, github_repo_id)
+);
+
+CREATE TABLE webhook_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    github_delivery_id TEXT UNIQUE,
+    event_type TEXT NOT NULL,
+    action TEXT,
+    payload JSONB NOT NULL,
+    processed BOOLEAN NOT NULL DEFAULT false,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE workspaces (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL REFERENCES users(id),
+    installation_id UUID NOT NULL REFERENCES github_installations(id),
+    github_repo_id UUID NOT NULL REFERENCES github_repos(id),
+    name TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
