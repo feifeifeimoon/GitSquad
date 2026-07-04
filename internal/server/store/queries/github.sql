@@ -14,6 +14,9 @@ RETURNING *;
 -- name: GetInstallation :one
 SELECT * FROM github_installations WHERE installation_id = $1;
 
+-- name: GetInstallationByDBID :one
+SELECT * FROM github_installations WHERE id = $1;
+
 -- name: ListInstallationsByUser :many
 SELECT * FROM github_installations WHERE user_id = $1 AND status != 'revoked' ORDER BY created_at DESC;
 
