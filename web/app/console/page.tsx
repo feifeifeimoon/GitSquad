@@ -22,7 +22,7 @@ export default function ConsoleHome() {
   };
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="p-8">
       <div className="flex items-center gap-2 mb-6">
         <LayoutDashboard className="size-5 text-zinc-950" />
         <h1 className="text-xl font-bold text-zinc-950">Home</h1>

@@ -124,7 +124,7 @@ export default function NewWorkspacePage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-8">
       <button
         onClick={() => router.push("/console/workspaces")}
         className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-950 mb-6 transition-colors"
@@ -196,7 +196,7 @@ export default function NewWorkspacePage() {
               <Loader2 className="size-6 text-zinc-400 animate-spin" />
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 mb-8 max-h-80 overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8 max-h-96 overflow-y-auto">
               {filteredRepos.map((repo) => {
                 const isSelected = selectedRepoID === repo.id;
                 return (
