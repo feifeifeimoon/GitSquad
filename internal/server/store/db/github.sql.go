@@ -17,6 +17,7 @@ INSERT INTO github_installations
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (installation_id)
 DO UPDATE SET
+    user_id = COALESCE(EXCLUDED.user_id, github_installations.user_id),
     account_login = EXCLUDED.account_login,
     account_type = EXCLUDED.account_type,
     repository_selection = EXCLUDED.repository_selection,
