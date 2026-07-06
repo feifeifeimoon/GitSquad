@@ -64,20 +64,63 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID
 	return &w, nil
 }
 
-func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID) ([]db.Workspace, error) {
-	list, err := s.store.ListWorkspacesByUser(ctx, userID)
+// WorkspaceWithRepo combines workspace and repo information for the list view.
+type WorkspaceWithRepo struct {
+	db.Workspace
+	RepoFullName string `json:"repo_full_name"`
+	RepoOwner    string `json:"repo_owner"`
+	RepoName     string `json:"repo_name"`
+	RepoPrivate  bool   `json:"repo_private"`
+}
+
+func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID) ([]WorkspaceWithRepo, error) {
+	rows, err := s.store.ListWorkspacesWithRepo(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list workspaces: %w", err)
+	}
+	list := make([]WorkspaceWithRepo, len(rows))
+	for i, row := range rows {
+		list[i] = WorkspaceWithRepo{
+			Workspace: db.Workspace{
+				ID:             row.ID,
+				UserID:         row.UserID,
+				InstallationID: row.InstallationID,
+				GithubRepoID:   row.GithubRepoID,
+				Name:           row.Name,
+				Status:         row.Status,
+				CreatedAt:      row.CreatedAt,
+				UpdatedAt:      row.UpdatedAt,
+			},
+			RepoFullName: row.RepoFullName,
+			RepoOwner:    row.RepoOwner,
+			RepoName:     row.RepoName,
+			RepoPrivate:  row.RepoPrivate,
+		}
 	}
 	return list, nil
 }
 
-func (s *WorkspaceService) GetWorkspace(ctx context.Context, id uuid.UUID) (*db.Workspace, error) {
-	w, err := s.store.GetWorkspace(ctx, id)
+func (s *WorkspaceService) GetWorkspace(ctx context.Context, id uuid.UUID) (*WorkspaceWithRepo, error) {
+	row, err := s.store.GetWorkspaceWithRepo(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrWorkspaceNotFound, err)
 	}
-	return &w, nil
+	return &WorkspaceWithRepo{
+		Workspace: db.Workspace{
+			ID:             row.ID,
+			UserID:         row.UserID,
+			InstallationID: row.InstallationID,
+			GithubRepoID:   row.GithubRepoID,
+			Name:           row.Name,
+			Status:         row.Status,
+			CreatedAt:      row.CreatedAt,
+			UpdatedAt:      row.UpdatedAt,
+		},
+		RepoFullName: row.RepoFullName,
+		RepoOwner:    row.RepoOwner,
+		RepoName:     row.RepoName,
+		RepoPrivate:  row.RepoPrivate,
+	}, nil
 }
 
 func (s *WorkspaceService) ArchiveWorkspace(ctx context.Context, id uuid.UUID) error {
