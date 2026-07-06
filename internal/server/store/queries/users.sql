@@ -4,6 +4,9 @@ INSERT INTO users (login, avatar_url) VALUES ($1, $2) RETURNING *;
 -- name: FindUserByID :one
 SELECT * FROM users WHERE id = $1;
 
+-- name: FindUserByLogin :one
+SELECT * FROM users WHERE login = $1;
+
 -- name: UpdateUserAvatar :exec
 UPDATE users SET avatar_url = $2, updated_at = now() WHERE id = $1;
 

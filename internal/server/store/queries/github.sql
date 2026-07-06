@@ -18,7 +18,7 @@ SELECT * FROM github_installations WHERE installation_id = $1;
 SELECT * FROM github_installations WHERE id = $1;
 
 -- name: ListInstallationsByUser :many
-SELECT * FROM github_installations WHERE user_id = $1 AND status != 'revoked' ORDER BY created_at DESC;
+SELECT * FROM github_installations WHERE (user_id = $1 OR user_id IS NULL) AND status != 'revoked' ORDER BY created_at DESC;
 
 -- name: UpdateInstallationStatus :exec
 UPDATE github_installations SET status = $2, updated_at = now() WHERE installation_id = $1;
