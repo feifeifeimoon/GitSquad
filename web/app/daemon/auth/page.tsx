@@ -81,9 +81,6 @@ function DaemonAuthContent() {
             </div>
           </div>
           <h1 className="text-xl font-bold text-zinc-950 text-center">Device Activation</h1>
-          <p className="text-sm text-zinc-500 text-center mt-1 mb-8">
-            Connect <strong>{machineName || "a device"}</strong> to your GitSquad account
-          </p>
 
           {/* Need login */}
           {status === "need_login" && (
