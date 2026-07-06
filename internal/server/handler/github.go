@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -133,19 +134,34 @@ func (h *GitHubHandler) Webhook(c *gin.Context) {
 		return
 	}
 
+	slog.Info("webhook received", "event", eventType, "delivery_id", deliveryID, "size", len(body))
+
 	if !h.githubSvc.VerifyWebhook(body, signature) {
 		slog.Warn("webhook signature verification failed", "delivery_id", deliveryID)
 		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("invalid signature"))
 		return
 	}
 
-	// GitHub sends the action in the payload, not as a header.
-	// For skeleton storage we pass empty action — event_type is sufficient.
-	if err := h.githubSvc.ProcessWebhook(c.Request.Context(), deliveryID, eventType, "", body); err != nil {
+	// Extract action from JSON payload (GitHub puts it in the body, not a header).
+	action := extractAction(body)
+	slog.Info("webhook processing", "event", eventType, "action", action, "delivery_id", deliveryID)
+
+	if err := h.githubSvc.ProcessWebhook(c.Request.Context(), deliveryID, eventType, action, body); err != nil {
 		slog.Error("process webhook", "delivery_id", deliveryID, "error", err)
 		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to process webhook"))
 		return
 	}
 
 	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]string{"status": "accepted"}, 0))
+}
+
+// extractAction peeks at the "action" field in a GitHub webhook JSON payload.
+func extractAction(body []byte) string {
+	var partial struct {
+		Action string `json:"action"`
+	}
+	if err := json.Unmarshal(body, &partial); err != nil {
+		return ""
+	}
+	return partial.Action
 }
