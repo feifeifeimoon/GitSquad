@@ -2,16 +2,17 @@
 
 import { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
-import { FolderGit2, ChevronLeft, ExternalLink } from "lucide-react";
+import { ChevronLeft, ExternalLink, Lock, Calendar } from "lucide-react";
 import { api } from "@/lib/api";
 
 interface Workspace {
   id: string;
   name: string;
   status: string;
-  user_id: string;
-  installation_id: string;
-  github_repo_id: string;
+  repo_full_name: string;
+  repo_owner: string;
+  repo_name: string;
+  repo_private: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -44,27 +45,28 @@ export default function WorkspaceDetailPage({
 
   if (!workspace) return null;
 
-  const isDegraded = workspace.status === "degraded";
+  const repoFullName = workspace.repo_full_name || `${workspace.repo_owner}/${workspace.repo_name}`;
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-8 max-w-4xl">
       <button
         onClick={() => router.push("/console/workspaces")}
-        className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-950 mb-4 transition-colors"
+        className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-950 mb-6 transition-colors"
       >
         <ChevronLeft className="size-4" />
-        Back to Workspaces
+        All Workspaces
       </button>
 
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-zinc-100">
-          <FolderGit2 className="size-5 text-zinc-600" />
+      {/* Header */}
+      <div className="flex items-start gap-4 mb-8">
+        <div className="flex size-14 shrink-0 items-center justify-center rounded-xl bg-zinc-950 text-white text-lg font-bold">
+          {workspace.name.slice(0, 2).toUpperCase()}
         </div>
-        <div>
-          <h1 className="text-xl font-bold text-zinc-950">{workspace.name}</h1>
-          <div className="flex items-center gap-2 mt-0.5">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-zinc-950">{workspace.name}</h1>
+          <div className="flex items-center gap-2 mt-1">
             <span
-              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+              className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
                 workspace.status === "active"
                   ? "bg-green-100 text-green-700"
                   : workspace.status === "degraded"
@@ -74,40 +76,61 @@ export default function WorkspaceDetailPage({
             >
               {workspace.status}
             </span>
-            {isDegraded && (
-              <span className="text-xs text-amber-600">
-                Repository access may have changed. Re-link the GitHub App to restore.
-              </span>
-            )}
           </div>
         </div>
       </div>
 
-      <div className="rounded-lg border border-zinc-200 bg-white p-6 space-y-4">
+      {/* Repo card */}
+      <div className="rounded-xl border border-zinc-200 bg-white p-5 mb-6">
+        <div className="flex items-center gap-3">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-zinc-100">
+            {workspace.repo_private ? (
+              <Lock className="size-4 text-zinc-500" />
+            ) : (
+              <ExternalLink className="size-4 text-zinc-500" />
+            )}
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-zinc-950">{repoFullName}</p>
+            <p className="text-xs text-zinc-400">
+              {workspace.repo_private ? "Private" : "Public"} repository
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Metadata */}
+      <div className="rounded-xl border border-zinc-200 bg-white p-5">
+        <h2 className="text-sm font-semibold text-zinc-950 mb-3">Details</h2>
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
-            <p className="text-zinc-400 text-xs mb-0.5">Created</p>
-            <p className="text-zinc-950 font-medium">
-              {new Date(workspace.created_at).toLocaleDateString()}
-            </p>
+            <p className="text-xs text-zinc-400 mb-0.5">Created</p>
+            <div className="flex items-center gap-1.5">
+              <Calendar className="size-3.5 text-zinc-400" />
+              <p className="text-zinc-700">
+                {new Date(workspace.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
+              </p>
+            </div>
           </div>
           <div>
-            <p className="text-zinc-400 text-xs mb-0.5">Status</p>
-            <p className="text-zinc-950 font-medium capitalize">
-              {workspace.status}
-            </p>
+            <p className="text-xs text-zinc-400 mb-0.5">Repository</p>
+            <p className="text-zinc-700 truncate">{repoFullName}</p>
           </div>
         </div>
+      </div>
 
-        <div className="rounded-md border border-dashed border-zinc-300 p-6 text-center">
-          <ExternalLink className="size-5 text-zinc-400 mx-auto mb-2" />
-          <p className="text-sm font-medium text-zinc-500 mb-1">
-            Issues & agent configuration coming soon
-          </p>
-          <p className="text-xs text-zinc-400">
-            This is where the Issue blackboard and agent team will live (Task 4 & 5).
-          </p>
-        </div>
+      {/* Placeholder for future features */}
+      <div className="mt-6 rounded-xl border border-dashed border-zinc-300 p-10 text-center">
+        <p className="text-sm font-medium text-zinc-500 mb-1">
+          Issues & agent configuration
+        </p>
+        <p className="text-xs text-zinc-400">
+          Issue blackboard and agent team management coming in upcoming sprints.
+        </p>
       </div>
     </div>
   );

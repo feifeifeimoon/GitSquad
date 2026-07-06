@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -64,6 +65,49 @@ func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, er
 	return i, err
 }
 
+const getWorkspaceWithRepo = `-- name: GetWorkspaceWithRepo :one
+SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at,
+       r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private
+FROM workspaces w
+JOIN github_repos r ON r.id = w.github_repo_id
+WHERE w.id = $1
+`
+
+type GetWorkspaceWithRepoRow struct {
+	ID             uuid.UUID `json:"id"`
+	UserID         uuid.UUID `json:"user_id"`
+	InstallationID uuid.UUID `json:"installation_id"`
+	GithubRepoID   uuid.UUID `json:"github_repo_id"`
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	RepoFullName   string    `json:"repo_full_name"`
+	RepoOwner      string    `json:"repo_owner"`
+	RepoName       string    `json:"repo_name"`
+	RepoPrivate    bool      `json:"repo_private"`
+}
+
+func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWorkspaceWithRepoRow, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceWithRepo, id)
+	var i GetWorkspaceWithRepoRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.InstallationID,
+		&i.GithubRepoID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.RepoFullName,
+		&i.RepoOwner,
+		&i.RepoName,
+		&i.RepoPrivate,
+	)
+	return i, err
+}
+
 const listWorkspacesByUser = `-- name: ListWorkspacesByUser :many
 SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
 `
@@ -86,6 +130,63 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listWorkspacesWithRepo = `-- name: ListWorkspacesWithRepo :many
+SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at,
+       r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private
+FROM workspaces w
+JOIN github_repos r ON r.id = w.github_repo_id
+WHERE w.user_id = $1 AND w.status != 'archived'
+ORDER BY w.created_at DESC
+`
+
+type ListWorkspacesWithRepoRow struct {
+	ID             uuid.UUID `json:"id"`
+	UserID         uuid.UUID `json:"user_id"`
+	InstallationID uuid.UUID `json:"installation_id"`
+	GithubRepoID   uuid.UUID `json:"github_repo_id"`
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+	RepoFullName   string    `json:"repo_full_name"`
+	RepoOwner      string    `json:"repo_owner"`
+	RepoName       string    `json:"repo_name"`
+	RepoPrivate    bool      `json:"repo_private"`
+}
+
+func (q *Queries) ListWorkspacesWithRepo(ctx context.Context, userID uuid.UUID) ([]ListWorkspacesWithRepoRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspacesWithRepo, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListWorkspacesWithRepoRow
+	for rows.Next() {
+		var i ListWorkspacesWithRepoRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.InstallationID,
+			&i.GithubRepoID,
+			&i.Name,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RepoFullName,
+			&i.RepoOwner,
+			&i.RepoName,
+			&i.RepoPrivate,
 		); err != nil {
 			return nil, err
 		}
