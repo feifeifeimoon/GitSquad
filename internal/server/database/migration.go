@@ -47,6 +47,46 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			diagnostics TEXT, max_concurrency INT NOT NULL DEFAULT 1,
 			UNIQUE(daemon_id, kind, name)
 		)`},
+			{name: "007_create_github_installations", sql: `CREATE TABLE IF NOT EXISTS github_installations (
+				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+				user_id UUID NOT NULL REFERENCES users(id),
+				installation_id BIGINT NOT NULL UNIQUE,
+				account_login TEXT NOT NULL,
+				account_type TEXT NOT NULL,
+				repository_selection TEXT NOT NULL DEFAULT 'selected',
+				status TEXT NOT NULL DEFAULT 'active',
+				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			)`},
+			{name: "008_create_github_repos", sql: `CREATE TABLE IF NOT EXISTS github_repos (
+				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+				installation_id UUID NOT NULL REFERENCES github_installations(id),
+				github_repo_id BIGINT NOT NULL,
+				owner TEXT NOT NULL,
+				name TEXT NOT NULL,
+				full_name TEXT NOT NULL,
+				private BOOLEAN NOT NULL DEFAULT false,
+				UNIQUE(installation_id, github_repo_id)
+			)`},
+			{name: "009_create_webhook_events", sql: `CREATE TABLE IF NOT EXISTS webhook_events (
+				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+				github_delivery_id TEXT UNIQUE,
+				event_type TEXT NOT NULL,
+				action TEXT,
+				payload JSONB NOT NULL,
+				processed BOOLEAN NOT NULL DEFAULT false,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			)`},
+			{name: "010_create_workspaces", sql: `CREATE TABLE IF NOT EXISTS workspaces (
+				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+				user_id UUID NOT NULL REFERENCES users(id),
+				installation_id UUID NOT NULL REFERENCES github_installations(id),
+				github_repo_id UUID NOT NULL REFERENCES github_repos(id),
+				name TEXT NOT NULL,
+				status TEXT NOT NULL DEFAULT 'active',
+				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			)`},
 	}
 
 	for _, m := range migrations {
