@@ -42,6 +42,7 @@ const (
 // PairingPollResponse is returned when polling a pairing code's status.
 type PairingPollResponse struct {
 	Status      string `json:"status"`
+	MachineName string `json:"machine_name,omitempty"`
 	DaemonID    string `json:"daemon_id"`
 	Token       string `json:"token"`
 	TokenPrefix string `json:"token_prefix"`
