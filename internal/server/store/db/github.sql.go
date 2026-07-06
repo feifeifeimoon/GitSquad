@@ -136,6 +136,40 @@ func (q *Queries) GetInstallationByDBID(ctx context.Context, id uuid.UUID) (Gith
 	return i, err
 }
 
+const listAllInstallations = `-- name: ListAllInstallations :many
+SELECT id, user_id, installation_id, account_login, account_type, repository_selection, status, created_at, updated_at FROM github_installations ORDER BY created_at DESC
+`
+
+func (q *Queries) ListAllInstallations(ctx context.Context) ([]GithubInstallation, error) {
+	rows, err := q.db.Query(ctx, listAllInstallations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []GithubInstallation
+	for rows.Next() {
+		var i GithubInstallation
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.InstallationID,
+			&i.AccountLogin,
+			&i.AccountType,
+			&i.RepositorySelection,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listInstallationsByUser = `-- name: ListInstallationsByUser :many
 SELECT id, user_id, installation_id, account_login, account_type, repository_selection, status, created_at, updated_at FROM github_installations WHERE (user_id = $1 OR user_id IS NULL) AND status != 'revoked' ORDER BY created_at DESC
 `
