@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/crypto"
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
@@ -70,9 +71,11 @@ func (h *AuthHandler) CallbackGoogle(c *gin.Context) {
 
 	slog.Info("oauth login success", "user", result.User.Login)
 
-	// Redirect to frontend with JWT in hash fragment.
-	// Hash fragments avoid URL query length limits and keep the token
-	// out of server logs and referrer headers.
+	// Set JWT as httpOnly cookie so browser redirects (e.g. GitHub App
+	// callback) carry authentication without needing a custom header.
+	c.SetCookie("gitsquad_token", result.Token, int((7*24*time.Hour).Seconds()), "/", "", false, true)
+
+	// Redirect to frontend with JWT in hash fragment (for localStorage).
 	c.Redirect(http.StatusFound,
 		h.cfg.FrontendURL+"/auth/callback#"+url.QueryEscape(result.Token))
 }
