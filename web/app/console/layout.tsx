@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { Monitor, Settings, LogOut, FolderGit2 } from "lucide-react";
@@ -19,11 +19,17 @@ const navItems = [
   { href: "/console/settings", label: "Settings", icon: Settings },
 ];
 
+const MIN_WIDTH = 200;
+const MAX_WIDTH = 400;
+const DEFAULT_WIDTH = 240;
+
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const dragging = useRef(false);
 
   useEffect(() => {
     api
@@ -37,10 +43,38 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     router.push("/");
   };
 
+  const onMouseDown = useCallback(() => {
+    dragging.current = true;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+  }, []);
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragging.current) return;
+      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
+      setSidebarWidth(next);
+    };
+    const onMouseUp = () => {
+      dragging.current = false;
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+    document.addEventListener("mousemove", onMouseMove);
+    document.addEventListener("mouseup", onMouseUp);
+    return () => {
+      document.removeEventListener("mousemove", onMouseMove);
+      document.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
   return (
     <div className="flex h-screen bg-white">
       {/* Sidebar */}
-      <aside className="flex w-60 flex-col border-r border-zinc-200 bg-zinc-50/50">
+      <aside
+        className="flex flex-col border-r border-zinc-200 bg-zinc-50/50 shrink-0 relative"
+        style={{ width: sidebarWidth }}
+      >
         {/* Logo */}
         <div className="flex h-14 items-center gap-2 px-5 border-b border-zinc-200">
           <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5" />
@@ -91,6 +125,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
             </button>
           </div>
         </div>
+
+        {/* Resize handle */}
+        <div
+          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-zinc-300 transition-colors"
+          onMouseDown={onMouseDown}
+        />
       </aside>
 
       {/* Main content */}
