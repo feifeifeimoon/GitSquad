@@ -92,6 +92,7 @@ func (h *DaemonHandler) PollPairing(c *gin.Context) {
 
 	c.JSON(http.StatusOK, v1.SuccessResponse(v1.PairingPollResponse{
 		Status:      result.Status,
+		MachineName: result.MachineName,
 		DaemonID:    result.DaemonID,
 		Token:       result.Token,
 		TokenPrefix: result.TokenPrefix,
