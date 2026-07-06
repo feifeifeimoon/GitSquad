@@ -101,19 +101,6 @@ func (s *GitHubAppService) ListInstallations(ctx context.Context, userID uuid.UU
 	if err != nil {
 		return nil, fmt.Errorf("list installations: %w", err)
 	}
-	slog.Info("list installations result", "user_id", userID, "count", len(list))
-
-	// Debug: dump all installations regardless of filter.
-	all, _ := s.store.ListAllInstallations(ctx)
-	slog.Info("ALL installations in DB", "count", len(all))
-	for _, inst := range all {
-		uid := "nil"
-		if inst.UserID != nil {
-			uid = inst.UserID.String()
-		}
-		slog.Info("  DB row", "id", inst.ID, "installation_id", inst.InstallationID, "user_id", uid, "status", inst.Status)
-	}
-
 	return list, nil
 }
 
