@@ -101,6 +101,7 @@ func (s *GitHubAppService) ListInstallations(ctx context.Context, userID uuid.UU
 	if err != nil {
 		return nil, fmt.Errorf("list installations: %w", err)
 	}
+	slog.Info("list installations result", "user_id", userID, "count", len(list))
 	return list, nil
 }
 
