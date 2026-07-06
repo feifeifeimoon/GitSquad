@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { LayoutDashboard, Monitor, Settings, LogOut, FolderGit2 } from "lucide-react";
+import { Monitor, Settings, LogOut, FolderGit2 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -14,7 +14,6 @@ interface User {
 }
 
 const navItems = [
-  { href: "/console", label: "Home", icon: LayoutDashboard },
   { href: "/console/workspaces", label: "Workspaces", icon: FolderGit2 },
   { href: "/console/daemons", label: "Daemons", icon: Monitor },
   { href: "/console/settings", label: "Settings", icon: Settings },
@@ -51,7 +50,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         {/* Nav */}
         <nav className="flex-1 px-3 py-4 space-y-1">
           {navItems.map((item) => {
-            const active = pathname === item.href;
+            const active = pathname.startsWith(item.href);
             return (
               <button
                 key={item.href}
