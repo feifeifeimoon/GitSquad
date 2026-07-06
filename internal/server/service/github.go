@@ -312,18 +312,14 @@ func (s *GitHubAppService) handleInstallationCreated(ctx context.Context, payloa
 		repoSelection = *inst.RepositorySelection
 	}
 
-	// Try to find the GitSquad user linked to the GitHub sender.
-	sender := ev.Sender
-	var userID *uuid.UUID
-	if sender != nil {
-		u, err := s.store.FindUserByLogin(ctx, sender.GetLogin())
-		if err == nil {
-			userID = &u.ID
-		}
-	}
+	// NOTE: We intentionally do NOT try to match the sender to a GitSquad user.
+	// The webhook has no user session — only the OAuth callback (with JWT cookie)
+	// can reliably associate the installation with the logged-in user.
+	// Installations created via webhook have user_id=NULL and are visible to all
+	// users until claimed via the callback flow.
 
 	_, err := s.store.CreateInstallation(ctx, db.CreateInstallationParams{
-		UserID:              userID,
+		UserID:              nil,
 		InstallationID:      installationID,
 		AccountLogin:        accountLogin,
 		AccountType:         accountType,
