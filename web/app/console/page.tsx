@@ -1,12 +1,25 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { LayoutDashboard, GitBranch, ArrowRight } from "lucide-react";
-
-const GITHUB_APP_INSTALL_URL = "https://github.com/apps/gitsquad/installations/new";
+import { api } from "@/lib/api";
 
 export default function ConsoleHome() {
   const router = useRouter();
+  const [installing, setInstalling] = useState(false);
+
+  const handleInstall = async () => {
+    setInstalling(true);
+    try {
+      const data = await api.post<{ url: string }>("/api/v1/github/prepare-install");
+      window.location.href = data.url;
+    } catch {
+      // Fallback: direct link without state.
+      window.location.href = "https://github.com/apps/gitsquad/installations/new";
+    }
+    setInstalling(false);
+  };
 
   return (
     <div className="p-6 max-w-3xl">
@@ -24,15 +37,17 @@ export default function ConsoleHome() {
           <div className="flex-1">
             <h2 className="text-sm font-semibold text-zinc-950 mb-1">Connect GitHub</h2>
             <p className="text-sm text-zinc-500 mb-4">
-              Install the GitSquad GitHub App to grant access to your repositories. You can choose which repos to share.
+              Install the GitSquad GitHub App to grant access to your repositories.
+              You can choose which repos to share.
             </p>
-            <a
-              href={GITHUB_APP_INSTALL_URL}
-              className="inline-flex items-center gap-2 rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+            <button
+              onClick={handleInstall}
+              disabled={installing}
+              className="inline-flex items-center gap-2 rounded-md bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors"
             >
-              Install on GitHub
+              {installing ? "Redirecting..." : "Install on GitHub"}
               <ArrowRight className="size-4" />
-            </a>
+            </button>
           </div>
         </div>
       </div>

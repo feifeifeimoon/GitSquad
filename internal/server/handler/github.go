@@ -6,9 +6,12 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"time"
 
+	"github.com/feifeifeimoon/GitSquad/internal/crypto"
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
 	"github.com/feifeifeimoon/GitSquad/internal/server/middleware"
+	"github.com/feifeifeimoon/GitSquad/internal/server/store/memory"
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gin-gonic/gin"
@@ -18,42 +21,74 @@ import (
 type GitHubHandler struct {
 	cfg       config.Config
 	githubSvc *service.GitHubAppService
+	states    *memory.StateStore
 }
 
 func NewGitHubHandler(cfg config.Config, g *service.GitHubAppService) *GitHubHandler {
-	return &GitHubHandler{cfg: cfg, githubSvc: g}
+	return &GitHubHandler{
+		cfg:       cfg,
+		githubSvc: g,
+		states:    memory.NewStateStore(),
+	}
 }
 
-// Callback handles the GitHub App installation redirect.
-// GET /api/v1/github/callback?installation_id=xxx
-func (h *GitHubHandler) Callback(c *gin.Context) {
+// InstallLink handles POST /api/v1/github/prepare-install.
+// Generates a state-tagged GitHub App installation URL so the callback
+// can associate the installation with the authenticated user.
+func (h *GitHubHandler) InstallLink(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
 		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("login required"))
 		return
 	}
 
-	installationIDStr := c.Query("installation_id")
-	if installationIDStr == "" {
-		c.JSON(http.StatusBadRequest, v1.ErrorResponse("missing installation_id"))
+	state, err := crypto.RandomHex(16)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to generate state"))
 		return
 	}
+
+	h.states.Set(state, user.ID, 5*time.Minute)
+
+	url := "https://github.com/apps/" + h.cfg.GitHubAppName + "/installations/new?state=" + state
+	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]string{"url": url}, 0))
+}
+
+// Callback handles GET /api/v1/github/callback?installation_id=xxx&state=yyy.
+// This endpoint is public — authentication is via the state parameter.
+func (h *GitHubHandler) Callback(c *gin.Context) {
+	installationIDStr := c.Query("installation_id")
+	state := c.Query("state")
+
+	if installationIDStr == "" {
+		c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console")
+		return
+	}
+
 	installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid installation_id"))
+		c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console?error=invalid_installation")
 		return
 	}
 
-	inst, err := h.githubSvc.CreateInstallation(c.Request.Context(), installationID, user.ID)
+	// Look up user via state parameter.
+	var userID *uuid.UUID
+	if state != "" {
+		if id := h.states.Pop(state); id != uuid.Nil {
+			userID = &id
+		} else {
+			slog.Warn("github callback with unknown/expired state", "state", state)
+		}
+	}
+
+	_, err = h.githubSvc.CreateInstallation(c.Request.Context(), installationID, userID)
 	if err != nil {
-		slog.Error("create installation", "error", err, "installation_id", installationID)
-		c.JSON(http.StatusBadGateway, v1.ErrorResponse("failed to register installation"))
+		slog.Error("create installation via callback", "error", err, "installation_id", installationID)
+		c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console?error=install_failed")
 		return
 	}
 
-	slog.Info("installation created", "installation_id", installationID, "user", user.Login, "account", inst.AccountLogin)
-
-	// Redirect user to console.
+	slog.Info("installation created via callback", "installation_id", installationID, "user_id", userID)
 	c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console")
 }
 
@@ -90,7 +125,6 @@ func (h *GitHubHandler) GetInstallation(c *gin.Context) {
 		return
 	}
 
-	// Validate ownership.
 	insts, err := h.githubSvc.ListInstallations(c.Request.Context(), user.ID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to list installations"))
@@ -142,7 +176,6 @@ func (h *GitHubHandler) Webhook(c *gin.Context) {
 		return
 	}
 
-	// Extract action from JSON payload (GitHub puts it in the body, not a header).
 	action := extractAction(body)
 	slog.Info("webhook processing", "event", eventType, "action", action, "delivery_id", deliveryID)
 
@@ -155,7 +188,6 @@ func (h *GitHubHandler) Webhook(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]string{"status": "accepted"}, 0))
 }
 
-// extractAction peeks at the "action" field in a GitHub webhook JSON payload.
 func extractAction(body []byte) string {
 	var partial struct {
 		Action string `json:"action"`

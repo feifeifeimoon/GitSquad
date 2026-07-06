@@ -66,14 +66,19 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		daemonConfirm.POST("/:code/confirm", daemonHandler.ConfirmPairing)
 	}
 
-		// GitHub App callback and installation management (requires user login).
+		// GitHub App prepare-install + installation list (requires user login).
 		github := api.Group("/github")
 		github.Use(middleware.RequireAuth(cfg, userSvc))
 		{
-			github.GET("/callback", githubHandler.Callback)
+			github.POST("/prepare-install", githubHandler.InstallLink)
 			github.GET("/installations", githubHandler.ListInstallations)
 			github.GET("/installations/:id", githubHandler.GetInstallation)
 		}
+
+		// GitHub App installation callback — public.
+		// Auth is via state parameter because this endpoint receives
+		// a cross-site redirect from github.com with no session.
+		api.GET("/github/callback", githubHandler.Callback)
 
 	// Protected daemon endpoints (daemon token auth).
 		// Daemon identity is resolved from the token — no :id in the URL.
