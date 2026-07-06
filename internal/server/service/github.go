@@ -39,7 +39,7 @@ func NewGitHubAppService(s *store.Store, cfg config.Config) *GitHubAppService {
 // CreateInstallation handles the OAuth installation callback from GitHub.
 // It fetches installation metadata and the authorized repository list,
 // then upserts the installation and repos atomically.
-func (s *GitHubAppService) CreateInstallation(ctx context.Context, installationID int64, userID uuid.UUID) (*db.GithubInstallation, error) {
+func (s *GitHubAppService) CreateInstallation(ctx context.Context, installationID int64, userID *uuid.UUID) (*db.GithubInstallation, error) {
 	client, err := s.newAppClient()
 	if err != nil {
 		return nil, fmt.Errorf("create app client: %w", err)
@@ -63,7 +63,7 @@ func (s *GitHubAppService) CreateInstallation(ctx context.Context, installationI
 	}
 
 	installation, err := s.store.CreateInstallation(ctx, db.CreateInstallationParams{
-		UserID:              &userID,
+		UserID:              userID,
 		InstallationID:      installationID,
 		AccountLogin:        accountLogin,
 		AccountType:         accountType,
