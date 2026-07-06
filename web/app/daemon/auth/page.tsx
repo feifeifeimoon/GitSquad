@@ -3,7 +3,8 @@
 import Image from "next/image";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { Check, Loader2 } from "lucide-react";
+import { Check, Loader2, ArrowRight } from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { api } from "@/lib/api";
 
 function DaemonAuthContent() {
@@ -17,6 +18,8 @@ function DaemonAuthContent() {
   });
   const [error, setError] = useState("");
   const [machineName, setMachineName] = useState("");
+  const [userAvatar, setUserAvatar] = useState("");
+  const [userLogin, setUserLogin] = useState("");
 
   // Check auth and fetch pairing info on mount.
   useEffect(() => {
@@ -26,11 +29,16 @@ function DaemonAuthContent() {
       return;
     }
     let cancelled = false;
-    api
-      .get<{ status: string; machine_name: string }>(`/api/v1/daemon/auth/${code}`)
-      .then((data) => {
+    // Fetch user info and pairing info in parallel.
+    Promise.all([
+      api.get<{ avatar_url: string; login: string }>("/api/v1/me"),
+      api.get<{ status: string; machine_name: string }>(`/api/v1/daemon/auth/${code}`),
+    ])
+      .then(([user, pairing]) => {
         if (cancelled) return;
-        setMachineName(data.machine_name || "Unknown device");
+        setUserAvatar(user.avatar_url);
+        setUserLogin(user.login);
+        setMachineName(pairing.machine_name || "Unknown device");
         setStatus("confirm");
       })
       .catch(() => {
@@ -59,13 +67,23 @@ function DaemonAuthContent() {
     <main className="min-h-screen flex items-center justify-center bg-zinc-50 p-4">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="flex size-12 items-center justify-center rounded-xl bg-zinc-950 mx-auto mb-4">
-              <Image src="/favicon.ico" alt="GitSquad" width={22} height={22} className="size-[22px]" />
+          {/* Header — connection flow */}
+          <div className="flex items-center justify-center gap-4 mb-8">
+            <Avatar className="size-14 ring-2 ring-zinc-200 ring-offset-2">
+              <AvatarImage src={userAvatar} />
+              <AvatarFallback className="text-lg">
+                {userLogin?.slice(0, 2).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <ArrowRight className="size-5 text-zinc-300" />
+            <div className="flex size-14 items-center justify-center rounded-2xl bg-zinc-100 ring-2 ring-zinc-200 ring-offset-2">
+              <Image src="/favicon.ico" alt="GitSquad" width={28} height={28} className="size-7" />
             </div>
-            <h1 className="text-xl font-bold text-zinc-950">Device Activation</h1>
           </div>
+          <h1 className="text-xl font-bold text-zinc-950 text-center">Device Activation</h1>
+          <p className="text-sm text-zinc-500 text-center mt-1 mb-8">
+            Connect <strong>{machineName || "a device"}</strong> to your GitSquad account
+          </p>
 
           {/* Need login */}
           {status === "need_login" && (
