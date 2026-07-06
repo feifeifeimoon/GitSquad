@@ -27,12 +27,12 @@ func NewWorkspaceService(s *store.Store) *WorkspaceService {
 // CreateWorkspace creates a new Workspace bound to a specific repo.
 // Validates that installation_id belongs to user_id and repo_id belongs to installation_id.
 func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID, installationID uuid.UUID, repoID uuid.UUID, name string) (*db.Workspace, error) {
-	// Verify installation belongs to user.
+	// Verify installation belongs to user (or is unclaimed — nil UserID).
 	inst, err := s.store.GetInstallationByDBID(ctx, installationID)
 	if err != nil {
 		return nil, ErrInstallationMismatch
 	}
-	if inst.UserID != userID {
+	if inst.UserID != nil && *inst.UserID != userID {
 		return nil, ErrInstallationMismatch
 	}
 

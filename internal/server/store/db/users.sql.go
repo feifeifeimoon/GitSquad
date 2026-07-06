@@ -146,6 +146,23 @@ func (q *Queries) FindUserByID(ctx context.Context, id uuid.UUID) (User, error) 
 	return i, err
 }
 
+const findUserByLogin = `-- name: FindUserByLogin :one
+SELECT id, login, avatar_url, created_at, updated_at FROM users WHERE login = $1
+`
+
+func (q *Queries) FindUserByLogin(ctx context.Context, login string) (User, error) {
+	row := q.db.QueryRow(ctx, findUserByLogin, login)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Login,
+		&i.AvatarUrl,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
 const updateIdentityTokens = `-- name: UpdateIdentityTokens :exec
 UPDATE user_identities SET access_token = $2, refresh_token = $3, updated_at = now() WHERE id = $1
 `

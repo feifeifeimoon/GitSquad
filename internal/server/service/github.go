@@ -63,7 +63,7 @@ func (s *GitHubAppService) CreateInstallation(ctx context.Context, installationI
 	}
 
 	installation, err := s.store.CreateInstallation(ctx, db.CreateInstallationParams{
-		UserID:              userID,
+		UserID:              &userID,
 		InstallationID:      installationID,
 		AccountLogin:        accountLogin,
 		AccountType:         accountType,
@@ -97,7 +97,7 @@ func (s *GitHubAppService) GetInstallation(ctx context.Context, installationID i
 }
 
 func (s *GitHubAppService) ListInstallations(ctx context.Context, userID uuid.UUID) ([]db.GithubInstallation, error) {
-	list, err := s.store.ListInstallationsByUser(ctx, userID)
+	list, err := s.store.ListInstallationsByUser(ctx, &userID)
 	if err != nil {
 		return nil, fmt.Errorf("list installations: %w", err)
 	}
@@ -183,7 +183,10 @@ func (s *GitHubAppService) ProcessWebhook(ctx context.Context, deliveryID, event
 	// Trigger side effects for installation events.
 	switch eventType {
 	case "installation":
-		if action == "deleted" {
+		switch action {
+		case "created":
+			s.handleInstallationCreated(ctx, payload)
+		case "deleted":
 			s.handleInstallationDeleted(ctx, payload)
 		}
 	case "installation_repositories":
@@ -265,6 +268,52 @@ func (s *GitHubAppService) newInstallationClient(ctx context.Context, installati
 	}
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 	return github.NewClient(&http.Client{Transport: &oauth2.Transport{Source: ts}}), nil
+}
+
+func (s *GitHubAppService) handleInstallationCreated(ctx context.Context, payload []byte) {
+	var ev github.InstallationEvent
+	if err := json.Unmarshal(payload, &ev); err != nil {
+		slog.Warn("parse installation.created", "error", err)
+		return
+	}
+
+	inst := ev.Installation
+	installationID := inst.GetID()
+	accountLogin := ""
+	accountType := ""
+	if inst.Account != nil {
+		accountLogin = inst.Account.GetLogin()
+		accountType = inst.Account.GetType()
+	}
+
+	repoSelection := "selected"
+	if inst.RepositorySelection != nil {
+		repoSelection = *inst.RepositorySelection
+	}
+
+	// Try to find the GitSquad user linked to the GitHub sender.
+	sender := ev.Sender
+	var userID *uuid.UUID
+	if sender != nil {
+		u, err := s.store.FindUserByLogin(ctx, sender.GetLogin())
+		if err == nil {
+			userID = &u.ID
+		}
+	}
+
+	_, err := s.store.CreateInstallation(ctx, db.CreateInstallationParams{
+		UserID:              userID,
+		InstallationID:      installationID,
+		AccountLogin:        accountLogin,
+		AccountType:         accountType,
+		RepositorySelection: repoSelection,
+	})
+	if err != nil {
+		slog.Warn("create installation from webhook", "error", err, "installation_id", installationID)
+		return
+	}
+
+	slog.Info("installation created via webhook", "installation_id", installationID, "account", accountLogin)
 }
 
 func (s *GitHubAppService) handleInstallationDeleted(ctx context.Context, payload []byte) {

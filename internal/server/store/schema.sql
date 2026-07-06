@@ -38,7 +38,7 @@ CREATE TABLE runtimes (
 
 CREATE TABLE github_installations (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES users(id),
+    user_id UUID REFERENCES users(id),
     installation_id BIGINT NOT NULL UNIQUE,
     account_login TEXT NOT NULL,
     account_type TEXT NOT NULL,
