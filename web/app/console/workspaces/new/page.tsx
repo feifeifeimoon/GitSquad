@@ -124,7 +124,7 @@ export default function NewWorkspacePage() {
   }
 
   return (
-    <div className="p-8 max-w-4xl">
+    <div className="p-8 max-w-4xl mx-auto">
       <button
         onClick={() => router.push("/console/workspaces")}
         className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-950 mb-6 transition-colors"
