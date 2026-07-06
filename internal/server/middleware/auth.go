@@ -16,15 +16,11 @@ import (
 const userContextKey = "user"
 
 // RequireAuth returns a middleware that validates the Bearer JWT and injects the User into context.
+// The JWT may come from either the Authorization header or the gitsquad_token cookie.
 func RequireAuth(cfg config.Config, users *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		header := c.GetHeader("Authorization")
-		if header == "" || !strings.HasPrefix(header, "Bearer ") {
-			c.AbortWithStatusJSON(http.StatusUnauthorized, v1.ErrorResponse("missing authorization header"))
-			return
-		}
+		token := extractToken(c)
 
-		token := strings.TrimPrefix(header, "Bearer ")
 		userID, err := auth.ParseToken(token, cfg.JWTSecret)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, v1.ErrorResponse("invalid or expired token"))
@@ -46,6 +42,22 @@ func RequireAuth(cfg config.Config, users *service.UserService) gin.HandlerFunc 
 		c.Set(userContextKey, user)
 		c.Next()
 	}
+}
+
+// extractToken reads the JWT from the Authorization header first,
+// then falls back to the gitsquad_token cookie.
+func extractToken(c *gin.Context) string {
+	// 1. Authorization: Bearer <token>
+	if header := c.GetHeader("Authorization"); header != "" && strings.HasPrefix(header, "Bearer ") {
+		return strings.TrimPrefix(header, "Bearer ")
+	}
+
+	// 2. gitsquad_token cookie (used by browser redirects like GitHub App callback)
+	if cookie, err := c.Cookie("gitsquad_token"); err == nil && cookie != "" {
+		return cookie
+	}
+
+	return ""
 }
 
 // GetUser extracts the authenticated User from context.
