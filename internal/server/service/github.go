@@ -181,16 +181,24 @@ func (s *GitHubAppService) ProcessWebhook(ctx context.Context, deliveryID, event
 	}
 
 	// Trigger side effects for installation events.
+	slog.Info("webhook dispatch", "event", eventType, "action", action, "delivery_id", deliveryID)
 	switch eventType {
 	case "installation":
 		switch action {
 		case "created":
+			slog.Info("handling installation.created", "delivery_id", deliveryID)
 			s.handleInstallationCreated(ctx, payload)
 		case "deleted":
+			slog.Info("handling installation.deleted", "delivery_id", deliveryID)
 			s.handleInstallationDeleted(ctx, payload)
+		default:
+			slog.Info("installation event without handler", "action", action)
 		}
 	case "installation_repositories":
+		slog.Info("handling installation_repositories", "delivery_id", deliveryID)
 		s.handleInstallationReposChanged(ctx, payload)
+	default:
+		slog.Info("webhook event stored, no side effects", "event", eventType)
 	}
 
 	return nil
