@@ -7,6 +7,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/middleware"
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
+	"github.com/feifeifeimoon/GitSquad/internal/server/store/memory"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -32,7 +33,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	userHandler := NewUserHandler()
 	daemonHandler := NewDaemonHandler(cfg, daemonSvc)
 
-	githubSvc := service.NewGitHubAppService(s, cfg)
+	githubSvc := service.NewGitHubAppService(s, cfg, memory.NewPendingInstallationStore())
 	workspaceSvc := service.NewWorkspaceService(s)
 	githubHandler := NewGitHubHandler(cfg, githubSvc)
 	workspaceHandler := NewWorkspaceHandler(workspaceSvc)

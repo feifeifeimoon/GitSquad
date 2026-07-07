@@ -47,17 +47,17 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			diagnostics TEXT, max_concurrency INT NOT NULL DEFAULT 1,
 			UNIQUE(daemon_id, kind, name)
 		)`},
-			{name: "007_create_github_installations", sql: `CREATE TABLE IF NOT EXISTS github_installations (
-				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-				user_id UUID NOT NULL REFERENCES users(id),
-				installation_id BIGINT NOT NULL UNIQUE,
-				account_login TEXT NOT NULL,
-				account_type TEXT NOT NULL,
-				repository_selection TEXT NOT NULL DEFAULT 'selected',
-				status TEXT NOT NULL DEFAULT 'active',
-				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-				updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-			)`},
+		{name: "007_create_github_installations", sql: `CREATE TABLE IF NOT EXISTS github_installations (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			user_id UUID NOT NULL REFERENCES users(id),
+			installation_id BIGINT NOT NULL UNIQUE,
+			account_login TEXT NOT NULL,
+			account_type TEXT NOT NULL,
+			repository_selection TEXT NOT NULL DEFAULT 'selected',
+			status TEXT NOT NULL DEFAULT 'active',
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`},
 			{name: "008_create_github_repos", sql: `CREATE TABLE IF NOT EXISTS github_repos (
 				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 				installation_id UUID NOT NULL REFERENCES github_installations(id),
@@ -87,7 +87,6 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`},
-		{name: "011_github_installations_nullable_user", sql: `ALTER TABLE github_installations ALTER COLUMN user_id DROP NOT NULL`},
 	}
 
 	for _, m := range migrations {

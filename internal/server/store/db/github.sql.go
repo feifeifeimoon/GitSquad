@@ -17,7 +17,7 @@ INSERT INTO github_installations
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (installation_id)
 DO UPDATE SET
-    user_id = COALESCE(EXCLUDED.user_id, github_installations.user_id),
+    user_id = EXCLUDED.user_id,
     account_login = EXCLUDED.account_login,
     account_type = EXCLUDED.account_type,
     repository_selection = EXCLUDED.repository_selection,
@@ -27,11 +27,11 @@ RETURNING id, user_id, installation_id, account_login, account_type, repository_
 `
 
 type CreateInstallationParams struct {
-	UserID              *uuid.UUID `json:"user_id"`
-	InstallationID      int64      `json:"installation_id"`
-	AccountLogin        string     `json:"account_login"`
-	AccountType         string     `json:"account_type"`
-	RepositorySelection string     `json:"repository_selection"`
+	UserID              uuid.UUID `json:"user_id"`
+	InstallationID      int64     `json:"installation_id"`
+	AccountLogin        string    `json:"account_login"`
+	AccountType         string    `json:"account_type"`
+	RepositorySelection string    `json:"repository_selection"`
 }
 
 func (q *Queries) CreateInstallation(ctx context.Context, arg CreateInstallationParams) (GithubInstallation, error) {
@@ -138,10 +138,10 @@ func (q *Queries) GetInstallationByDBID(ctx context.Context, id uuid.UUID) (Gith
 }
 
 const listInstallationsByUser = `-- name: ListInstallationsByUser :many
-SELECT id, user_id, installation_id, account_login, account_type, repository_selection, status, created_at, updated_at FROM github_installations WHERE (user_id = $1 OR user_id IS NULL) AND status != 'revoked' ORDER BY created_at DESC
+SELECT id, user_id, installation_id, account_login, account_type, repository_selection, status, created_at, updated_at FROM github_installations WHERE user_id = $1 AND status != 'revoked' ORDER BY created_at DESC
 `
 
-func (q *Queries) ListInstallationsByUser(ctx context.Context, userID *uuid.UUID) ([]GithubInstallation, error) {
+func (q *Queries) ListInstallationsByUser(ctx context.Context, userID uuid.UUID) ([]GithubInstallation, error) {
 	rows, err := q.db.Query(ctx, listInstallationsByUser, userID)
 	if err != nil {
 		return nil, err

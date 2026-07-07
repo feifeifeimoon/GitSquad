@@ -72,13 +72,21 @@ func (h *GitHubHandler) Callback(c *gin.Context) {
 	}
 
 	// Look up user via state parameter.
-	var userID *uuid.UUID
+	var userID uuid.UUID
+	var ok bool
 	if state != "" {
 		if id := h.states.Pop(state); id != uuid.Nil {
-			userID = &id
+			userID = id
+			ok = true
 		} else {
 			slog.Warn("github callback with unknown/expired state", "state", state)
 		}
+	}
+
+	if !ok {
+		slog.Warn("github callback without valid state, refusing to create installation", "installation_id", installationID)
+		c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console?error=invalid_state")
+		return
 	}
 
 	_, err = h.githubSvc.CreateInstallation(c.Request.Context(), installationID, userID)

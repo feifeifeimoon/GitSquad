@@ -40,15 +40,15 @@ type DaemonToken struct {
 }
 
 type GithubInstallation struct {
-	ID                  uuid.UUID  `json:"id"`
-	UserID              *uuid.UUID `json:"user_id"`
-	InstallationID      int64      `json:"installation_id"`
-	AccountLogin        string     `json:"account_login"`
-	AccountType         string     `json:"account_type"`
-	RepositorySelection string     `json:"repository_selection"`
-	Status              string     `json:"status"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
+	ID                  uuid.UUID `json:"id"`
+	UserID              uuid.UUID `json:"user_id"`
+	InstallationID      int64     `json:"installation_id"`
+	AccountLogin        string    `json:"account_login"`
+	AccountType         string    `json:"account_type"`
+	RepositorySelection string    `json:"repository_selection"`
+	Status              string    `json:"status"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }
 
 type GithubRepo struct {

@@ -17,6 +17,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/server/store/memory"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/go-github/v68/github"
 	"github.com/google/uuid"
@@ -26,40 +27,49 @@ import (
 // GitHubAppService handles GitHub App installation flows, token generation,
 // webhook verification, and repository synchronization.
 type GitHubAppService struct {
-	store *store.Store
-	cfg   config.Config
+	store   *store.Store
+	cfg     config.Config
+	pending *memory.PendingInstallationStore
 }
 
-func NewGitHubAppService(s *store.Store, cfg config.Config) *GitHubAppService {
-	return &GitHubAppService{store: s, cfg: cfg}
+func NewGitHubAppService(s *store.Store, cfg config.Config, pending *memory.PendingInstallationStore) *GitHubAppService {
+	return &GitHubAppService{store: s, cfg: cfg, pending: pending}
 }
 
 // ── Installation callbacks ────────────────────────────────────────────────
 
 // CreateInstallation handles the OAuth installation callback from GitHub.
-// It fetches installation metadata and the authorized repository list,
-// then upserts the installation and repos atomically.
-func (s *GitHubAppService) CreateInstallation(ctx context.Context, installationID int64, userID *uuid.UUID) (*db.GithubInstallation, error) {
-	client, err := s.newAppClient()
-	if err != nil {
-		return nil, fmt.Errorf("create app client: %w", err)
-	}
+// It first checks the pending-installation memory store (populated by
+// the installation.created webhook); if found it uses that metadata,
+// otherwise it fetches from the GitHub API. The installation is always
+// written with a non-nil user_id.
+func (s *GitHubAppService) CreateInstallation(ctx context.Context, installationID int64, userID uuid.UUID) (*db.GithubInstallation, error) {
+	var accountLogin, accountType, repoSelection string
 
-	inst, _, err := client.Apps.GetInstallation(ctx, installationID)
-	if err != nil {
-		return nil, fmt.Errorf("get installation: %w", err)
-	}
+	// Prefer memory-bridge data from the webhook.
+	if p := s.pending.Get(installationID); p != nil {
+		accountLogin = p.AccountLogin
+		accountType = p.AccountType
+		repoSelection = p.RepositorySelection
+	} else {
+		// Fallback: fetch from GitHub API.
+		client, err := s.newAppClient()
+		if err != nil {
+			return nil, fmt.Errorf("create app client: %w", err)
+		}
 
-	accountLogin := ""
-	accountType := ""
-	if inst.Account != nil {
-		accountLogin = inst.Account.GetLogin()
-		accountType = inst.Account.GetType()
-	}
+		inst, _, err := client.Apps.GetInstallation(ctx, installationID)
+		if err != nil {
+			return nil, fmt.Errorf("get installation: %w", err)
+		}
 
-	repoSelection := "selected"
-	if inst.RepositorySelection != nil {
-		repoSelection = *inst.RepositorySelection
+		if inst.Account != nil {
+			accountLogin = inst.Account.GetLogin()
+			accountType = inst.Account.GetType()
+		}
+		if inst.RepositorySelection != nil {
+			repoSelection = *inst.RepositorySelection
+		}
 	}
 
 	installation, err := s.store.CreateInstallation(ctx, db.CreateInstallationParams{
@@ -83,6 +93,9 @@ func (s *GitHubAppService) CreateInstallation(ctx context.Context, installationI
 		}
 	}
 
+	// Clean up the memory bridge.
+	s.pending.Delete(installationID)
+
 	return &installation, nil
 }
 
@@ -97,7 +110,7 @@ func (s *GitHubAppService) GetInstallation(ctx context.Context, installationID i
 }
 
 func (s *GitHubAppService) ListInstallations(ctx context.Context, userID uuid.UUID) ([]db.GithubInstallation, error) {
-	list, err := s.store.ListInstallationsByUser(ctx, &userID)
+	list, err := s.store.ListInstallationsByUser(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list installations: %w", err)
 	}
@@ -182,24 +195,24 @@ func (s *GitHubAppService) ProcessWebhook(ctx context.Context, deliveryID, event
 
 	// Trigger side effects for installation events.
 	slog.Info("webhook dispatch", "event", eventType, "action", action, "delivery_id", deliveryID)
-	switch eventType {
-	case "installation":
-		switch action {
-		case "created":
-			slog.Info("handling installation.created", "delivery_id", deliveryID)
-			s.handleInstallationCreated(ctx, payload)
-		case "deleted":
-			slog.Info("handling installation.deleted", "delivery_id", deliveryID)
-			s.handleInstallationDeleted(ctx, payload)
+		switch eventType {
+		case "installation":
+			switch action {
+			case "created":
+				slog.Info("handling installation.created", "delivery_id", deliveryID)
+				s.handleInstallationCreated(ctx, payload)
+			case "deleted":
+				slog.Info("handling installation.deleted", "delivery_id", deliveryID)
+				s.handleInstallationDeleted(ctx, payload)
+			default:
+				slog.Info("installation event stored, no side effects", "action", action)
+			}
+		case "installation_repositories":
+			slog.Info("handling installation_repositories", "delivery_id", deliveryID)
+			s.handleInstallationReposChanged(ctx, payload)
 		default:
-			slog.Info("installation event without handler", "action", action)
+			slog.Info("webhook event stored, no side effects", "event", eventType)
 		}
-	case "installation_repositories":
-		slog.Info("handling installation_repositories", "delivery_id", deliveryID)
-		s.handleInstallationReposChanged(ctx, payload)
-	default:
-		slog.Info("webhook event stored, no side effects", "event", eventType)
-	}
 
 	return nil
 }
@@ -287,37 +300,35 @@ func (s *GitHubAppService) handleInstallationCreated(ctx context.Context, payloa
 
 	inst := ev.Installation
 	installationID := inst.GetID()
+
+	// If the callback already arrived and created the DB record, nothing to do.
+	existing, _ := s.store.GetInstallation(ctx, installationID)
+	if existing.ID != uuid.Nil {
+		slog.Info("installation.created ignored, already in DB", "installation_id", installationID)
+		return
+	}
+
+	// Save to memory bridge for the upcoming callback.
 	accountLogin := ""
 	accountType := ""
 	if inst.Account != nil {
 		accountLogin = inst.Account.GetLogin()
 		accountType = inst.Account.GetType()
 	}
-
 	repoSelection := "selected"
 	if inst.RepositorySelection != nil {
 		repoSelection = *inst.RepositorySelection
 	}
 
-	// NOTE: We intentionally do NOT try to match the sender to a GitSquad user.
-	// The webhook has no user session — only the OAuth callback (with JWT cookie)
-	// can reliably associate the installation with the logged-in user.
-	// Installations created via webhook have user_id=NULL and are visible to all
-	// users until claimed via the callback flow.
-
-	_, err := s.store.CreateInstallation(ctx, db.CreateInstallationParams{
-		UserID:              nil,
+	s.pending.Set(installationID, memory.PendingInstallation{
 		InstallationID:      installationID,
 		AccountLogin:        accountLogin,
 		AccountType:         accountType,
 		RepositorySelection: repoSelection,
+		CreatedAt:           time.Now(),
 	})
-	if err != nil {
-		slog.Warn("create installation from webhook", "error", err, "installation_id", installationID)
-		return
-	}
 
-	slog.Info("installation created via webhook", "installation_id", installationID, "account", accountLogin)
+	slog.Info("installation.created saved to memory", "installation_id", installationID, "account", accountLogin)
 }
 
 func (s *GitHubAppService) handleInstallationDeleted(ctx context.Context, payload []byte) {
@@ -327,11 +338,21 @@ func (s *GitHubAppService) handleInstallationDeleted(ctx context.Context, payloa
 		return
 	}
 	installationID := ev.Installation.GetID()
-	_ = s.store.UpdateInstallationStatus(ctx, db.UpdateInstallationStatusParams{
-		InstallationID: installationID,
-		Status:         "revoked",
-	})
-	slog.Info("installation revoked", "installation_id", installationID)
+
+	// Check DB first.
+	inst, _ := s.store.GetInstallation(ctx, installationID)
+	if inst.ID != uuid.Nil {
+		_ = s.store.UpdateInstallationStatus(ctx, db.UpdateInstallationStatusParams{
+			InstallationID: installationID,
+			Status:         "revoked",
+		})
+		slog.Info("installation revoked", "installation_id", installationID)
+		return
+	}
+
+	// Not in DB yet — may be in memory (callback hasn't arrived).
+	s.pending.Delete(installationID)
+	slog.Info("pending installation removed", "installation_id", installationID)
 }
 
 func (s *GitHubAppService) handleInstallationReposChanged(ctx context.Context, payload []byte) {
@@ -340,9 +361,19 @@ func (s *GitHubAppService) handleInstallationReposChanged(ctx context.Context, p
 		slog.Warn("parse installation_repositories", "error", err)
 		return
 	}
-	inst, _ := s.store.GetInstallation(ctx, ev.Installation.GetID())
+	installationID := ev.Installation.GetID()
+
+	// Check DB first.
+	inst, _ := s.store.GetInstallation(ctx, installationID)
 	if inst.ID != uuid.Nil {
 		_ = s.RefreshRepos(ctx, inst.ID)
+		return
+	}
+
+	// Not in DB yet — update memory if pending.
+	if ev.RepositorySelection != nil {
+		s.pending.UpdateSelection(installationID, *ev.RepositorySelection)
+		slog.Info("updated pending installation repository_selection", "installation_id", installationID)
 	}
 }
 

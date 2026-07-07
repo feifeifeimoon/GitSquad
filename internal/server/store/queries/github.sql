@@ -4,7 +4,7 @@ INSERT INTO github_installations
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (installation_id)
 DO UPDATE SET
-    user_id = COALESCE(EXCLUDED.user_id, github_installations.user_id),
+    user_id = EXCLUDED.user_id,
     account_login = EXCLUDED.account_login,
     account_type = EXCLUDED.account_type,
     repository_selection = EXCLUDED.repository_selection,
@@ -19,7 +19,7 @@ SELECT * FROM github_installations WHERE installation_id = $1;
 SELECT * FROM github_installations WHERE id = $1;
 
 -- name: ListInstallationsByUser :many
-SELECT * FROM github_installations WHERE (user_id = $1 OR user_id IS NULL) AND status != 'revoked' ORDER BY created_at DESC;
+SELECT * FROM github_installations WHERE user_id = $1 AND status != 'revoked' ORDER BY created_at DESC;
 
 -- name: UpdateInstallationStatus :exec
 UPDATE github_installations SET status = $2, updated_at = now() WHERE installation_id = $1;
