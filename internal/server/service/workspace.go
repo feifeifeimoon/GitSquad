@@ -32,7 +32,7 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID
 	if err != nil {
 		return nil, ErrInstallationMismatch
 	}
-	if inst.UserID != nil && *inst.UserID != userID {
+		if inst.UserID != userID {
 		return nil, ErrInstallationMismatch
 	}
 
