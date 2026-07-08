@@ -20,44 +20,44 @@ export default function SettingsPage() {
 
   return (
     <div className="p-6">
-      <div className="flex items-center gap-2 mb-6">
-        <Settings className="size-5 text-zinc-950" />
-        <h1 className="text-xl font-bold text-zinc-950">Settings</h1>
+      <div className="mb-6 flex items-center gap-2">
+        <Settings className="size-5 text-ink" />
+        <h1 className="text-xl font-semibold tracking-[-0.02em] text-ink">Settings</h1>
       </div>
 
       {/* Profile */}
-      <div className="rounded-lg border border-zinc-200 bg-white mb-6">
-        <div className="px-5 py-4 border-b border-zinc-100">
-          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+      <div className="mb-6 overflow-hidden rounded-md border border-hairline bg-canvas shadow-level-2">
+        <div className="border-b border-hairline px-5 py-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
             <User className="size-4" />
             Profile
           </div>
         </div>
-        <div className="px-5 py-4 flex items-center gap-4">
+        <div className="flex items-center gap-4 px-5 py-4">
           <Avatar className="size-14">
             <AvatarImage src={user?.avatar_url} />
             <AvatarFallback>{user?.login?.slice(0, 2).toUpperCase()}</AvatarFallback>
           </Avatar>
           <div>
-            <p className="text-sm font-semibold text-zinc-950">@{user?.login}</p>
-            <p className="text-xs text-zinc-400">Connected via Google</p>
+            <p className="text-sm font-semibold text-ink">@{user?.login}</p>
+            <p className="text-xs text-mute">Connected via Google</p>
           </div>
         </div>
       </div>
 
       {/* Token management placeholder */}
-      <div className="rounded-lg border border-zinc-200 bg-white">
-        <div className="px-5 py-4 border-b border-zinc-100">
-          <div className="flex items-center gap-2 text-sm font-semibold text-zinc-950">
+      <div className="overflow-hidden rounded-md border border-hairline bg-canvas shadow-level-2">
+        <div className="border-b border-hairline px-5 py-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-ink">
             <Key className="size-4" />
             Daemon Tokens
           </div>
         </div>
         <div className="px-5 py-4">
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-body">
             Generate daemon tokens for headless / SSH / CI environments.
           </p>
-          <p className="text-xs text-zinc-400 mt-2">
+          <p className="mt-2 text-xs text-mute">
             Token management will be available in the next update.
           </p>
         </div>
