@@ -31,10 +31,10 @@ export function LiveAgentLog() {
     <div className="h-[132px] overflow-hidden bg-black px-6 py-5 font-mono text-[12px] leading-6 sm:px-8">
       <div className="transition-transform duration-500 ease-out">
         {visibleLines.map(([time, agent, message]) => (
-          <p key={time + agent + message} className="grid grid-cols-[78px_82px_1fr] gap-2 text-slate-500 max-sm:grid-cols-1 max-sm:gap-0 max-sm:py-1">
+          <p key={time + agent + message} className="grid grid-cols-[78px_82px_1fr] gap-2 text-white/40 max-sm:grid-cols-1 max-sm:gap-0 max-sm:py-1">
             <span>[{time}]</span>
-            <span className="text-orange-400">{agent}</span>
-            <span className="truncate text-slate-100">{message}</span>
+            <span className="text-[#50e3c2]">{agent}</span>
+            <span className="truncate text-white/80">{message}</span>
           </p>
         ))}
       </div>
