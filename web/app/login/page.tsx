@@ -20,7 +20,7 @@ function LoginContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex justify-center py-20 text-zinc-500">Loading...</div>}>
+    <Suspense fallback={<div className="flex justify-center py-20 text-mute">Loading...</div>}>
       <LoginContent />
     </Suspense>
   );

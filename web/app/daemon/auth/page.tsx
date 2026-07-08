@@ -64,33 +64,33 @@ function DaemonAuthContent() {
   const codeParts = code ? code.split("-") : [];
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-zinc-50 p-4">
+    <main className="flex min-h-screen items-center justify-center bg-canvas-soft p-4">
       <div className="w-full max-w-md">
-        <div className="bg-white rounded-2xl border border-zinc-200 shadow-sm p-8">
+        <div className="rounded-lg border border-hairline bg-canvas-soft-2 p-8 shadow-level-4">
           {/* Header — connection flow */}
-          <div className="flex items-center justify-center gap-4 mb-8">
-            <Avatar className="size-14 ring-2 ring-zinc-200 ring-offset-2">
+          <div className="mb-8 flex items-center justify-center gap-4">
+            <Avatar className="size-14 ring-2 ring-hairline ring-offset-2 ring-offset-canvas-soft-2">
               <AvatarImage src={userAvatar} />
               <AvatarFallback className="text-lg">
                 {userLogin?.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <ArrowRight className="size-5 text-zinc-300" />
-            <div className="flex size-14 items-center justify-center rounded-2xl bg-zinc-100 ring-2 ring-zinc-200 ring-offset-2">
+            <ArrowRight className="size-5 text-hairline-strong" />
+            <div className="flex size-14 items-center justify-center rounded-md bg-muted ring-2 ring-hairline ring-offset-2 ring-offset-canvas-soft-2">
               <Image src="/favicon.ico" alt="GitSquad" width={28} height={28} className="size-7" />
             </div>
           </div>
-          <h1 className="text-xl font-bold text-zinc-950 text-center">Device Activation</h1>
+          <h1 className="text-center text-xl font-semibold tracking-[-0.04em] text-ink">Device Activation</h1>
 
           {/* Need login */}
           {status === "need_login" && (
-            <div className="text-center space-y-5">
-              <p className="text-sm text-zinc-500">
+            <div className="space-y-5 text-center">
+              <p className="text-sm text-body">
                 Log in with your Google account to connect a daemon to GitSquad.
               </p>
               <button
                 onClick={() => router.push(`/login?return=${encodeURIComponent(`/daemon/auth?code=${code}`)}`)}
-                className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-5 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors w-full justify-center"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-sm bg-primary px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/85"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -106,7 +106,7 @@ function DaemonAuthContent() {
           {/* Loading */}
           {status === "loading" && (
             <div className="flex justify-center py-8">
-              <Loader2 className="size-6 text-zinc-400 animate-spin" />
+              <Loader2 className="size-6 animate-spin text-mute" />
             </div>
           )}
 
@@ -115,7 +115,7 @@ function DaemonAuthContent() {
             <div className="space-y-6">
               {/* Pairing code */}
               <div>
-                <p className="text-xs font-medium text-zinc-400 uppercase tracking-wider text-center mb-3">
+                <p className="mb-3 text-center font-mono text-xs uppercase tracking-wider text-mute">
                   Verification Code
                 </p>
                 <div className="flex items-center justify-center gap-2">
@@ -125,14 +125,14 @@ function DaemonAuthContent() {
                         {part.split("").map((ch, j) => (
                           <span
                             key={j}
-                            className="flex size-10 items-center justify-center rounded-lg border-2 border-zinc-200 bg-zinc-50 text-lg font-bold text-zinc-950 uppercase"
+                            className="flex size-10 items-center justify-center rounded-sm border border-hairline bg-canvas-soft text-lg font-bold uppercase text-ink"
                           >
                             {ch}
                           </span>
                         ))}
                       </div>
                       {i < codeParts.length - 1 && (
-                        <span className="text-zinc-300 font-bold text-lg">—</span>
+                        <span className="text-lg font-bold text-hairline-strong">—</span>
                       )}
                     </div>
                   ))}
@@ -140,19 +140,19 @@ function DaemonAuthContent() {
               </div>
 
               {/* Device info */}
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4 text-center">
-                <p className="text-xs text-zinc-400 mb-1">Device</p>
-                <p className="text-sm font-semibold text-zinc-950">{machineName}</p>
+              <div className="rounded-sm border border-hairline bg-canvas-soft p-4 text-center">
+                <p className="mb-1 text-xs text-mute">Device</p>
+                <p className="text-sm font-semibold text-ink">{machineName}</p>
               </div>
 
-              <p className="text-xs text-zinc-400 text-center">
+              <p className="text-center text-xs text-mute">
                 This device will be able to execute tasks on your behalf.
               </p>
 
               <button
                 onClick={handleConfirm}
                 disabled={status === "confirming"}
-                className="w-full rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors"
+                className="w-full rounded-sm bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/85 disabled:opacity-50"
               >
                 {status === "confirming" ? "Confirming..." : "Authorize Device"}
               </button>
@@ -161,13 +161,13 @@ function DaemonAuthContent() {
 
           {/* Confirmed */}
           {status === "confirmed" && (
-            <div className="text-center space-y-4">
-              <div className="flex size-12 items-center justify-center rounded-full bg-green-100 mx-auto">
-                <Check className="size-6 text-green-600" />
+            <div className="space-y-4 text-center">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#0070f3]/10">
+                <Check className="size-6 text-[#0070f3]" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-zinc-950">Device Connected</h2>
-                <p className="text-sm text-zinc-500 mt-1">
+                <h2 className="text-lg font-semibold text-ink">Device Connected</h2>
+                <p className="mt-1 text-sm text-body">
                   You can close this page and return to your terminal.
                 </p>
               </div>
@@ -176,17 +176,17 @@ function DaemonAuthContent() {
 
           {/* Error */}
           {status === "error" && (
-            <div className="text-center space-y-4">
-              <div className="flex size-12 items-center justify-center rounded-full bg-red-100 mx-auto">
-                <span className="text-xl font-bold text-red-600">!</span>
+            <div className="space-y-4 text-center">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10">
+                <span className="text-xl font-bold text-destructive">!</span>
               </div>
               <div>
-                <h2 className="text-lg font-bold text-zinc-950">Verification Failed</h2>
-                <p className="text-sm text-zinc-500 mt-1">{error}</p>
+                <h2 className="text-lg font-semibold text-ink">Verification Failed</h2>
+                <p className="mt-1 text-sm text-body">{error}</p>
               </div>
               <a
                 href="/login"
-                className="inline-block text-sm text-zinc-500 hover:text-zinc-950 transition-colors"
+                className="inline-block text-sm text-body transition-colors hover:text-ink"
               >
                 Back to login
               </a>
@@ -194,7 +194,7 @@ function DaemonAuthContent() {
           )}
         </div>
 
-        <p className="text-xs text-zinc-400 text-center mt-4">
+        <p className="mt-4 text-center text-xs text-mute">
           GitSquad — Autonomous developer team on GitHub
         </p>
       </div>
@@ -206,8 +206,8 @@ export default function DaemonAuthPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-zinc-50">
-          <Loader2 className="size-6 text-zinc-400 animate-spin" />
+        <div className="flex min-h-screen items-center justify-center bg-canvas-soft">
+          <Loader2 className="size-6 animate-spin text-mute" />
         </div>
       }
     >

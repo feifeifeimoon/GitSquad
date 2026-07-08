@@ -54,28 +54,28 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
   const content = (
     <div className="flex flex-col items-center text-center">
       {/* Logo */}
-      <div className="mb-6 flex size-14 items-center justify-center rounded-2xl border border-zinc-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.12)]">
+      <div className="mb-6 flex size-14 items-center justify-center rounded-md border border-hairline bg-canvas shadow-level-2">
         <Image
           src="/favicon.ico"
           alt="GitSquad"
           width={48}
           height={48}
-          className="size-11 rounded-xl"
+          className="size-11 rounded-sm"
           priority
         />
       </div>
 
       {/* Heading */}
-      <h2 className="text-2xl font-bold tracking-tight text-zinc-950">
+      <h2 className="text-2xl font-semibold tracking-[-0.04em] text-ink">
         Welcome back
       </h2>
-      <p className="mt-2 text-sm text-zinc-500">
+      <p className="mt-2 text-sm text-body">
         Log in to your GitSquad account to continue
       </p>
 
       {/* Error */}
       {error && (
-        <div className="mt-6 w-full rounded-md bg-red-50 border border-red-200 px-4 py-2 text-sm text-red-600">
+        <div className="mt-6 w-full rounded-sm border border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive">
           {errorMessages[error] || "An unexpected error occurred. Please try again."}
         </div>
       )}
@@ -83,13 +83,13 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
       {/* Google button */}
       <button
         onClick={handleLogin}
-        className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-lg border border-zinc-200 bg-white px-5 py-2.5 text-sm font-semibold text-zinc-700 shadow-sm transition-colors hover:bg-zinc-50"
+        className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-sm border border-hairline bg-canvas px-5 py-2.5 text-sm font-medium text-ink shadow-level-1 transition-colors hover:bg-muted"
       >
         <GoogleIcon />
         Continue with Google
       </button>
 
-      <p className="mt-4 text-xs text-zinc-400">
+      <p className="mt-4 text-xs text-mute">
         Your agent team is one click away.
       </p>
     </div>
@@ -98,8 +98,10 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
   // ── Page mode: full-page centered layout ──
   if (mode === "page") {
     return (
-      <main className="min-h-screen flex items-center justify-center bg-white px-5">
-        <div className="w-full max-w-sm">{content}</div>
+      <main className="flex min-h-screen items-center justify-center bg-canvas-soft px-6">
+        <div className="w-full max-w-sm rounded-lg border border-hairline bg-canvas-soft-2 p-8 shadow-level-4">
+          {content}
+        </div>
       </main>
     );
   }
@@ -114,12 +116,12 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
       />
 
       {/* Card */}
-      <div className="relative w-full max-w-sm rounded-2xl border border-zinc-200 bg-white p-8 shadow-2xl">
+      <div className="relative w-full max-w-sm rounded-lg border border-hairline bg-canvas-soft-2 p-8 shadow-level-5">
         {/* Close button */}
         {onClose && (
           <button
             onClick={onClose}
-            className="absolute right-4 top-4 rounded-md p-1 text-zinc-400 transition-colors hover:bg-zinc-100 hover:text-zinc-600"
+            className="absolute right-4 top-4 rounded-sm p-1 text-mute transition-colors hover:bg-muted hover:text-ink"
           >
             <X className="size-4" />
           </button>
