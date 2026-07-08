@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronLeft, Lock, Search, Check, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 interface Repo {
   id: string;
@@ -117,8 +118,8 @@ export default function NewWorkspacePage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin w-6 h-6 border-2 border-zinc-950 border-t-transparent rounded-full" />
+      <div className="flex h-full items-center justify-center">
+        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
@@ -127,28 +128,28 @@ export default function NewWorkspacePage() {
     <div className="p-8">
       <button
         onClick={() => router.push("/console/workspaces")}
-        className="flex items-center gap-1 text-sm text-zinc-500 hover:text-zinc-950 mb-6 transition-colors"
+        className="mb-6 flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
       >
         <ChevronLeft className="size-4" />
         All Workspaces
       </button>
 
-      <h1 className="text-2xl font-bold text-zinc-950 mb-2">
+      <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
         Create a Workspace
       </h1>
-      <p className="text-sm text-zinc-500 mb-8">
+      <p className="mb-8 text-sm text-body">
         Import a Git repository and configure your agent team.
       </p>
 
       {installations.length === 0 ? (
-        <div className="rounded-xl border border-zinc-200 bg-white p-12 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-zinc-100 mx-auto mb-4">
-            <Search className="size-6 text-zinc-400" />
+        <div className="rounded-md border border-hairline bg-canvas p-12 text-center shadow-level-2">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-muted">
+            <Search className="size-6 text-mute" />
           </div>
-          <p className="text-sm font-semibold text-zinc-950 mb-1">
+          <p className="mb-1 text-sm font-semibold text-ink">
             No GitHub installations
           </p>
-          <p className="text-sm text-zinc-500 mb-6">
+          <p className="text-sm text-body">
             Install the GitSquad GitHub App to connect your repositories.
           </p>
         </div>
@@ -156,7 +157,7 @@ export default function NewWorkspacePage() {
         <form onSubmit={handleSubmit}>
           {/* Account tabs */}
           {installations.length > 1 && (
-            <div className="flex gap-2 mb-6">
+            <div className="mb-6 flex gap-2">
               {installations.map((inst) => (
                 <button
                   key={inst.id}
@@ -166,10 +167,10 @@ export default function NewWorkspacePage() {
                     setSelectedRepoID("");
                     fetchRepos(inst.id);
                   }}
-                  className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                  className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                     selectedInstallationID === inst.id
-                      ? "bg-zinc-950 text-white"
-                      : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"
+                      ? "bg-primary text-white"
+                      : "bg-muted text-body hover:bg-canvas-soft-2 hover:text-ink"
                   }`}
                 >
                   {inst.account_login}
@@ -180,23 +181,23 @@ export default function NewWorkspacePage() {
 
           {/* Repo search */}
           <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-zinc-400" />
+            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-mute" />
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search repositories..."
-              className="w-full rounded-lg border border-zinc-200 bg-white pl-9 pr-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-950 focus:outline-none transition-colors"
+              className="h-10 w-full rounded-sm border border-hairline bg-canvas pl-9 pr-3 text-sm text-ink transition-colors placeholder:text-mute focus:border-hairline-strong focus:outline-none"
             />
           </div>
 
           {/* Repo cards */}
           {repoLoading ? (
             <div className="flex items-center justify-center py-16">
-              <Loader2 className="size-6 text-zinc-400 animate-spin" />
+              <Loader2 className="size-6 animate-spin text-mute" />
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8 max-h-96 overflow-y-auto">
+            <div className="mb-8 grid max-h-96 grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
               {filteredRepos.map((repo) => {
                 const isSelected = selectedRepoID === repo.id;
                 return (
@@ -204,17 +205,17 @@ export default function NewWorkspacePage() {
                     key={repo.id}
                     type="button"
                     onClick={() => setSelectedRepoID(repo.id)}
-                    className={`flex items-center gap-3 rounded-xl border p-4 text-left transition-all ${
+                    className={`flex items-center gap-3 rounded-md border p-4 text-left transition-all ${
                       isSelected
-                        ? "border-zinc-950 bg-zinc-50 ring-1 ring-zinc-950"
-                        : "border-zinc-200 bg-white hover:border-zinc-300 hover:bg-zinc-50"
+                        ? "border-primary bg-muted ring-1 ring-primary"
+                        : "border-hairline bg-canvas hover:bg-muted"
                     }`}
                   >
                     <div
                       className={`flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors ${
                         isSelected
-                          ? "border-zinc-950 bg-zinc-950"
-                          : "border-zinc-300"
+                          ? "border-primary bg-primary"
+                          : "border-hairline-strong"
                       }`}
                     >
                       {isSelected && (
@@ -223,14 +224,14 @@ export default function NewWorkspacePage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-sm font-semibold text-zinc-950 truncate">
+                        <p className="truncate text-sm font-semibold text-ink">
                           {repo.name}
                         </p>
                         {repo.private && (
-                          <Lock className="size-3 text-zinc-400 shrink-0" />
+                          <Lock className="size-3 shrink-0 text-mute" />
                         )}
                       </div>
-                      <p className="text-xs text-zinc-400 truncate">
+                      <p className="truncate text-xs text-mute">
                         {repo.owner}
                       </p>
                     </div>
@@ -239,7 +240,7 @@ export default function NewWorkspacePage() {
               })}
               {filteredRepos.length === 0 && !repoLoading && (
                 <div className="col-span-2 py-12 text-center">
-                  <p className="text-sm text-zinc-400">
+                  <p className="text-sm text-mute">
                     {search
                       ? "No repositories match your search."
                       : "No repositories found."}
@@ -251,9 +252,9 @@ export default function NewWorkspacePage() {
 
           {/* Name + Create */}
           {selectedRepoID && (
-            <div className="rounded-xl border border-zinc-200 bg-white p-5 space-y-4">
+            <div className="space-y-4 rounded-md border border-hairline bg-canvas p-5 shadow-level-2">
               <div>
-                <label className="block text-sm font-semibold text-zinc-950 mb-1.5">
+                <label className="mb-1.5 block text-sm font-semibold text-ink">
                   Workspace Name
                 </label>
                 <input
@@ -261,24 +262,20 @@ export default function NewWorkspacePage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. main, frontend, backend"
-                  className="w-full rounded-lg border border-zinc-200 bg-white px-3 py-2.5 text-sm text-zinc-950 placeholder:text-zinc-400 focus:border-zinc-950 focus:outline-none transition-colors"
+                  className="h-10 w-full rounded-sm border border-hairline bg-canvas px-3 text-sm text-ink transition-colors placeholder:text-mute focus:border-hairline-strong focus:outline-none"
                   required
                 />
               </div>
 
               {error && (
-                <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">
+                <p className="rounded-sm bg-destructive/10 px-3 py-2 text-sm text-destructive">
                   {error}
                 </p>
               )}
 
-              <button
-                type="submit"
-                disabled={creating}
-                className="w-full rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800 disabled:opacity-50 transition-colors"
-              >
+              <Button type="submit" disabled={creating} className="w-full">
                 {creating ? "Creating..." : "Create Workspace"}
-              </button>
+              </Button>
             </div>
           )}
         </form>
