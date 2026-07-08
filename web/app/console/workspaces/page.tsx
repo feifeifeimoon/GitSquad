@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Plus, Archive, ExternalLink, Lock } from "lucide-react";
 import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 
 interface Workspace {
   id: string;
@@ -40,48 +41,42 @@ export default function WorkspacesPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="animate-spin w-6 h-6 border-2 border-zinc-950 border-t-transparent rounded-full" />
+      <div className="flex h-full items-center justify-center">
+        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
       </div>
     );
   }
 
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-zinc-950">Workspaces</h1>
-          <p className="text-sm text-zinc-500 mt-1">
+          <h1 className="text-xl font-semibold tracking-[-0.02em] text-ink">Workspaces</h1>
+          <p className="mt-1 text-sm text-body">
             {workspaces.length} workspace{workspaces.length !== 1 && "s"}
           </p>
         </div>
-        <button
-          onClick={() => router.push("/console/workspaces/new")}
-          className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-4 py-2.5 text-sm font-semibold text-white hover:bg-zinc-800 transition-colors"
-        >
+        <Button onClick={() => router.push("/console/workspaces/new")}>
           <Plus className="size-4" />
           New Workspace
-        </button>
+        </Button>
       </div>
 
       {workspaces.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-zinc-300 p-16 text-center">
-          <div className="flex size-12 items-center justify-center rounded-full bg-zinc-100 mx-auto mb-4">
-            <Plus className="size-6 text-zinc-400" />
+        <div className="rounded-md border border-dashed border-hairline-strong p-16 text-center">
+          <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-muted">
+            <Plus className="size-6 text-mute" />
           </div>
-          <p className="text-sm font-semibold text-zinc-950 mb-1">
+          <p className="mb-1 text-sm font-semibold text-ink">
             No workspaces yet
           </p>
-          <p className="text-sm text-zinc-500 mb-6 max-w-xs mx-auto">
+          <p className="mx-auto mb-6 max-w-xs text-sm text-body">
             Link a GitHub repository and configure your agent team to get
             started.
           </p>
-          <button
-            onClick={() => router.push("/console/workspaces/new")}
-            className="inline-flex items-center gap-2 rounded-lg bg-zinc-950 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
-          >
+          <Button onClick={() => router.push("/console/workspaces/new")}>
             Create your first Workspace
-          </button>
+          </Button>
         </div>
       ) : (
         <div className="grid gap-3">
@@ -89,30 +84,30 @@ export default function WorkspacesPage() {
             <div
               key={w.id}
               onClick={() => router.push(`/console/workspaces/${w.id}`)}
-              className="group flex items-center justify-between rounded-xl border border-zinc-200 bg-white p-5 hover:border-zinc-300 hover:shadow-sm cursor-pointer transition-all"
+              className="group flex cursor-pointer items-center justify-between rounded-md border border-hairline bg-canvas p-5 shadow-level-2 transition-all hover:shadow-level-3"
             >
-              <div className="flex items-center gap-4 min-w-0">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-zinc-950 text-white text-sm font-bold">
+              <div className="flex min-w-0 items-center gap-4">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-sm bg-primary text-sm font-bold text-white">
                   {w.name.slice(0, 2).toUpperCase()}
                 </div>
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-semibold text-zinc-950 truncate">
+                    <p className="truncate text-sm font-semibold text-ink">
                       {w.name}
                     </p>
                     {w.status !== "active" && (
-                      <span className="inline-flex shrink-0 items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                      <span className="inline-flex shrink-0 items-center rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-medium text-warning">
                         {w.status}
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <ExternalLink className="size-3 text-zinc-400 shrink-0" />
-                    <p className="text-[13px] text-zinc-500 truncate">
+                  <div className="mt-0.5 flex items-center gap-1.5">
+                    <ExternalLink className="size-3 shrink-0 text-mute" />
+                    <p className="truncate text-[13px] text-body">
                       {w.repo_full_name || w.repo_owner + "/" + w.repo_name}
                     </p>
                     {w.repo_private && (
-                      <Lock className="size-3 text-zinc-400 shrink-0" />
+                      <Lock className="size-3 shrink-0 text-mute" />
                     )}
                   </div>
                 </div>
@@ -122,7 +117,7 @@ export default function WorkspacesPage() {
                   e.stopPropagation();
                   handleArchive(w.id);
                 }}
-                className="shrink-0 rounded-lg p-2 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-950 opacity-0 group-hover:opacity-100 transition-all"
+                className="shrink-0 rounded-sm p-2 text-mute opacity-0 transition-all hover:bg-muted hover:text-ink group-hover:opacity-100"
                 title="Archive workspace"
               >
                 <Archive className="size-4" />

@@ -69,32 +69,35 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   }, []);
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="flex h-screen bg-canvas">
       {/* Sidebar */}
       <aside
-        className="flex flex-col border-r border-zinc-200 bg-zinc-50/50 shrink-0 relative"
+        className="relative flex shrink-0 flex-col border-r border-hairline bg-canvas"
         style={{ width: sidebarWidth }}
       >
         {/* Logo */}
-        <div className="flex h-14 items-center gap-2 px-5 border-b border-zinc-200">
-          <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5" />
-          <span className="font-bold text-sm tracking-tight">GitSquad</span>
+        <div className="flex h-16 items-center gap-2 border-b border-hairline px-5">
+          <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
+          <span className="text-sm font-semibold tracking-tight">GitSquad</span>
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 space-y-1 px-3 py-4">
           {navItems.map((item) => {
             const active = pathname.startsWith(item.href);
             return (
               <button
                 key={item.href}
                 onClick={() => router.push(item.href)}
-                className={`flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
                   active
-                    ? "bg-zinc-200/70 text-zinc-950"
-                    : "text-zinc-500 hover:bg-zinc-100 hover:text-zinc-950"
+                    ? "bg-muted text-ink"
+                    : "text-body hover:bg-muted hover:text-ink"
                 }`}
               >
+                {active && (
+                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                )}
                 <item.icon className="size-4" />
                 {item.label}
               </button>
@@ -103,7 +106,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         </nav>
 
         {/* User */}
-        <div className="border-t border-zinc-200 px-3 py-4">
+        <div className="border-t border-hairline px-3 py-4">
           <div className="flex items-center gap-3">
             <Avatar className="size-8">
               <AvatarImage src={user?.avatar_url} />
@@ -111,14 +114,14 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                 {user?.login?.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-zinc-950 truncate">
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium text-ink">
                 @{user?.login}
               </p>
             </div>
             <button
               onClick={() => setLogoutConfirm(true)}
-              className="text-zinc-400 hover:text-zinc-950 transition-colors"
+              className="text-mute transition-colors hover:text-ink"
               title="Logout"
             >
               <LogOut className="size-4" />
@@ -128,7 +131,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
         {/* Resize handle */}
         <div
-          className="absolute top-0 right-0 w-1 h-full cursor-col-resize hover:bg-zinc-300 transition-colors"
+          className="absolute right-0 top-0 h-full w-1 cursor-col-resize transition-colors hover:bg-hairline-strong"
           onMouseDown={onMouseDown}
         />
       </aside>
@@ -139,19 +142,19 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       {/* Logout confirmation */}
       {logoutConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="rounded-lg border border-zinc-200 bg-white p-6 shadow-lg max-w-xs">
-            <p className="text-sm font-semibold text-zinc-950 mb-1">Sign out</p>
-            <p className="text-sm text-zinc-500 mb-4">Are you sure you want to sign out?</p>
-            <div className="flex gap-2 justify-end">
+          <div className="max-w-xs rounded-lg border border-hairline bg-canvas p-6 shadow-level-5">
+            <p className="mb-1 text-sm font-semibold text-ink">Sign out</p>
+            <p className="mb-4 text-sm text-body">Are you sure you want to sign out?</p>
+            <div className="flex justify-end gap-2">
               <button
                 onClick={() => setLogoutConfirm(false)}
-                className="rounded-md px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100 transition-colors"
+                className="rounded-sm px-3 py-1.5 text-sm text-body transition-colors hover:bg-muted"
               >
                 Cancel
               </button>
               <button
                 onClick={handleLogout}
-                className="rounded-md bg-zinc-950 px-3 py-1.5 text-sm font-medium text-white hover:bg-zinc-800 transition-colors"
+                className="rounded-sm bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/85"
               >
                 Sign out
               </button>
