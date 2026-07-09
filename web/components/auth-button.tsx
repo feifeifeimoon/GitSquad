@@ -88,7 +88,7 @@ export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
 
   return (
     <Button
-      size="pill-sm"
+      size="sm"
       onClick={() => {
         if (onLoginClick) {
           onLoginClick();
