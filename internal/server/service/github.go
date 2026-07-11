@@ -45,6 +45,7 @@ func NewGitHubAppService(s *store.Store, cfg config.Config, pending *memory.Pend
 // written with a non-nil user_id.
 func (s *GitHubAppService) CreateInstallation(ctx context.Context, installationID int64, userID uuid.UUID) (*db.GithubInstallation, error) {
 	var accountLogin, accountType, repoSelection string
+	repoSelection = "selected" // PostgreSQL default; don't let empty string override it
 
 	// Prefer memory-bridge data from the webhook.
 	if p := s.pending.Get(installationID); p != nil {
@@ -299,6 +300,10 @@ func (s *GitHubAppService) handleInstallationCreated(ctx context.Context, payloa
 	}
 
 	inst := ev.Installation
+	if inst == nil {
+		slog.Warn("installation.created webhook payload missing installation field")
+		return
+	}
 	installationID := inst.GetID()
 
 	// If the callback already arrived and created the DB record, nothing to do.
@@ -337,6 +342,10 @@ func (s *GitHubAppService) handleInstallationDeleted(ctx context.Context, payloa
 		slog.Warn("parse installation.deleted", "error", err)
 		return
 	}
+	if ev.Installation == nil {
+		slog.Warn("installation.deleted webhook payload missing installation field")
+		return
+	}
 	installationID := ev.Installation.GetID()
 
 	// Check DB first.
@@ -359,6 +368,10 @@ func (s *GitHubAppService) handleInstallationReposChanged(ctx context.Context, p
 	var ev github.InstallationRepositoriesEvent
 	if err := json.Unmarshal(payload, &ev); err != nil {
 		slog.Warn("parse installation_repositories", "error", err)
+		return
+	}
+	if ev.Installation == nil {
+		slog.Warn("installation_repositories webhook payload missing installation field")
 		return
 	}
 	installationID := ev.Installation.GetID()
