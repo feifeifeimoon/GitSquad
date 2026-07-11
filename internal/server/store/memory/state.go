@@ -51,7 +51,9 @@ func (s *StateStore) Pop(state string) uuid.UUID {
 
 // reap periodically removes expired entries.
 func (s *StateStore) reap() {
-	for range time.Tick(time.Minute) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
 		s.mu.Lock()
 		now := time.Now()
 		for k, v := range s.data {
@@ -133,7 +135,9 @@ func (s *PendingInstallationStore) Delete(installationID int64) {
 }
 
 func (s *PendingInstallationStore) reap() {
-	for range time.Tick(time.Minute) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
+	for range ticker.C {
 		s.mu.Lock()
 		now := time.Now()
 		for k, v := range s.data {

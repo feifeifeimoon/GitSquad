@@ -16,7 +16,11 @@ import (
 const userContextKey = "user"
 
 // RequireAuth returns a middleware that validates the Bearer JWT and injects the User into context.
-// The JWT may come from either the Authorization header or the gitsquad_token cookie.
+// The JWT must come from the Authorization header. Cookie-based auth is intentionally NOT
+// supported here: browsers auto-attach cookies to cross-site requests, so accepting the
+// gitsquad_token cookie would expose state-changing (POST/PUT/DELETE) endpoints to CSRF.
+// State-less browser redirects (e.g. the GitHub App callback) authenticate via the `state`
+// parameter + StateStore instead.
 func RequireAuth(cfg config.Config, users *service.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractToken(c)
@@ -44,17 +48,13 @@ func RequireAuth(cfg config.Config, users *service.UserService) gin.HandlerFunc 
 	}
 }
 
-// extractToken reads the JWT from the Authorization header first,
-// then falls back to the gitsquad_token cookie.
+// extractToken reads the JWT from the Authorization header only.
+// Header-based auth is immune to CSRF; cookie auth on state-changing
+// routes is not, so it is intentionally not supported here.
 func extractToken(c *gin.Context) string {
-	// 1. Authorization: Bearer <token>
+	// Authorization: Bearer <token>
 	if header := c.GetHeader("Authorization"); header != "" && strings.HasPrefix(header, "Bearer ") {
 		return strings.TrimPrefix(header, "Bearer ")
-	}
-
-	// 2. gitsquad_token cookie (used by browser redirects like GitHub App callback)
-	if cookie, err := c.Cookie("gitsquad_token"); err == nil && cookie != "" {
-		return cookie
 	}
 
 	return ""

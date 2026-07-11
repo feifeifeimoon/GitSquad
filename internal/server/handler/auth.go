@@ -4,7 +4,6 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/crypto"
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
@@ -15,7 +14,10 @@ import (
 // AuthHandler handles OAuth login and callback endpoints.
 // All OAuth business logic (code exchange, user upsert, JWT generation) lives
 // in service.AuthService. This handler is responsible only for HTTP concerns:
-// cookie management, redirects, and request parsing.
+// redirects and request parsing. The JWT is returned to the browser via the
+// URL hash fragment (picked up by the frontend and stored in localStorage);
+// it is NOT set as a cookie, since cookie auth on state-changing routes would
+// be vulnerable to CSRF.
 type AuthHandler struct {
 	cfg     config.Config
 	authSvc *service.AuthService
@@ -70,10 +72,6 @@ func (h *AuthHandler) CallbackGoogle(c *gin.Context) {
 	}
 
 	slog.Info("oauth login success", "user", result.User.Login)
-
-	// Set JWT as httpOnly cookie so browser redirects (e.g. GitHub App
-	// callback) carry authentication without needing a custom header.
-	c.SetCookie("gitsquad_token", result.Token, int((7*24*time.Hour).Seconds()), "/", "", false, true)
 
 	// Redirect to frontend with JWT in hash fragment (for localStorage).
 	c.Redirect(http.StatusFound,
