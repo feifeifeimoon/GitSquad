@@ -12,7 +12,7 @@
   "dependencies": {
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
-    "lucide-react": "^1.22.0",
+    "lucide-react": "^1.29.0",
     "next": "16.3.0",
     "radix-ui": "^1.6.0",
     "react": "19.2.8",
@@ -29,7 +29,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "tailwindcss": "^4",
-    "typescript": "^6"
+    "typescript": "^7"
   },
   "ignoreScripts": [
     "sharp",
