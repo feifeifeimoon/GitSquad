@@ -1,7 +1,10 @@
+> 进度基线(2026-08-12 同步):已完成 1.1/1.3–1.6、2.2–2.4、3.1–3.2/3.4、7.1–7.3;未开始 4/5/6/8/9/10/11 章;部分完成 2.5/3.3(degraded 缺口)、7.6(仅下线检测)、7.7(仅打包)。
+
 ## 1. 技术栈敲定与项目骨架
 
 - [x] 1.1 按 design.md 选择标准敲定 Layer 2 技术栈(SaaS 语言、daemon 语言、数据库、前端、sandbox provider),记录决策到 design.md 的 Open Questions
 - [ ] 1.2 spike 选定 SandboxProvider(对 E2B / Cloudflare Containers / Fly Machines 各做最小 spawn → run → kill 验证,按冷启动/成本/API 成熟度选定 MVP 厂商)
+  - 注:已延后,待第 8 章 CloudShell 开工时一并决策;仓库内目前无任何 SandboxProvider 代码
 - [x] 1.3 搭建 SaaS 项目骨架(目录结构、依赖、env 配置、Postgres 连接预留;数据库迁移框架延后到 schema 稳定后引入)
 - [x] 1.4 搭建 daemon 项目骨架(单 binary 构建脚本、跨平台编译验证)
 - [x] 1.5 补齐 AgentConfig、DaemonMachine、RuntimeCapability、daemon login、runtime status check 与 local task capability 匹配设计
@@ -10,17 +13,21 @@
 ## 2. GitHub App 集成与 link
 
 - [ ] 2.1 注册 GitSquad GitHub App,配置所需权限与 webhook 订阅(pull_request、installation、installation_repositories)
-- [ ] 2.2 实现 OAuth/安装重定向流程,落地 `GitHubAppInstallation` 记录(含授权 repo 列表)
-- [ ] 2.3 实现 webhook 接收端点,含签名校验(拒绝未签名请求)与事件分发
-- [ ] 2.4 实现 installation token 获取与按 installation 隔离的凭证管理(禁止跨 Workspace 复用)
+  - 注:外部操作,代码无法验证;配置项已就绪(.env: GITHUB_APP_ID / PRIVATE_KEY / NAME / WEBHOOK_SECRET),需人工确认 App 已注册且已订阅 pull_request
+- [x] 2.2 实现 OAuth/安装重定向流程,落地 `GitHubAppInstallation` 记录(含授权 repo 列表)
+- [x] 2.3 实现 webhook 接收端点,含签名校验(拒绝未签名请求)与事件分发
+- [x] 2.4 实现 installation token 获取与按 installation 隔离的凭证管理(禁止跨 Workspace 复用)
 - [ ] 2.5 处理 `installation_repositories` 事件,同步更新可访问 repo 列表;repo 被撤销授权时标记关联 Workspace 为 `degraded`
+  - 进度:repo 列表同步(分页 + upsert/delete)✅;repo 撤销授权 → Workspace `degraded` ❌(后端无设置逻辑,仅前端有渲染分支)
 
 ## 3. Workspace 管理
 
-- [ ] 3.1 实现 Workspace 数据模型(id、所属 User/Org、绑定 repo、agent 团队、settings)
-- [ ] 3.2 实现 Workspace 创建 API:从 `GitHubAppInstallation` 可访问 repo 列表中选一个绑定
+- [x] 3.1 实现 Workspace 数据模型(id、所属 User/Org、绑定 repo、agent 团队、settings)
+- [x] 3.2 实现 Workspace 创建 API:从 `GitHubAppInstallation` 可访问 repo 列表中选一个绑定
 - [ ] 3.3 实现 Workspace 可访问性校验:link 前置校验、repo 取消授权降级
-- [ ] 3.4 实现同一 repo 多 Workspace 支持(隔离 agent 团队与 Issue)
+  - 进度:创建时校验 installation/repo 归属与前置链接条件 ✅;repo 取消授权 → `degraded` 降级 ❌(与 2.5 同一缺口)
+- [x] 3.4 实现同一 repo 多 Workspace 支持(隔离 agent 团队与 Issue)
+  - 注:数据库无 repo 唯一约束,天然支持多 Workspace(agent 团队与 Issue 隔离待 4/5 章落地)
 
 ## 4. 平台 Issue 黑板
 
@@ -51,13 +58,17 @@
 
 ## 7. LocalShell daemon
 
-- [ ] 7.1 实现 `gitsquad daemon login` User 级 pairing 登录与 daemon token 本地保存
-- [ ] 7.2 实现 `gitsquad daemon status` runtime check 与 capabilities 上报
-- [ ] 7.3 实现 daemon↔SaaS 长连接(WebSocket/SSE 拉模式)与心跳/重连
+- [x] 7.1 实现 `gitsquad daemon login` User 级 pairing 登录与 daemon token 本地保存
+- [x] 7.2 实现 `gitsquad daemon status` runtime check 与 capabilities 上报
+- [x] 7.3 实现 daemon↔SaaS 长连接(WebSocket/SSE 拉模式)与心跳/重连
 - [ ] 7.4 实现 LocalShell 的 `next_task()` 接口(从长连接队列拉取任务)
+  - 注:`task_wake` / `task_available` 帧类型与 `PendingActions` 通道已定义,但服务端从不发送、daemon 侧为 TODO,依赖第 9 章任务派发
 - [ ] 7.5 实现多 Workspace 任务的工作目录隔离
+  - 注:未实现,依赖 7.4 任务通道
 - [ ] 7.6 实现 daemon 下线检测与任务超时标记 `failed` + Issue 回流通知(MVP 不自动迁移)
+  - 进度:下线检测 ✅(WS 陈旧连接驱逐 → `MarkOffline`);任务超时标记 `failed` + Issue 回流 ❌(任务系统未建)
 - [ ] 7.7 打包 daemon 单 binary(`gitsquad daemon`)与安装/更新脚本
+  - 进度:单 binary 打包 ✅(Makefile build-cli + goreleaser + `daemon start/stop` 前后台);安装/更新脚本 ❌(前端文案引用 `curl install | sh`,仓库内无脚本)
 
 ## 8. CloudShell + SandboxProvider
 
@@ -90,3 +101,16 @@
 - [ ] 11.4 用量日志埋点(sandbox 时长、任务数、token 估算),为未来计费留数据(MVP 不做计费)
 - [ ] 11.5 安全审计:installation token 隔离、webhook 签名、daemon 认证、PR 凭证最小权限
 - [ ] 11.6 文档:README 更新、link/Workspace/agent 配置的用户操作指引、daemon 安装指引
+
+---
+
+## 清单外已实现(2026-08-12 同步)
+
+以下功能已落地但不在原任务清单中,已并入进度基线:
+
+- Google OAuth 登录(登录页 + `/auth/callback` hash token 落地 + JWT 中间件)
+- GitHub App 安装回调竞态桥接(`PendingInstallationStore` webhook→memory bridge,处理 installation.created 早于浏览器回调到达)
+- 前端 Vercel 设计语言改版(营销页、登录、console 壳、workspaces、daemons、settings、daemon auth)
+- Console 壳:可拖拽侧栏、workspace 列表/详情、daemon 列表(15s 轮询)与连接指引
+- 后端单测覆盖 daemon / service / ws / config / client 等层;前端仅 landing 页静态断言测试
+- 工程化:Makefile、goreleaser 发布配置、Dockerfile、.github 工作流
