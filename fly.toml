@@ -1,0 +1,21 @@
+app = "gitsquad-api"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  GITSQUAD_ENV = "production"
+  GITSQUAD_HTTP_ADDR = ":8080"
+  GITSQUAD_FRONTEND_URL = "https://git-squad.vercel.app"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256

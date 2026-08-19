@@ -5,6 +5,13 @@
 
 # goreleaser output
 dist/
+bin/
+
+# Local build artifacts
+server.exe
+nul
+.zcode/
+.vercel/
 
 # CI / helpers
 .github/
