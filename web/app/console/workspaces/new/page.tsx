@@ -41,7 +41,22 @@ export default function NewWorkspacePage() {
   const [search, setSearch] = useState("");
   const [repoLoading, setRepoLoading] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  const [installLoading, setInstallLoading] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
+
+  // Start the GitHub App installation flow: get a state-tagged install URL
+  // from the backend, then bounce the user to github.com to authorize.
+  const handleInstallApp = async () => {
+    setInstallLoading(true);
+    try {
+      const { url } = await api.post<{ url: string }>(
+        "/api/v1/github/prepare-install"
+      );
+      window.location.href = url;
+    } catch {
+      setInstallLoading(false);
+    }
+  };
 
   // Fetch repos for the selected installation.
   const fetchRepos = async (installationID: string) => {
@@ -169,6 +184,19 @@ export default function NewWorkspacePage() {
           <p className="text-sm text-body">
             Install the GitSquad GitHub App to connect your repositories.
           </p>
+          <Button
+            type="button"
+            onClick={handleInstallApp}
+            disabled={installLoading}
+            className="mt-6"
+          >
+            {installLoading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <GitHubIcon className="size-4" />
+            )}
+            Install GitSquad GitHub App
+          </Button>
         </div>
       ) : (
         <div className="space-y-5">
