@@ -44,7 +44,7 @@ func (h *DaemonHandler) authByPairing(c *gin.Context) {
 		return
 	}
 
-	result, err := h.daemons.InitiatePairing(c.Request.Context(), req.MachineName)
+	result, err := h.daemons.InitiatePairing(c.Request.Context(), req.MachineName, req.OS, req.Arch, req.DaemonVersion)
 	if err != nil {
 		slog.Error("initiate pairing", "error", err)
 		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to create pairing"))

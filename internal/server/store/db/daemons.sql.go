@@ -49,7 +49,7 @@ func (q *Queries) ConsumePairingCode(ctx context.Context, id uuid.UUID) error {
 
 const createActiveToken = `-- name: CreateActiveToken :one
 INSERT INTO daemon_tokens (user_id, token_hash, token_prefix, status)
-VALUES ($1, $2, $3, 'active') RETURNING id, user_id, daemon_id, token_hash, token_prefix, pairing_code, machine_name, status, expires_at, issued_at, confirmed_at, last_used_at
+VALUES ($1, $2, $3, 'active') RETURNING id, user_id, daemon_id, token_hash, token_prefix, pairing_code, machine_name, os, arch, daemon_version, status, expires_at, issued_at, confirmed_at, last_used_at
 `
 
 type CreateActiveTokenParams struct {
@@ -69,6 +69,9 @@ func (q *Queries) CreateActiveToken(ctx context.Context, arg CreateActiveTokenPa
 		&i.TokenPrefix,
 		&i.PairingCode,
 		&i.MachineName,
+		&i.Os,
+		&i.Arch,
+		&i.DaemonVersion,
 		&i.Status,
 		&i.ExpiresAt,
 		&i.IssuedAt,
@@ -79,17 +82,26 @@ func (q *Queries) CreateActiveToken(ctx context.Context, arg CreateActiveTokenPa
 }
 
 const createDaemon = `-- name: CreateDaemon :one
-INSERT INTO daemons (user_id, name) VALUES ($1, $2) RETURNING id, user_id, token_id, name, os, arch, daemon_version, status, last_seen_at, connected_at, registered_at
+INSERT INTO daemons (user_id, name, os, arch, daemon_version) VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, token_id, name, os, arch, daemon_version, status, last_seen_at, connected_at, registered_at
 `
 
 type CreateDaemonParams struct {
-	UserID uuid.UUID `json:"user_id"`
-	Name   string    `json:"name"`
+	UserID        uuid.UUID `json:"user_id"`
+	Name          string    `json:"name"`
+	Os            string    `json:"os"`
+	Arch          string    `json:"arch"`
+	DaemonVersion string    `json:"daemon_version"`
 }
 
 // daemons
 func (q *Queries) CreateDaemon(ctx context.Context, arg CreateDaemonParams) (Daemon, error) {
-	row := q.db.QueryRow(ctx, createDaemon, arg.UserID, arg.Name)
+	row := q.db.QueryRow(ctx, createDaemon,
+		arg.UserID,
+		arg.Name,
+		arg.Os,
+		arg.Arch,
+		arg.DaemonVersion,
+	)
 	var i Daemon
 	err := row.Scan(
 		&i.ID,
@@ -108,16 +120,19 @@ func (q *Queries) CreateDaemon(ctx context.Context, arg CreateDaemonParams) (Dae
 }
 
 const createToken = `-- name: CreateToken :one
-INSERT INTO daemon_tokens (token_hash, token_prefix, pairing_code, machine_name, status, expires_at)
-VALUES ($1, $2, $3, $4, 'pending', $5) RETURNING id, user_id, daemon_id, token_hash, token_prefix, pairing_code, machine_name, status, expires_at, issued_at, confirmed_at, last_used_at
+INSERT INTO daemon_tokens (token_hash, token_prefix, pairing_code, machine_name, os, arch, daemon_version, status, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8) RETURNING id, user_id, daemon_id, token_hash, token_prefix, pairing_code, machine_name, os, arch, daemon_version, status, expires_at, issued_at, confirmed_at, last_used_at
 `
 
 type CreateTokenParams struct {
-	TokenHash   string     `json:"token_hash"`
-	TokenPrefix string     `json:"token_prefix"`
-	PairingCode *string    `json:"pairing_code"`
-	MachineName *string    `json:"machine_name"`
-	ExpiresAt   *time.Time `json:"expires_at"`
+	TokenHash     string     `json:"token_hash"`
+	TokenPrefix   string     `json:"token_prefix"`
+	PairingCode   *string    `json:"pairing_code"`
+	MachineName   *string    `json:"machine_name"`
+	Os            string     `json:"os"`
+	Arch          string     `json:"arch"`
+	DaemonVersion string     `json:"daemon_version"`
+	ExpiresAt     *time.Time `json:"expires_at"`
 }
 
 // daemon_tokens
@@ -127,6 +142,9 @@ func (q *Queries) CreateToken(ctx context.Context, arg CreateTokenParams) (Daemo
 		arg.TokenPrefix,
 		arg.PairingCode,
 		arg.MachineName,
+		arg.Os,
+		arg.Arch,
+		arg.DaemonVersion,
 		arg.ExpiresAt,
 	)
 	var i DaemonToken
@@ -138,6 +156,9 @@ func (q *Queries) CreateToken(ctx context.Context, arg CreateTokenParams) (Daemo
 		&i.TokenPrefix,
 		&i.PairingCode,
 		&i.MachineName,
+		&i.Os,
+		&i.Arch,
+		&i.DaemonVersion,
 		&i.Status,
 		&i.ExpiresAt,
 		&i.IssuedAt,
@@ -244,7 +265,7 @@ func (q *Queries) FindDaemonByUserAndName(ctx context.Context, arg FindDaemonByU
 }
 
 const findTokenByHash = `-- name: FindTokenByHash :one
-SELECT id, user_id, daemon_id, token_hash, token_prefix, pairing_code, machine_name, status, expires_at, issued_at, confirmed_at, last_used_at FROM daemon_tokens WHERE token_hash = $1
+SELECT id, user_id, daemon_id, token_hash, token_prefix, pairing_code, machine_name, os, arch, daemon_version, status, expires_at, issued_at, confirmed_at, last_used_at FROM daemon_tokens WHERE token_hash = $1
 `
 
 func (q *Queries) FindTokenByHash(ctx context.Context, tokenHash string) (DaemonToken, error) {
@@ -258,6 +279,9 @@ func (q *Queries) FindTokenByHash(ctx context.Context, tokenHash string) (Daemon
 		&i.TokenPrefix,
 		&i.PairingCode,
 		&i.MachineName,
+		&i.Os,
+		&i.Arch,
+		&i.DaemonVersion,
 		&i.Status,
 		&i.ExpiresAt,
 		&i.IssuedAt,
@@ -268,7 +292,7 @@ func (q *Queries) FindTokenByHash(ctx context.Context, tokenHash string) (Daemon
 }
 
 const findTokenByPairingCode = `-- name: FindTokenByPairingCode :one
-SELECT id, user_id, daemon_id, token_hash, token_prefix, pairing_code, machine_name, status, expires_at, issued_at, confirmed_at, last_used_at FROM daemon_tokens WHERE pairing_code = $1
+SELECT id, user_id, daemon_id, token_hash, token_prefix, pairing_code, machine_name, os, arch, daemon_version, status, expires_at, issued_at, confirmed_at, last_used_at FROM daemon_tokens WHERE pairing_code = $1
 `
 
 func (q *Queries) FindTokenByPairingCode(ctx context.Context, pairingCode *string) (DaemonToken, error) {
@@ -282,6 +306,9 @@ func (q *Queries) FindTokenByPairingCode(ctx context.Context, pairingCode *strin
 		&i.TokenPrefix,
 		&i.PairingCode,
 		&i.MachineName,
+		&i.Os,
+		&i.Arch,
+		&i.DaemonVersion,
 		&i.Status,
 		&i.ExpiresAt,
 		&i.IssuedAt,

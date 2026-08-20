@@ -1,7 +1,7 @@
 -- daemon_tokens
 -- name: CreateToken :one
-INSERT INTO daemon_tokens (token_hash, token_prefix, pairing_code, machine_name, status, expires_at)
-VALUES ($1, $2, $3, $4, 'pending', $5) RETURNING *;
+INSERT INTO daemon_tokens (token_hash, token_prefix, pairing_code, machine_name, os, arch, daemon_version, status, expires_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, 'pending', $8) RETURNING *;
 
 -- name: CreateActiveToken :one
 INSERT INTO daemon_tokens (user_id, token_hash, token_prefix, status)
@@ -31,7 +31,7 @@ UPDATE daemon_tokens SET token_hash = $2, token_prefix = $3 WHERE id = $1;
 
 -- daemons
 -- name: CreateDaemon :one
-INSERT INTO daemons (user_id, name) VALUES ($1, $2) RETURNING *;
+INSERT INTO daemons (user_id, name, os, arch, daemon_version) VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: FindDaemonByID :one
 SELECT * FROM daemons WHERE id = $1;

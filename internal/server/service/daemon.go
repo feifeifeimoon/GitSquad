@@ -47,14 +47,17 @@ type PollPairingResult struct {
 
 // ── Token operations ──────────────────────────────────────────────────
 
-func (s *DaemonService) CreateToken(ctx context.Context, tokenHash, tokenPrefix, pairingCode, machineName string) (*DaemonToken, error) {
+func (s *DaemonService) CreateToken(ctx context.Context, tokenHash, tokenPrefix, pairingCode, machineName, os, arch, version string) (*DaemonToken, error) {
 	expires := time.Now().Add(10 * time.Minute)
 	t, err := s.store.CreateToken(ctx, db.CreateTokenParams{
-		TokenHash:   tokenHash,
-		TokenPrefix: tokenPrefix,
-		PairingCode: &pairingCode,
-		MachineName: &machineName,
-		ExpiresAt:   &expires,
+		TokenHash:     tokenHash,
+		TokenPrefix:   tokenPrefix,
+		PairingCode:   &pairingCode,
+		MachineName:   &machineName,
+		Os:            os,
+		Arch:          arch,
+		DaemonVersion: version,
+		ExpiresAt:     &expires,
 	})
 	if err != nil {
 		return nil, err
@@ -105,8 +108,9 @@ func (s *DaemonService) SetTokenHash(ctx context.Context, id uuid.UUID, tokenHas
 // InitiatePairing creates a pending daemon token with a unique pairing code.
 // The token_hash is a placeholder (hash of the pairing code) to satisfy the
 // UNIQUE constraint on daemon_tokens.token_hash. It is overwritten later
-// when the real daemon token is issued.
-func (s *DaemonService) InitiatePairing(ctx context.Context, machineName string) (*PairingInitResult, error) {
+// when the real daemon token is issued. The machine info rides along so the
+// daemon record can be created with os/arch/version at confirm time.
+func (s *DaemonService) InitiatePairing(ctx context.Context, machineName, os, arch, version string) (*PairingInitResult, error) {
 	code, err := generatePairingCode()
 	if err != nil {
 		return nil, fmt.Errorf("generate pairing code: %w", err)
@@ -114,7 +118,7 @@ func (s *DaemonService) InitiatePairing(ctx context.Context, machineName string)
 
 	placeholderHash := crypto.Hash("pairing:" + code)
 
-	_, err = s.CreateToken(ctx, placeholderHash, "", code, machineName)
+	_, err = s.CreateToken(ctx, placeholderHash, "", code, machineName, os, arch, version)
 	if err != nil {
 		return nil, fmt.Errorf("create pairing token: %w", err)
 	}
@@ -202,13 +206,23 @@ func (s *DaemonService) ConfirmPairing(ctx context.Context, code string, userID 
 		machineName = *tok.MachineName
 	}
 
-	// Reuse an existing daemon with the same name, or create a new one.
+	// Reuse an existing daemon with the same name (refreshing its machine
+	// info), or create a new one with the info reported at pairing init.
 	existing, _ := s.FindByUserAndName(ctx, userID, machineName)
 	var daemonID uuid.UUID
 	if existing != nil {
 		daemonID = existing.ID
+		if err := s.store.UpdateDaemonInfo(ctx, db.UpdateDaemonInfoParams{
+			ID:            daemonID,
+			Name:          machineName,
+			Os:            tok.OS,
+			Arch:          tok.Arch,
+			DaemonVersion: tok.DaemonVersion,
+		}); err != nil {
+			return nil, fmt.Errorf("update daemon info: %w", err)
+		}
 	} else {
-		d, err := s.CreateDaemon(ctx, userID, machineName)
+		d, err := s.CreateDaemon(ctx, userID, machineName, tok.OS, tok.Arch, tok.DaemonVersion)
 		if err != nil {
 			return nil, fmt.Errorf("create daemon: %w", err)
 		}
@@ -251,8 +265,8 @@ func (s *DaemonService) AuthenticateByToken(ctx context.Context, rawToken string
 
 // ── Daemon operations ─────────────────────────────────────────────────
 
-func (s *DaemonService) CreateDaemon(ctx context.Context, userID uuid.UUID, name string) (*v1.Daemon, error) {
-	d, err := s.store.CreateDaemon(ctx, db.CreateDaemonParams{UserID: userID, Name: name})
+func (s *DaemonService) CreateDaemon(ctx context.Context, userID uuid.UUID, name, os, arch, version string) (*v1.Daemon, error) {
+	d, err := s.store.CreateDaemon(ctx, db.CreateDaemonParams{UserID: userID, Name: name, Os: os, Arch: arch, DaemonVersion: version})
 	if err != nil {
 		return nil, err
 	}

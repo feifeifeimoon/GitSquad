@@ -87,6 +87,10 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`},
+		{name: "011_daemon_tokens_machine_info", sql: `ALTER TABLE daemon_tokens
+			ADD COLUMN IF NOT EXISTS os TEXT NOT NULL DEFAULT '',
+			ADD COLUMN IF NOT EXISTS arch TEXT NOT NULL DEFAULT '',
+			ADD COLUMN IF NOT EXISTS daemon_version TEXT NOT NULL DEFAULT '0.0.0'`},
 	}
 
 	for _, m := range migrations {

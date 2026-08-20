@@ -14,7 +14,8 @@ CREATE TABLE user_identities (
 CREATE TABLE daemon_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID REFERENCES users(id),
     daemon_id UUID, token_hash TEXT UNIQUE NOT NULL, token_prefix TEXT NOT NULL DEFAULT 'gtsq_dm_',
-    pairing_code TEXT UNIQUE, machine_name TEXT, status TEXT NOT NULL DEFAULT 'pending',
+    pairing_code TEXT UNIQUE, machine_name TEXT, os TEXT NOT NULL DEFAULT '', arch TEXT NOT NULL DEFAULT '',
+    daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'pending',
     expires_at TIMESTAMPTZ, issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     confirmed_at TIMESTAMPTZ, last_used_at TIMESTAMPTZ
 );
