@@ -254,13 +254,13 @@ export default function DaemonsPage() {
                       Step 1: Install GitSquad CLI
                     </span>
                     <button
-                      onClick={() => handleCopy("curl -fsSL https://gitsquad.com/install | sh", "install")}
+                      onClick={() => handleCopy("curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash", "install")}
                       className="text-mute hover:text-ink"
                     >
                       {copied === "install" ? <Check className="size-3 text-[#0070f3]" /> : <Copy className="size-3" />}
                     </button>
                   </div>
-                  <p className="text-mute">curl -fsSL https://gitsquad.com/install | sh</p>
+                  <p className="text-mute">curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash</p>
                   <div className="mt-3 flex items-center justify-between">
                     <span className="flex items-center gap-1.5">
                       <Terminal className="size-3" />

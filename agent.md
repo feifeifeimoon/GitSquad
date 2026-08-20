@@ -252,3 +252,14 @@ If ANY step fails:
 - 256 MB is intentionally minimal — if the machine restarts repeatedly (OOM), bump memory: `flyctl machine update <id> --memory 512 --yes` and sync `memory_mb` in `fly.toml`.
 - GitHub App webhook URL must point to `https://gitsquad-api.fly.dev/api/v1/github/webhook` (Secret = `GITSQUAD_GITHUB_WEBHOOK_SECRET`, events: `pull_request`, `installation`, `installation_repositories`).
 - Google OAuth authorized redirect URI: `https://gitsquad-api.fly.dev/api/v1/auth/google/callback` (keep the localhost URI for local dev).
+
+### CLI binary release (GoReleaser)
+
+- `.goreleaser.yaml` builds the `gitsquad` CLI for linux/windows/darwin × amd64/arm64; version info is ldflags-injected into `internal/version`.
+- `.github/workflows/release.yml` runs on `v*` tags: `go test -race` guard → `goreleaser release --clean` → GitHub Release with archives + `checksums.txt` (prerelease auto for pre-release tags).
+- **Create a release**: `git tag v0.1.0 && git push origin v0.1.0` (tag on main).
+- **Install scripts** (`scripts/install.sh` macOS/Linux, `scripts/install.ps1` Windows) download the latest release binary:
+  - `curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash`
+  - `irm https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.ps1 | iex`
+  - Asset naming (goreleaser `.Version` strips the leading `v`): `gitsquad_<version>_<os>_<arch>.tar.gz` (windows: `.zip`).
+- Not yet implemented (open for later): Homebrew tap (`brews:` block), `gitsquad update` self-update command.
