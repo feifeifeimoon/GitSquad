@@ -72,6 +72,20 @@ try {
     [Environment]::SetEnvironmentVariable("Path", "$userPath;$installDir", "User")
     $env:Path = "$env:Path;$installDir"
     Write-Host "Added $installDir to your user PATH. Restart terminals to pick it up."
+
+    # Broadcast the change so new terminals launched from Explorer pick it up
+    # immediately (SetEnvironmentVariable only writes the registry).
+    try {
+      Add-Type -Namespace Win32 -Name NativeMethods -MemberDefinition @'
+[DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Auto)]
+public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);
+'@
+      $null = [Win32.NativeMethods]::SendMessageTimeout(
+        [IntPtr]0xffff, 0x001A, [UIntPtr]::Zero,
+        "$userPath;$installDir", 2, 5000, [ref][UIntPtr]::Zero)
+    } catch {
+      # Non-fatal — PATH is already persisted; a restart will pick it up.
+    }
   }
 
   Write-Host "Installed gitsquad $tag to $installDir"
