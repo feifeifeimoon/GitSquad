@@ -16,7 +16,7 @@
 | **Frontend** | Next.js 16 (App Router) + React 19 + TypeScript 5 |
 | **Styling** | Tailwind CSS v4 + [shadcn/ui](https://ui.shadcn.com/) (Radix primitives) |
 | **Frontend Runtime** | [Bun](https://bun.sh/) (package manager, test runner) |
-| **CI/CD** | GitHub Actions + GoReleaser |
+| **CI/CD** | GitHub Actions (CI + Fly.io auto-deploy) + GoReleaser |
 
 ---
 
@@ -28,6 +28,7 @@
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml             # CI: go test/build + bun test/lint/build
+│   │   ├── deploy-backend.yml # Fly.io auto-deploy on main (backend paths)
 │   │   └── release.yml        # GoReleaser on v* tags
 │   └── dependabot.yml         # Auto-deps: bun + github-actions, weekly
 ├── bin/                       # Local build output (gitignored)
@@ -91,6 +92,7 @@
 ├── sqlc.yaml                  # sqlc code-gen config
 ├── .goreleaser.yaml           # Cross-platform binary release config
 ├── Dockerfile                 # Multi-stage server image (golang → distroless)
+├── fly.toml                   # Fly.io deploy config (backend, see Deployment)
 ├── .env.example               # Environment variable template
 └── CONTRIBUTING.md            # Contributor guide
 ```
@@ -207,3 +209,46 @@ If ANY step fails:
 | `GITSQUAD_GITHUB_APP_PRIVATE_KEY` | No | — | GitHub App private key PEM (required for repo features) |
 | `GITSQUAD_GITHUB_APP_NAME` | No | `gitsquad` | GitHub App name |
 | `GITSQUAD_GITHUB_WEBHOOK_SECRET` | No | — | GitHub webhook HMAC secret |
+
+---
+
+## Deployment
+
+### Architecture
+
+| Component | Platform | Address |
+|-----------|----------|---------|
+| Frontend (`web/`) | Vercel project `git-squad` | https://git-squad.vercel.app |
+| Backend (Go server) | Fly.io app `gitsquad-api` | https://gitsquad-api.fly.dev |
+| Database | Neon Postgres (free tier, Singapore) | — |
+
+### Frontend (Vercel)
+
+- Project settings: Root Directory `web`, Next.js preset, `bun install` / `bun run build`.
+- Git integration is enabled — push/merge to `main` auto-deploys production.
+- Required env: `NEXT_PUBLIC_API_URL=https://gitsquad-api.fly.dev` (set for **both** Production and Preview; it is inlined at build time, so changes require a redeploy).
+- Manual production deploy from repo root: `vercel --prod --yes`. Do NOT run `vercel` from inside `web/` — the project link lives at the repo root, and running from `web/` creates a stray new project instead.
+
+### Backend (Fly.io)
+
+- `fly.toml` at repo root: `sin` region (Singapore — `hkg` is deprecated), shared 1 vCPU / 256 MB, **single machine** (`min_machines_running = 1`, `auto_stop_machines = false` so daemon WebSocket connections keep the machine awake).
+- Env is two layers, merged at runtime — **secrets override `fly.toml [env]`**:
+  - `fly.toml [env]` — plaintext, committed: `GITSQUAD_ENV`, `GITSQUAD_HTTP_ADDR`, `GITSQUAD_FRONTEND_URL`.
+  - `flyctl secrets` — encrypted, never in repo: `GITSQUAD_DATABASE_URL`, `GITSQUAD_JWT_SECRET`, Google OAuth creds, GitHub App creds. Local `.env` is NOT used in production (no `.env` file in the image; `godotenv` skips silently).
+- Secrets commands:
+  ```bash
+  flyctl secrets set KEY=value          # add/update (triggers rolling update)
+  flyctl secrets unset KEY              # remove
+  flyctl secrets import < .env          # bulk import (multi-line values like PEM not supported — set those individually)
+  flyctl secrets list                   # names + digests only, values are not viewable
+  ```
+- Auto-deploy: `.github/workflows/deploy-backend.yml` deploys via `flyctl deploy --remote-only` on `main` pushes touching backend paths (`cmd/`, `internal/`, `pkg/`, `go.mod`, `go.sum`, `Dockerfile`, `fly.toml`). Requires GitHub secret `FLY_API_TOKEN` (recreate with `flyctl tokens create deploy` if it expires).
+- Manual deploy (local Docker not required): `flyctl deploy --remote-only`.
+- Logs: `flyctl logs`.
+
+### Operational notes
+
+- Single-machine deployment has a brief restart window per deploy (no zero-downtime rolling).
+- 256 MB is intentionally minimal — if the machine restarts repeatedly (OOM), bump memory: `flyctl machine update <id> --memory 512 --yes` and sync `memory_mb` in `fly.toml`.
+- GitHub App webhook URL must point to `https://gitsquad-api.fly.dev/api/v1/github/webhook` (Secret = `GITSQUAD_GITHUB_WEBHOOK_SECRET`, events: `pull_request`, `installation`, `installation_repositories`).
+- Google OAuth authorized redirect URI: `https://gitsquad-api.fly.dev/api/v1/auth/google/callback` (keep the localhost URI for local dev).
