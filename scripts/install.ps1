@@ -13,23 +13,42 @@ $arch = switch ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArch
   default { throw "unsupported arch: $_" }
 }
 
-# Resolve the latest release tag (e.g. v1.2.3). Prefer the stable release;
-# fall back to the newest prerelease while no stable release exists yet.
+# Resolve the latest release tag (e.g. v1.2.3). Prefer the stable release via
+# the /releases/latest redirect; fall back to the newest prerelease from the
+# releases Atom feed. Both are web endpoints — no GitHub API rate limits.
+$tag = $null
 try {
-  $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest"
+  $req = [System.Net.HttpWebRequest]::Create("https://github.com/$repo/releases/latest")
+  $req.UserAgent = "gitsquad-installer"
+  $req.AllowAutoRedirect = $false
+  $resp = $req.GetResponse()
+  $finalUrl = $resp.Headers["Location"]
+  $resp.Close()
+  if ($finalUrl -match "/releases/tag/([^/]+)/?$") {
+    $tag = $Matches[1]
+  }
 } catch {
+  # Redirect or network failure — fall through to the Atom feed below.
+}
+
+if (-not $tag) {
   try {
-    $releases = @(Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases?per_page=1")
-    if ($releases.Count -eq 0) { throw "no releases" }
-    $release = $releases[0]
-    Write-Host "NOTE: no stable release yet, installing prerelease $($release.tag_name)." -ForegroundColor Yellow
+    $content = (Invoke-WebRequest -Uri "https://github.com/$repo/releases.atom" -UserAgent "gitsquad-installer").Content
+    $m = [regex]::Match($content, 'releases/tag/([^"<]+)')
+    if ($m.Success) {
+      $tag = $m.Groups[1].Value
+      Write-Host "NOTE: no stable release yet, installing prerelease $tag." -ForegroundColor Yellow
+    }
   } catch {
-    Write-Host "error: could not resolve any gitsquad release." -ForegroundColor Red
-    Write-Host "If no release exists yet, create one: git tag v0.1.0 && git push origin v0.1.0" -ForegroundColor Red
-    exit 1
+    $tag = $null
   }
 }
-$tag = $release.tag_name
+
+if (-not $tag) {
+  Write-Host "error: could not resolve any gitsquad release." -ForegroundColor Red
+  Write-Host "If no release exists yet, create one: git tag v0.1.0 && git push origin v0.1.0" -ForegroundColor Red
+  throw "no release found"
+}
 $version = $tag.TrimStart("v") # goreleaser .Version strips the leading "v"
 
 $asset = "${project}_${version}_windows_${arch}.zip"
