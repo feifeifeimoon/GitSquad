@@ -48,6 +48,9 @@ UPDATE daemons SET last_seen_at = now(), status = 'online', connected_at = COALE
 -- name: DaemonHeartbeat :exec
 UPDATE daemons SET last_seen_at = now() WHERE id = $1;
 
+-- name: UpdateDaemonVersion :exec
+UPDATE daemons SET daemon_version = $2 WHERE id = $1;
+
 -- name: DaemonOffline :exec
 UPDATE daemons SET status = 'offline' WHERE id = $1;
 

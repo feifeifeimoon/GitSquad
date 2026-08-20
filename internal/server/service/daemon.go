@@ -293,6 +293,13 @@ func (s *DaemonService) DaemonHeartbeat(ctx context.Context, id uuid.UUID) error
 	return s.store.DaemonHeartbeat(ctx, id)
 }
 
+// UpdateDaemonVersion refreshes the reported CLI version. Called from the
+// batched heartbeat path so upgrades show up in the console without a
+// re-login.
+func (s *DaemonService) UpdateDaemonVersion(ctx context.Context, id uuid.UUID, version string) error {
+	return s.store.UpdateDaemonVersion(ctx, db.UpdateDaemonVersionParams{ID: id, DaemonVersion: version})
+}
+
 // PendingActions returns the list of server-to-daemon commands that should be
 // delivered in the next heartbeat ack. MVP returns an empty slice; task
 // wakeup actions will be populated when task dispatch is implemented.

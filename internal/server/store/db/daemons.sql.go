@@ -444,3 +444,17 @@ func (q *Queries) UpdateDaemonInfo(ctx context.Context, arg UpdateDaemonInfoPara
 	)
 	return err
 }
+
+const updateDaemonVersion = `-- name: UpdateDaemonVersion :exec
+UPDATE daemons SET daemon_version = $2 WHERE id = $1
+`
+
+type UpdateDaemonVersionParams struct {
+	ID            uuid.UUID `json:"id"`
+	DaemonVersion string    `json:"daemon_version"`
+}
+
+func (q *Queries) UpdateDaemonVersion(ctx context.Context, arg UpdateDaemonVersionParams) error {
+	_, err := q.db.Exec(ctx, updateDaemonVersion, arg.ID, arg.DaemonVersion)
+	return err
+}

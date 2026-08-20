@@ -91,8 +91,13 @@ func heartbeatHandler(daemonSvc *service.DaemonService, scheduler *HeartbeatSche
 
 		uid, _ := uuid.Parse(conn.DaemonID)
 
+		// The heartbeat payload carries the CLI version — hand it to the
+		// batched update path so upgrades show up in the console.
+		var hb v1.WSHeartbeatPayload
+		_ = json.Unmarshal(frame.Payload, &hb)
+
 		// Batched last_seen_at update — avoids a DB write on every single heartbeat.
-		scheduler.RecordHeartbeat(uid)
+		scheduler.RecordHeartbeat(uid, hb.DaemonVersion)
 
 		actions := daemonSvc.PendingActions(ctx, uid)
 

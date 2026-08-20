@@ -11,6 +11,7 @@ import (
 // HeartbeatStore is the minimal DB interface the scheduler needs.
 type HeartbeatStore interface {
 	DaemonHeartbeat(ctx context.Context, id uuid.UUID) error
+	UpdateDaemonVersion(ctx context.Context, id uuid.UUID, version string) error
 }
 
 // HeartbeatScheduler coalesces per-heartbeat last_seen_at updates into a
@@ -18,9 +19,12 @@ type HeartbeatStore interface {
 //
 // The status flip (offline→online) still goes through the synchronous
 // MarkOnline path — only the repeated "still alive" bumps are batched here.
+// Reported CLI versions ride along and are written only when they change.
 type HeartbeatScheduler struct {
 	mu       sync.Mutex
 	recently map[uuid.UUID]time.Time
+	versions map[uuid.UUID]string
+	written  map[uuid.UUID]string
 	store    HeartbeatStore
 	interval time.Duration
 }
@@ -30,6 +34,8 @@ type HeartbeatScheduler struct {
 func NewHeartbeatScheduler(ctx context.Context, store HeartbeatStore) *HeartbeatScheduler {
 	s := &HeartbeatScheduler{
 		recently: make(map[uuid.UUID]time.Time),
+		versions: make(map[uuid.UUID]string),
+		written:  make(map[uuid.UUID]string),
 		store:    store,
 		interval: 60 * time.Second,
 	}
@@ -37,11 +43,15 @@ func NewHeartbeatScheduler(ctx context.Context, store HeartbeatStore) *Heartbeat
 	return s
 }
 
-// RecordHeartbeat remembers that the daemon sent a heartbeat now.
-// It does NOT write to the database — the flushLoop handles that.
-func (s *HeartbeatScheduler) RecordHeartbeat(id uuid.UUID) {
+// RecordHeartbeat remembers that the daemon sent a heartbeat now, along with
+// its reported version. It does NOT write to the database — the flushLoop
+// handles that.
+func (s *HeartbeatScheduler) RecordHeartbeat(id uuid.UUID, version string) {
 	s.mu.Lock()
 	s.recently[id] = time.Now()
+	if version != "" {
+		s.versions[id] = version
+	}
 	s.mu.Unlock()
 }
 
@@ -61,12 +71,18 @@ func (s *HeartbeatScheduler) flushLoop(ctx context.Context) {
 func (s *HeartbeatScheduler) flush(ctx context.Context) {
 	s.mu.Lock()
 	batch := s.recently
+	versions := s.versions
 	s.recently = make(map[uuid.UUID]time.Time)
+	s.versions = make(map[uuid.UUID]string)
 	s.mu.Unlock()
 
 	for id := range batch {
 		flushCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
 		_ = s.store.DaemonHeartbeat(flushCtx, id)
+		if version := versions[id]; version != "" && version != s.written[id] {
+			_ = s.store.UpdateDaemonVersion(flushCtx, id, version)
+			s.written[id] = version
+		}
 		cancel()
 	}
 }
