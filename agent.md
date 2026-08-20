@@ -202,7 +202,7 @@ If ANY step fails:
 | `GITSQUAD_FRONTEND_URL` | No | `http://localhost:3000` | For OAuth redirect |
 | `GITSQUAD_HTTP_ADDR` | No | `:8080` | Server listen address |
 | `GITSQUAD_ENV` | No | `development` | `development` / `production` |
-| `GITSQUAD_API_URL` | No | `http://localhost:8080` | Daemon → server API URL |
+| `GITSQUAD_API_URL` | No | `https://gitsquad-api.fly.dev` | Daemon → server API URL; local dev override: `http://localhost:8080` |
 | `GITSQUAD_DAEMON_TOKEN` | No | — | Daemon pairing token |
 | `GITSQUAD_DAEMON_WORK_DIR` | No | `~/.gitsquad/workspaces` | Daemon workspace root |
 | `GITSQUAD_GITHUB_APP_ID` | No | — | GitHub App ID (required for repo features) |

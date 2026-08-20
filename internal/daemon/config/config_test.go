@@ -15,8 +15,8 @@ func TestLoadUsesDefaults(t *testing.T) {
 
 	cfg := Load()
 
-	if cfg.APIURL != "http://localhost:8080" {
-		t.Fatalf("APIURL = %q, want http://localhost:8080", cfg.APIURL)
+	if cfg.APIURL != "https://gitsquad-api.fly.dev" {
+		t.Fatalf("APIURL = %q, want https://gitsquad-api.fly.dev", cfg.APIURL)
 	}
 
 	home, _ := os.UserHomeDir()

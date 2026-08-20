@@ -28,8 +28,12 @@ type Config struct {
 	PollInterval       time.Duration
 }
 
+// defaultAPIURL is the SaaS backend URL. All builds default to the hosted
+// service (like `gh` defaults to api.github.com); local development or
+// self-hosting overrides it via config.yaml `api_url` or GITSQUAD_API_URL.
+const defaultAPIURL = "https://gitsquad-api.fly.dev"
+
 const (
-	defaultAPIURL    = "http://localhost:8080"
 	configDirName    = ".gitsquad"
 	configFileName   = "config.yaml"
 	workspaceDirName = "workspaces"
