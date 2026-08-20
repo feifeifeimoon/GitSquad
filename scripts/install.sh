@@ -20,13 +20,14 @@ case "$(uname -m)" in
   *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
 esac
 
-# Resolve the latest release tag (e.g. v1.2.3) via the GitHub redirect.
-if ! LATEST="$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/$REPO/releases/latest" 2>/dev/null)"; then
-  echo "error: could not resolve the latest gitsquad release." >&2
+# Resolve the latest stable release tag (e.g. v1.2.3) via the GitHub API.
+# The API returns 404 when only prereleases exist — report that clearly.
+if ! TAG="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
+    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)" || [ -z "$TAG" ]; then
+  echo "error: could not resolve the latest gitsquad release (no stable release yet)." >&2
   echo "If no release exists yet, create one: git tag v0.1.0 && git push origin v0.1.0" >&2
   exit 1
 fi
-TAG="${LATEST##*/}"
 VERSION="${TAG#v}" # goreleaser .Version strips the leading "v"
 
 ASSET="${PROJECT}_${VERSION}_${OS}_${ARCH}.tar.gz"
