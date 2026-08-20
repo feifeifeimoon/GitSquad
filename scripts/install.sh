@@ -20,13 +20,21 @@ case "$(uname -m)" in
   *) echo "unsupported arch: $(uname -m)" >&2; exit 1 ;;
 esac
 
-# Resolve the latest stable release tag (e.g. v1.2.3) via the GitHub API.
-# The API returns 404 when only prereleases exist — report that clearly.
-if ! TAG="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" \
-    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)" || [ -z "$TAG" ]; then
-  echo "error: could not resolve the latest gitsquad release (no stable release yet)." >&2
-  echo "If no release exists yet, create one: git tag v0.1.0 && git push origin v0.1.0" >&2
-  exit 1
+# Resolve the latest release tag (e.g. v1.2.3). Prefer the stable release;
+# fall back to the newest prerelease while no stable release exists yet.
+LATEST="$(curl -fsSL "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
+    | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"
+if [ -n "$LATEST" ]; then
+  TAG="$LATEST"
+else
+  TAG="$(curl -fsSL "https://api.github.com/repos/$REPO/releases?per_page=1" 2>/dev/null \
+      | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -1)"
+  if [ -z "$TAG" ]; then
+    echo "error: could not resolve any gitsquad release." >&2
+    echo "If no release exists yet, create one: git tag v0.1.0 && git push origin v0.1.0" >&2
+    exit 1
+  fi
+  echo "NOTE: no stable release yet, installing prerelease $TAG" >&2
 fi
 VERSION="${TAG#v}" # goreleaser .Version strips the leading "v"
 

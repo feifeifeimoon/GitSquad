@@ -258,7 +258,7 @@ If ANY step fails:
 - `.goreleaser.yaml` builds the `gitsquad` CLI for linux/windows/darwin × amd64/arm64; version info is ldflags-injected into `internal/version`.
 - `.github/workflows/release.yml` runs on `v*` tags: `go test -race` guard → `goreleaser release --clean` → GitHub Release with archives + `checksums.txt` (prerelease auto for pre-release tags).
 - **Create a release**: `git tag v0.1.0 && git push origin v0.1.0` (tag on main).
-- **Install scripts** (`scripts/install.sh` macOS/Linux, `scripts/install.ps1` Windows) download the latest release binary:
+- **Install scripts** (`scripts/install.sh` macOS/Linux, `scripts/install.ps1` Windows) download the latest release binary — stable release preferred, newest prerelease as fallback while no stable exists:
   - `curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash`
   - `irm https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.ps1 | iex`
   - Asset naming (goreleaser `.Version` strips the leading `v`): `gitsquad_<version>_<os>_<arch>.tar.gz` (windows: `.zip`).

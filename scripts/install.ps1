@@ -13,13 +13,21 @@ $arch = switch ([System.Runtime.InteropServices.RuntimeInformation]::ProcessArch
   default { throw "unsupported arch: $_" }
 }
 
-# Resolve the latest release tag (e.g. v1.2.3).
+# Resolve the latest release tag (e.g. v1.2.3). Prefer the stable release;
+# fall back to the newest prerelease while no stable release exists yet.
 try {
   $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest"
 } catch {
-  Write-Host "error: could not resolve the latest gitsquad release." -ForegroundColor Red
-  Write-Host "If no release exists yet, create one: git tag v0.1.0 && git push origin v0.1.0" -ForegroundColor Red
-  exit 1
+  try {
+    $releases = @(Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases?per_page=1")
+    if ($releases.Count -eq 0) { throw "no releases" }
+    $release = $releases[0]
+    Write-Host "NOTE: no stable release yet, installing prerelease $($release.tag_name)." -ForegroundColor Yellow
+  } catch {
+    Write-Host "error: could not resolve any gitsquad release." -ForegroundColor Red
+    Write-Host "If no release exists yet, create one: git tag v0.1.0 && git push origin v0.1.0" -ForegroundColor Red
+    exit 1
+  }
 }
 $tag = $release.tag_name
 $version = $tag.TrimStart("v") # goreleaser .Version strips the leading "v"
