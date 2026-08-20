@@ -25,18 +25,21 @@ type Daemon struct {
 }
 
 type DaemonToken struct {
-	ID          uuid.UUID  `json:"id"`
-	UserID      *uuid.UUID `json:"user_id"`
-	DaemonID    *uuid.UUID `json:"daemon_id"`
-	TokenHash   string     `json:"token_hash"`
-	TokenPrefix string     `json:"token_prefix"`
-	PairingCode *string    `json:"pairing_code"`
-	MachineName *string    `json:"machine_name"`
-	Status      string     `json:"status"`
-	ExpiresAt   *time.Time `json:"expires_at"`
-	IssuedAt    time.Time  `json:"issued_at"`
-	ConfirmedAt *time.Time `json:"confirmed_at"`
-	LastUsedAt  *time.Time `json:"last_used_at"`
+	ID            uuid.UUID  `json:"id"`
+	UserID        *uuid.UUID `json:"user_id"`
+	DaemonID      *uuid.UUID `json:"daemon_id"`
+	TokenHash     string     `json:"token_hash"`
+	TokenPrefix   string     `json:"token_prefix"`
+	PairingCode   *string    `json:"pairing_code"`
+	MachineName   *string    `json:"machine_name"`
+	Os            string     `json:"os"`
+	Arch          string     `json:"arch"`
+	DaemonVersion string     `json:"daemon_version"`
+	Status        string     `json:"status"`
+	ExpiresAt     *time.Time `json:"expires_at"`
+	IssuedAt      time.Time  `json:"issued_at"`
+	ConfirmedAt   *time.Time `json:"confirmed_at"`
+	LastUsedAt    *time.Time `json:"last_used_at"`
 }
 
 type GithubInstallation struct {
