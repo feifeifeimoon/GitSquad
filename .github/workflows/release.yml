@@ -4,14 +4,36 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: goreleaser-release
+  cancel-in-progress: false
+
 jobs:
+  test:
+    name: Backend Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Test
+        run: go test -v -race $(go list ./... | grep -v '/web/')
+
   release:
     name: Release with GoReleaser
     runs-on: ubuntu-latest
+    needs: test
     steps:
       - name: Checkout
         uses: actions/checkout@v7
