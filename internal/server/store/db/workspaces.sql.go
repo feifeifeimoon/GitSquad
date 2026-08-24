@@ -13,8 +13,8 @@ import (
 )
 
 const createWorkspace = `-- name: CreateWorkspace :one
-INSERT INTO workspaces (user_id, installation_id, github_repo_id, name)
-VALUES ($1, $2, $3, $4) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter
+INSERT INTO workspaces (user_id, installation_id, github_repo_id, name, issue_prefix)
+VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter
 `
 
 type CreateWorkspaceParams struct {
@@ -22,6 +22,7 @@ type CreateWorkspaceParams struct {
 	InstallationID uuid.UUID `json:"installation_id"`
 	GithubRepoID   uuid.UUID `json:"github_repo_id"`
 	Name           string    `json:"name"`
+	IssuePrefix    string    `json:"issue_prefix"`
 }
 
 func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error) {
@@ -30,6 +31,7 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		arg.InstallationID,
 		arg.GithubRepoID,
 		arg.Name,
+		arg.IssuePrefix,
 	)
 	var i Workspace
 	err := row.Scan(

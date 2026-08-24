@@ -1,6 +1,6 @@
 -- name: CreateWorkspace :one
-INSERT INTO workspaces (user_id, installation_id, github_repo_id, name)
-VALUES ($1, $2, $3, $4) RETURNING *;
+INSERT INTO workspaces (user_id, installation_id, github_repo_id, name, issue_prefix)
+VALUES ($1, $2, $3, $4, $5) RETURNING *;
 
 -- name: ListWorkspacesByUser :many
 SELECT * FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC;
