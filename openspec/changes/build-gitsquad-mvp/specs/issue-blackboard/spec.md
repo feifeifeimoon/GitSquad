@@ -7,7 +7,7 @@
 #### Scenario: 用户在 Workspace 创建 Issue
 
 - **WHEN** 用户在已绑定 repo 的 Workspace 中创建一个 Issue,填写标题与描述
-- **THEN** 系统 MUST 在该 Workspace 下持久化此 Issue,记录创建者、创建时间、初始状态 `open`,且此 Issue 不出现在 GitHub 的 issue 列表中
+- **THEN** 系统 MUST 在该 Workspace 下持久化此 Issue,记录创建者、创建时间、初始状态 `backlog`,且此 Issue 不出现在 GitHub 的 issue 列表中
 
 #### Scenario: Issue 黑板读写对称
 
@@ -21,7 +21,7 @@
 #### Scenario: 关闭 Issue
 
 - **WHEN** Issue 完成或被取消,具备权限的参与者将其关闭
-- **THEN** 系统 MUST 将 Issue 状态置为终态(`done` 或 `closed`),且该 Issue 不再出现在活跃 Issue 列表中,但历史可查
+- **THEN** 系统 MUST 将 Issue 状态置为终态(`done` 或 `cancelled`),且该 Issue 不再出现在活跃 Issue 列表中,但历史可查
 
 ### Requirement: Issue 评论流
 
@@ -48,17 +48,36 @@
 
 ### Requirement: Issue 简单状态机
 
-系统 SHALL 对每个 Issue 维护一个简单状态:`open` → `in_progress` → `done`(外加可选 `closed`)。MVP 不引入 label / 看板等复杂 PM 功能。
+系统 SHALL 对每个 Issue 维护一个 7 态状态机:`backlog`(默认,停泊不执行)→ `todo` → `in_progress` → `in_review` → `done`,外加 `blocked`(被阻塞)与 `cancelled`(取消)。任意合法枚举间可转换。MVP 不引入 label / 看板复杂 PM 功能。
+
+#### Scenario: Issue 创建默认 backlog
+
+- **WHEN** 用户创建 Issue 且未指定状态
+- **THEN** 系统 MUST 将该 Issue 状态置为 `backlog`,且不触发任何任务派发
 
 #### Scenario: Issue 进入 in_progress
 
 - **WHEN** 某被 @ 的 agent 开始执行任务
-- **THEN** 系统 MUST 将 Issue 状态从 `open` 转为 `in_progress`
+- **THEN** 系统 MUST 将 Issue 状态从 `todo`(或 `backlog`)转为 `in_progress`,并追加 `status_change` 评论落账
 
 #### Scenario: Issue 完成转 done
 
 - **WHEN** Issue 关联的 PR 被合并,或具备权限的参与者手动标记完成
 - **THEN** 系统 MUST 将 Issue 状态转为 `done`
+
+#### Scenario: Issue 状态变更可审计
+
+- **WHEN** 任何参与者或系统触发 Issue 状态变更
+- **THEN** 系统 MUST 在评论流追加一条不可编辑的 `status_change` 评论,记录 from → to、操作者与时间
+
+### Requirement: Issue 平台内编号
+
+系统 SHALL 为每个 Issue 分配 Workspace 内顺序编号(如 `GIT-42`),编号由 Workspace 前缀(名称非字母字符移除后取前 3 大写,不足则 `WS`)+ 递增计数器构成,在 Workspace 内唯一。
+
+#### Scenario: Issue 使用平台内编号
+
+- **WHEN** 用户在 Workspace 创建 Issue
+- **THEN** 系统 MUST 分配形如 `GIT-42` 的 Workspace 内顺序编号,该编号用于评论互提与 PR body 引用
 
 ### Requirement: Issue 与 PR 的弱关联
 

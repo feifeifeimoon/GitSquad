@@ -1,4 +1,4 @@
-> 进度基线(2026-08-12 同步):已完成 1.1/1.3–1.6、2.2–2.4、3.1–3.2/3.4、7.1–7.3;未开始 4/5/6/8/9/10/11 章;部分完成 2.5/3.3(degraded 缺口)、7.6(仅下线检测)、7.7(仅打包)。
+> 进度基线(2026-08-24 同步):已完成 1.1/1.3–1.6、2.2–2.4、3.1–3.2/3.4、4.1–4.6、7.1–7.3/7.7;未开始 5/6/8/9/10/11 章;部分完成 2.5/3.3(degraded 缺口)、7.4/7.5(依赖第 9 章)、7.6(仅下线检测)。
 
 ## 1. 技术栈敲定与项目骨架
 
@@ -31,12 +31,13 @@
 
 ## 4. 平台 Issue 黑板
 
-- [ ] 4.1 实现 Issue 数据模型(Workspace 外键、标题/描述、状态 open/in_progress/done、`linked_prs`、`assigned_agents`、预留 `source_upstream_issue` 字段)
-- [ ] 4.2 实现 Issue CRUD API(创建、读取、更新、关闭)
-- [ ] 4.3 实现评论流 API(追加评论、记录作者标识人与 agent、时间戳、不可编辑历史)
-- [ ] 4.4 实现 @mention 解析器:从描述/评论解析 agent 名称,校验 Workspace 内唯一性,不匹配时追加系统提示
-- [ ] 4.5 实现 Issue 简单状态机(open → in_progress → done)与状态转换触发点
-- [ ] 4.6 验证 MVP 不读取 `source_upstream_issue` 字段(字段持久化但不触发同步)
+- [x] 4.1 实现 Issue 数据模型(Workspace 外键、标题/描述、状态 7 态、`linked_prs`、`assigned_agents`、预留 `source_upstream_issue` 字段)
+- [x] 4.2 实现 Issue CRUD API(创建、读取、更新、关闭;编号 GIT-42 式 workspace 内递增)
+- [x] 4.3 实现评论流 API(追加评论、记录作者标识人与 agent、时间戳、不可编辑历史;comment/status_change/system 三类型)
+- [x] 4.4 实现 @mention 解析器:从描述/评论解析 agent 名称,校验 Workspace 内唯一性(待第 5 章 agent 表接线),不匹配时追加系统提示
+- [x] 4.5 实现 Issue 状态机(Multica 7 态:backlog/todo/in_progress/in_review/done/blocked/cancelled)与状态转换落账(status_change 评论)
+- [x] 4.6 验证 MVP 不读取 `source_upstream_issue` 字段(字段持久化但不触发同步)
+  - 注:2026-08-24 完成,含七列看板 + 详情页前端;设计文档 docs/superpowers/specs/2026-08-24-issue-blackboard-design.md
 
 ## 5. Agent 配置
 
@@ -68,7 +69,7 @@
 - [ ] 7.6 实现 daemon 下线检测与任务超时标记 `failed` + Issue 回流通知(MVP 不自动迁移)
   - 进度:下线检测 ✅(WS 陈旧连接驱逐 → `MarkOffline`);任务超时标记 `failed` + Issue 回流 ❌(任务系统未建)
 - [ ] 7.7 打包 daemon 单 binary(`gitsquad daemon`)与安装/更新脚本
-  - 进度:单 binary 打包 ✅(Makefile build-cli + goreleaser + `daemon start/stop` 前后台);安装/更新脚本 ❌(前端文案引用 `curl install | sh`,仓库内无脚本)
+  - 进度:单 binary 打包 ✅(Makefile build-cli + goreleaser + `daemon start/stop` 前后台);安装/更新脚本 ✅(scripts/install.sh + install.ps1,2026-08-20 落地,含版本解析/prerelease 兜底/PATH 广播)
 
 ## 8. CloudShell + SandboxProvider
 
@@ -114,3 +115,4 @@
 - Console 壳:可拖拽侧栏、workspace 列表/详情、daemon 列表(15s 轮询)与连接指引
 - 后端单测覆盖 daemon / service / ws / config / client 等层;前端仅 landing 页静态断言测试
 - 工程化:Makefile、goreleaser 发布配置、Dockerfile、.github 工作流
+- Issue 黑板全链路:7 态状态机(backlog 默认)、GIT-42 式编号、评论三类型(user/agent/system)不可编辑、@mention 解析(代码块跳过 + 系统提示 + 派发钩子)、七列看板 + 详情页(设计文档:docs/superpowers/specs/2026-08-24-issue-blackboard-design.md)
