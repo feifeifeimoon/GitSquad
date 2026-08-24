@@ -78,3 +78,61 @@ export const api = {
 };
 
 export { ApiError };
+
+// ── Issues ────────────────────────────────────────────────────────────
+
+export type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "blocked" | "cancelled";
+
+export interface Issue {
+  id: string;
+  number: number;
+  issue_key: string;
+  title: string;
+  description: string;
+  status: IssueStatus;
+  assigned_agents: string[];
+  linked_prs: string[];
+  creator_name: string;
+  comments_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IssueComment {
+  id: string;
+  author_type: "user" | "agent" | "system";
+  author_name: string;
+  type: "comment" | "status_change" | "system";
+  content: string;
+  created_at: string;
+}
+
+export interface IssueDetail extends Issue {
+  comments: IssueComment[];
+}
+
+export const ISSUE_STATUSES: IssueStatus[] = [
+  "backlog", "todo", "in_progress", "in_review", "done", "blocked", "cancelled",
+];
+
+export const ISSUE_STATUS_LABELS: Record<IssueStatus, string> = {
+  backlog: "Backlog",
+  todo: "Todo",
+  in_progress: "In Progress",
+  in_review: "In Review",
+  done: "Done",
+  blocked: "Blocked",
+  cancelled: "Cancelled",
+};
+
+export const issueApi = {
+  list: (workspaceId: string) => api.get<Issue[]>(`/api/v1/workspaces/${workspaceId}/issues`),
+  get: (workspaceId: string, issueId: string) =>
+    api.get<IssueDetail>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`),
+  create: (workspaceId: string, body: { title: string; description?: string }) =>
+    api.post<Issue>(`/api/v1/workspaces/${workspaceId}/issues`, body),
+  update: (workspaceId: string, issueId: string, body: { status?: IssueStatus; title?: string; description?: string }) =>
+    api.patch<Issue>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`, body),
+  addComment: (workspaceId: string, issueId: string, content: string) =>
+    api.post<IssueComment>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/comments`, { content }),
+};
