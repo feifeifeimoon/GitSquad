@@ -13,17 +13,17 @@ import (
 )
 
 const addIssueAssignedAgent = `-- name: AddIssueAssignedAgent :exec
-UPDATE issues SET assigned_agents = array_append(assigned_agents, $2), updated_at = now()
-WHERE id = $1 AND NOT ($2 = ANY(assigned_agents))
+UPDATE issues SET assigned_agents = array_append(assigned_agents, $2::text), updated_at = now()
+WHERE id = $1 AND NOT ($2::text = ANY(assigned_agents))
 `
 
 type AddIssueAssignedAgentParams struct {
-	ID          uuid.UUID   `json:"id"`
-	ArrayAppend interface{} `json:"array_append"`
+	ID        uuid.UUID `json:"id"`
+	AgentName string    `json:"agent_name"`
 }
 
 func (q *Queries) AddIssueAssignedAgent(ctx context.Context, arg AddIssueAssignedAgentParams) error {
-	_, err := q.db.Exec(ctx, addIssueAssignedAgent, arg.ID, arg.ArrayAppend)
+	_, err := q.db.Exec(ctx, addIssueAssignedAgent, arg.ID, arg.AgentName)
 	return err
 }
 

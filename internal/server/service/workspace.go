@@ -57,6 +57,7 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID
 		InstallationID: installationID,
 		GithubRepoID:   repoID,
 		Name:           name,
+		IssuePrefix:    deriveIssuePrefix(name),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("create workspace: %w", err)

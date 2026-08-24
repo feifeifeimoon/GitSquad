@@ -26,8 +26,8 @@ UPDATE workspaces SET issue_counter = issue_counter + 1 WHERE id = $1 RETURNING 
 SELECT issue_prefix FROM workspaces WHERE id = $1;
 
 -- name: AddIssueAssignedAgent :exec
-UPDATE issues SET assigned_agents = array_append(assigned_agents, $2), updated_at = now()
-WHERE id = $1 AND NOT ($2 = ANY(assigned_agents));
+UPDATE issues SET assigned_agents = array_append(assigned_agents, sqlc.arg(agent_name)::text), updated_at = now()
+WHERE id = $1 AND NOT (sqlc.arg(agent_name)::text = ANY(assigned_agents));
 
 -- name: UpdateIssueStatus :one
 UPDATE issues SET status = $3, updated_at = now() WHERE id = $1 AND workspace_id = $2 RETURNING *;
