@@ -80,3 +80,40 @@ CREATE TABLE workspaces (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE workspaces
+    ADD COLUMN issue_prefix TEXT NOT NULL DEFAULT '',
+    ADD COLUMN issue_counter INT NOT NULL DEFAULT 0;
+
+CREATE TABLE issues (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    number INT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'backlog'
+        CHECK (status IN ('backlog','todo','in_progress','in_review','done','blocked','cancelled')),
+    creator_user_id UUID REFERENCES users(id),
+    assigned_agents TEXT[] NOT NULL DEFAULT '{}',
+    linked_prs TEXT[] NOT NULL DEFAULT '{}',
+    source_upstream_issue TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (workspace_id, number)
+);
+
+CREATE INDEX IF NOT EXISTS idx_issues_workspace ON issues(workspace_id, created_at);
+
+CREATE TABLE issue_comments (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    author_type TEXT NOT NULL CHECK (author_type IN ('user','agent','system')),
+    author_id UUID,
+    author_name TEXT NOT NULL DEFAULT '',
+    type TEXT NOT NULL DEFAULT 'comment'
+        CHECK (type IN ('comment','status_change','system')),
+    content TEXT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_issue_comments_issue ON issue_comments(issue_id, created_at);

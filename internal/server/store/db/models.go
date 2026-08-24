@@ -64,6 +64,32 @@ type GithubRepo struct {
 	Private        bool      `json:"private"`
 }
 
+type Issue struct {
+	ID                  uuid.UUID  `json:"id"`
+	WorkspaceID         uuid.UUID  `json:"workspace_id"`
+	Number              int32      `json:"number"`
+	Title               string     `json:"title"`
+	Description         string     `json:"description"`
+	Status              string     `json:"status"`
+	CreatorUserID       *uuid.UUID `json:"creator_user_id"`
+	AssignedAgents      []string   `json:"assigned_agents"`
+	LinkedPrs           []string   `json:"linked_prs"`
+	SourceUpstreamIssue *string    `json:"source_upstream_issue"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+}
+
+type IssueComment struct {
+	ID         uuid.UUID  `json:"id"`
+	IssueID    uuid.UUID  `json:"issue_id"`
+	AuthorType string     `json:"author_type"`
+	AuthorID   *uuid.UUID `json:"author_id"`
+	AuthorName string     `json:"author_name"`
+	Type       string     `json:"type"`
+	Content    string     `json:"content"`
+	CreatedAt  time.Time  `json:"created_at"`
+}
+
 type Runtime struct {
 	ID             uuid.UUID `json:"id"`
 	DaemonID       uuid.UUID `json:"daemon_id"`
@@ -117,4 +143,6 @@ type Workspace struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	IssuePrefix    string    `json:"issue_prefix"`
+	IssueCounter   int32     `json:"issue_counter"`
 }

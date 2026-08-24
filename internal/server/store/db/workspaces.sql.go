@@ -14,7 +14,7 @@ import (
 
 const createWorkspace = `-- name: CreateWorkspace :one
 INSERT INTO workspaces (user_id, installation_id, github_repo_id, name)
-VALUES ($1, $2, $3, $4) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at
+VALUES ($1, $2, $3, $4) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter
 `
 
 type CreateWorkspaceParams struct {
@@ -41,12 +41,14 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IssuePrefix,
+		&i.IssueCounter,
 	)
 	return i, err
 }
 
 const getWorkspace = `-- name: GetWorkspace :one
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at FROM workspaces WHERE id = $1
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter FROM workspaces WHERE id = $1
 `
 
 func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, error) {
@@ -61,6 +63,8 @@ func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, er
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.IssuePrefix,
+		&i.IssueCounter,
 	)
 	return i, err
 }
@@ -109,7 +113,7 @@ func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWo
 }
 
 const listWorkspacesByUser = `-- name: ListWorkspacesByUser :many
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
 `
 
 func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([]Workspace, error) {
@@ -130,6 +134,8 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.IssuePrefix,
+			&i.IssueCounter,
 		); err != nil {
 			return nil, err
 		}

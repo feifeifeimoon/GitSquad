@@ -91,6 +91,41 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			ADD COLUMN IF NOT EXISTS os TEXT NOT NULL DEFAULT '',
 			ADD COLUMN IF NOT EXISTS arch TEXT NOT NULL DEFAULT '',
 			ADD COLUMN IF NOT EXISTS daemon_version TEXT NOT NULL DEFAULT '0.0.0'`},
+		{name: "012_workspace_issue_numbering", sql: `ALTER TABLE workspaces
+			ADD COLUMN IF NOT EXISTS issue_prefix TEXT NOT NULL DEFAULT '',
+			ADD COLUMN IF NOT EXISTS issue_counter INT NOT NULL DEFAULT 0`},
+		{name: "013_create_issues", sql: `CREATE TABLE IF NOT EXISTS issues (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			number INT NOT NULL,
+			title TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			status TEXT NOT NULL DEFAULT 'backlog'
+				CHECK (status IN ('backlog','todo','in_progress','in_review','done','blocked','cancelled')),
+			creator_user_id UUID REFERENCES users(id),
+			assigned_agents TEXT[] NOT NULL DEFAULT '{}',
+			linked_prs TEXT[] NOT NULL DEFAULT '{}',
+			source_upstream_issue TEXT,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (workspace_id, number)
+		)`},
+		{name: "014_create_issue_comments", sql: `CREATE TABLE IF NOT EXISTS issue_comments (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+			author_type TEXT NOT NULL CHECK (author_type IN ('user','agent','system')),
+			author_id UUID,
+			author_name TEXT NOT NULL DEFAULT '',
+			type TEXT NOT NULL DEFAULT 'comment'
+				CHECK (type IN ('comment','status_change','system')),
+			content TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`},
+		{name: "015_issue_prefix_backfill", sql: `DO $$
+			BEGIN
+				UPDATE workspaces SET issue_prefix = UPPER(LEFT(REGEXP_REPLACE(name, '[^a-zA-Z]', '', 'g'), 3)) WHERE issue_prefix = '';
+				UPDATE workspaces SET issue_prefix = 'WS' WHERE issue_prefix = '';
+			END $$`},
 	}
 
 	for _, m := range migrations {
