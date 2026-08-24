@@ -37,6 +37,8 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	workspaceSvc := service.NewWorkspaceService(s)
 	githubHandler := NewGitHubHandler(cfg, githubSvc)
 	workspaceHandler := NewWorkspaceHandler(workspaceSvc)
+	issueSvc := service.NewIssueService(s)
+	issueHandler := NewIssueHandler(issueSvc, workspaceSvc)
 
 	r.GET("/healthz", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
@@ -110,7 +112,14 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.GET("/workspaces", workspaceHandler.List)
 			protected.GET("/workspaces/:id", workspaceHandler.Get)
 			protected.DELETE("/workspaces/:id", workspaceHandler.Archive)
-	}
+
+			// Issue blackboard
+			protected.POST("/workspaces/:id/issues", issueHandler.Create)
+			protected.GET("/workspaces/:id/issues", issueHandler.List)
+			protected.GET("/workspaces/:id/issues/:issueId", issueHandler.Get)
+			protected.PATCH("/workspaces/:id/issues/:issueId", issueHandler.Update)
+			protected.POST("/workspaces/:id/issues/:issueId/comments", issueHandler.AddComment)
+		}
 }
 
 	// Webhook endpoint — public, HMAC-verified, no user auth required.
