@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "bun test app/page.test.mjs"
+    "test": "bun test app/page.test.mjs lib/issues.test.ts"
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
