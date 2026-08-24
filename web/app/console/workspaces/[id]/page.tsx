@@ -99,6 +99,18 @@ export default function WorkspaceDetailPage({
         </div>
       </div>
 
+      {/* Issues entry */}
+      <button
+        onClick={() => router.push(`/console/workspaces/${id}/issues`)}
+        className="mb-6 flex w-full items-center justify-between rounded-md border border-hairline bg-canvas p-5 text-left shadow-level-2 transition-colors hover:bg-muted"
+      >
+        <div>
+          <p className="text-sm font-semibold text-ink">Issues</p>
+          <p className="text-xs text-mute">Board and collaborate with your agents</p>
+        </div>
+        <span className="text-sm text-body">Open →</span>
+      </button>
+
       {/* Metadata */}
       <div className="rounded-md border border-hairline bg-canvas p-5 shadow-level-2">
         <h2 className="mb-3 text-sm font-semibold text-ink">Details</h2>
