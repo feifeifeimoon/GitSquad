@@ -130,24 +130,6 @@ func getRowToResponse(row db.GetIssueRow) IssueResponse {
 	}
 }
 
-// issueResponseFrom builds an IssueResponse from a bare issue row model
-// plus context fetched separately (workspace prefix, creator login).
-func issueResponseFrom(issue db.Issue, prefix, creatorName string) IssueResponse {
-	return IssueResponse{
-		ID:             issue.ID,
-		Number:         issue.Number,
-		IssueKey:       issueKey(prefix, issue.Number),
-		Title:          issue.Title,
-		Description:    issue.Description,
-		Status:         issue.Status,
-		AssignedAgents: issue.AssignedAgents,
-		LinkedPRs:      issue.LinkedPrs,
-		CreatorName:    creatorName,
-		CreatedAt:      issue.CreatedAt,
-		UpdatedAt:      issue.UpdatedAt,
-	}
-}
-
 // uuidPtr converts a uuid.UUID into the *uuid.UUID the sqlc-generated
 // models use for nullable uuid columns.
 func uuidPtr(id uuid.UUID) *uuid.UUID { return &id }
@@ -279,12 +261,11 @@ func (s *IssueService) UpdateIssue(ctx context.Context, workspaceID, issueID uui
 			return fmt.Errorf("%w: %v", ErrIssueNotFound, err)
 		}
 		if status != nil && *status != row.Status {
-			updated, err := q.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
+			if _, err := q.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
 				ID:          issueID,
 				WorkspaceID: workspaceID,
 				Status:      *status,
-			})
-			if err != nil {
+			}); err != nil {
 				return fmt.Errorf("update status: %w", err)
 			}
 			if _, err := q.CreateComment(ctx, db.CreateCommentParams{
@@ -296,8 +277,6 @@ func (s *IssueService) UpdateIssue(ctx context.Context, workspaceID, issueID uui
 			}); err != nil {
 				return fmt.Errorf("append status change comment: %w", err)
 			}
-			r := issueResponseFrom(updated, row.IssuePrefix, row.CreatorName)
-			resp = &r
 		}
 		if title != nil || description != nil {
 			newTitle := row.Title
@@ -308,22 +287,23 @@ func (s *IssueService) UpdateIssue(ctx context.Context, workspaceID, issueID uui
 			if description != nil {
 				newDesc = *description
 			}
-			updated, err := q.UpdateIssueTitleDescription(ctx, db.UpdateIssueTitleDescriptionParams{
+			if _, err := q.UpdateIssueTitleDescription(ctx, db.UpdateIssueTitleDescriptionParams{
 				ID:          issueID,
 				WorkspaceID: workspaceID,
 				Title:       newTitle,
 				Description: newDesc,
-			})
-			if err != nil {
+			}); err != nil {
 				return fmt.Errorf("update fields: %w", err)
 			}
-			r := issueResponseFrom(updated, row.IssuePrefix, row.CreatorName)
-			resp = &r
 		}
-		if resp == nil {
-			r := getRowToResponse(row)
-			resp = &r
+		// Re-fetch so the response carries the accurate comments_count,
+		// which the bare UpdateIssue* RETURNING row does not include.
+		fresh, err := q.GetIssue(ctx, db.GetIssueParams{ID: issueID, WorkspaceID: workspaceID})
+		if err != nil {
+			return fmt.Errorf("refetch issue: %w", err)
 		}
+		r := getRowToResponse(fresh)
+		resp = &r
 		return nil
 	})
 	if err != nil {

@@ -41,6 +41,8 @@ func processMentions(content string, agentNames []string) (matched, unmatched []
 	for _, a := range agentNames {
 		agents[a] = true
 	}
+	matched = []string{}
+	unmatched = []string{}
 	for _, m := range ParseMentions(content) {
 		if agents[m] {
 			matched = append(matched, m)
