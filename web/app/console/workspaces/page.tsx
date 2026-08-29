@@ -84,7 +84,7 @@ export default function WorkspacesPage() {
     });
   }, [workspaces, search, sortField, sortDir]);
 
-  const SortIcon = ({ field }: { field: SortField }) => {
+  const sortIcon = (field: SortField) => {
     if (sortField !== field) return null;
     return sortDir === "asc" ? (
       <ChevronUp className="size-3" />
@@ -155,7 +155,7 @@ export default function WorkspacesPage() {
                       onClick={() => toggleSort("name")}
                       className="flex items-center gap-1 text-xs font-medium text-mute transition-colors hover:text-ink"
                     >
-                      Name <SortIcon field="name" />
+                      Name {sortIcon("name")}
                     </button>
                   </th>
                   <th className="py-2 pr-4 text-xs font-medium text-mute">Repository</th>
@@ -165,7 +165,7 @@ export default function WorkspacesPage() {
                       onClick={() => toggleSort("created_at")}
                       className="flex items-center gap-1 text-xs font-medium text-mute transition-colors hover:text-ink"
                     >
-                      Created <SortIcon field="created_at" />
+                      Created {sortIcon("created_at")}
                     </button>
                   </th>
                   <th className="w-10" />
