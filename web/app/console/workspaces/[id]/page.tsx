@@ -134,16 +134,6 @@ export default function WorkspaceDetailPage({
           </div>
         </div>
       </div>
-
-      {/* Placeholder for future features */}
-      <div className="mt-6 rounded-md border border-dashed border-hairline-strong p-10 text-center">
-        <p className="mb-1 text-sm font-medium text-body">
-          Issues & agent configuration
-        </p>
-        <p className="text-xs text-mute">
-          Issue blackboard and agent team management coming in upcoming sprints.
-        </p>
-      </div>
     </div>
   );
 }
