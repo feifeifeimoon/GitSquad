@@ -25,6 +25,8 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-warning-soft: var(--warning-soft);
+  --color-link-bg-soft: var(--link-bg-soft);
+  --color-warning-deep: var(--warning-deep);
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -101,6 +103,8 @@
   --success: #0070f3;
   --warning: #f5a623;
   --warning-soft: #ffefcf;
+  --link-bg-soft: #d3e5ff;
+  --warning-deep: #ab570a;
 
   --chart-1: #007cf0;
   --chart-2: #7928ca;
