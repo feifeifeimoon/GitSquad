@@ -136,3 +136,16 @@ export const issueApi = {
   addComment: (workspaceId: string, issueId: string, content: string) =>
     api.post<IssueComment>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/comments`, { content }),
 };
+
+// ── Workspaces ─────────────────────────────────────────────────────────
+
+export interface Workspace {
+  id: string;
+  name: string;
+  status: string;
+  repo_full_name: string;
+  repo_owner: string;
+  repo_name: string;
+  repo_private: boolean;
+  created_at: string;
+}
