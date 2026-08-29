@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, MessageSquare, Plus } from "lucide-react";
+import { MessageSquare, Plus } from "lucide-react";
 import {
   Issue, IssueStatus, ISSUE_STATUSES, ISSUE_STATUS_LABELS, issueApi,
 } from "@/lib/api";
@@ -74,16 +74,11 @@ export default function IssuesBoardPage({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-8 pt-8">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => router.push(`/console/workspaces/${id}`)}
-            className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
-          >
-            <ChevronLeft className="size-4" />
-            Workspace
-          </button>
-          <h1 className="text-xl font-semibold">Issues</h1>
+      <div className="flex items-center justify-between px-8 pb-4 pt-6">
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-xs tabular-nums text-mute">
+            {issues.length}
+          </span>
         </div>
         <Dialog>
           <DialogTrigger asChild>
