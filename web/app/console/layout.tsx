@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import { Monitor, Settings, LogOut, FolderGit2 } from "lucide-react";
-import { api } from "@/lib/api";
+import { api, Workspace } from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface User {
@@ -31,12 +31,32 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const dragging = useRef(false);
 
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const wsMatch = pathname?.match(/^\/console\/workspaces\/([^/]+)/);
+  const wsId = wsMatch ? decodeURIComponent(wsMatch[1]) : null;
+
   useEffect(() => {
     api
       .get<User>("/api/v1/me")
       .then(setUser)
       .catch(() => router.push("/login"));
   }, [router]);
+
+  useEffect(() => {
+    if (!wsId) return;
+    let cancelled = false;
+    api
+      .get<Workspace>(`/api/v1/workspaces/${wsId}`)
+      .then((w) => {
+        if (!cancelled) setWorkspace(w);
+      })
+      .catch(() => {
+        if (!cancelled) setWorkspace(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [wsId]);
 
   const handleLogout = () => {
     localStorage.removeItem("gitsquad_token");
@@ -75,10 +95,23 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         className="relative flex shrink-0 flex-col border-r border-hairline bg-canvas"
         style={{ width: sidebarWidth }}
       >
-        {/* Logo */}
+        {/* Logo / workspace switcher */}
         <div className="flex h-16 items-center gap-2 border-b border-hairline px-5">
-          <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
-          <span className="text-sm font-semibold tracking-tight">GitSquad</span>
+          {wsId && workspace ? (
+            <>
+              <div className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-primary text-xs font-semibold text-white">
+                {workspace.name.slice(0, 2).toUpperCase()}
+              </div>
+              <span className="truncate text-sm font-semibold tracking-tight">
+                {workspace.name}
+              </span>
+            </>
+          ) : (
+            <>
+              <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
+              <span className="text-sm font-semibold tracking-tight">GitSquad</span>
+            </>
+          )}
         </div>
 
         {/* Nav */}

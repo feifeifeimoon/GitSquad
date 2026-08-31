@@ -6,8 +6,8 @@ const list = readFileSync(
   new URL("../app/console/workspaces/page.tsx", import.meta.url),
   "utf8",
 );
-const layout = readFileSync(
-  new URL("../app/console/workspaces/[id]/layout.tsx", import.meta.url),
+const shell = readFileSync(
+  new URL("../app/console/layout.tsx", import.meta.url),
   "utf8",
 );
 const badge = readFileSync(
@@ -15,22 +15,18 @@ const badge = readFileSync(
   "utf8",
 );
 
-test("workspace list is a searchable, sortable table", () => {
-  assert.match(list, /Search/);
-  assert.match(list, /Search workspaces/);
-  assert.match(list, /toggleSort/);
-  assert.match(list, /<table/);
+test("workspace list renders a card grid", () => {
+  assert.match(list, /grid-cols-1/);
   assert.match(list, /StatusBadge/);
+  assert.match(list, /timeAgo/);
   assert.doesNotMatch(list, /font-bold/);
   assert.doesNotMatch(list, /text-\[10px\]/);
 });
 
-test("workspace detail has header and tab navigation", () => {
-  assert.match(layout, /All workspaces/);
-  assert.match(layout, /StatusBadge/);
-  assert.match(layout, /Overview/);
-  assert.match(layout, /Issues/);
-  assert.match(layout, /usePathname/);
+test("console shell swaps GitSquad for the active workspace", () => {
+  assert.match(shell, /GitSquad/);
+  assert.match(shell, /usePathname/);
+  assert.match(shell, /workspace\.name/);
 });
 
 test("status badge defines three states", () => {

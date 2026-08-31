@@ -29,7 +29,7 @@ export default function IssueDetailPage({
     issueApi
       .get(id, issueId)
       .then(setIssue)
-      .catch(() => router.push(`/console/workspaces/${id}/issues`))
+      .catch(() => router.push(`/console/workspaces/${id}`))
       .finally(() => setLoading(false));
   };
   useEffect(load, [id, issueId, router]);
@@ -64,7 +64,7 @@ export default function IssueDetailPage({
   return (
     <div className="mx-auto max-w-3xl p-8">
       <button
-        onClick={() => router.push(`/console/workspaces/${id}/issues`)}
+        onClick={() => router.push(`/console/workspaces/${id}`)}
         className="mb-6 flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
       >
         <ChevronLeft className="size-4" />

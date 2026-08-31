@@ -3,10 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const board = readFileSync(
-  new URL(
-    "../app/console/workspaces/[id]/issues/page.tsx",
-    import.meta.url,
-  ),
+  new URL("../app/console/workspaces/[id]/page.tsx", import.meta.url),
   "utf8",
 );
 const detail = readFileSync(
@@ -16,7 +13,6 @@ const detail = readFileSync(
   ),
   "utf8",
 );
-
 const api = readFileSync(
   new URL("./api.ts", import.meta.url),
   "utf8",
@@ -38,11 +34,12 @@ test("issue board renders all seven status columns", () => {
   }
 });
 
-test("issue board supports create and drag-to-change-status", () => {
+test("issue board supports create, drag, and status coloring", () => {
   assert.match(board, /New Issue/);
   assert.match(board, /onDragStart/);
   assert.match(board, /onDrop/);
   assert.match(board, /issueApi\.update/);
+  assert.match(board, /STATUS_BG/);
 });
 
 test("issue detail renders comments and a status selector", () => {
