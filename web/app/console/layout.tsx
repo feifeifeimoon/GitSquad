@@ -34,7 +34,6 @@ const navItems = [
   { href: "/console/daemons", label: "Daemons", icon: Monitor },
   { href: "/console/settings", label: "Settings", icon: Settings },
 ];
-
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
 const DEFAULT_WIDTH = 240;
@@ -168,11 +167,15 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         {/* Nav */}
         <nav className="flex-1 space-y-1 px-3 py-4">
           {navItems.map((item) => {
-            const active = pathname.startsWith(item.href);
+            const href =
+              item.href === "/console/settings" && wsId
+                ? `/console/workspaces/${wsId}/settings`
+                : item.href;
+            const active = pathname.startsWith(href);
             return (
               <button
                 key={item.href}
-                onClick={() => router.push(item.href)}
+                onClick={() => router.push(href)}
                 className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "bg-muted text-ink"

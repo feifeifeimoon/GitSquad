@@ -163,3 +163,9 @@ func (s *WorkspaceService) ArchiveWorkspace(ctx context.Context, id uuid.UUID) e
 		Status: "archived",
 	})
 }
+
+// DeleteWorkspace permanently removes a workspace. Its issues and comments
+// are removed via the DB-level ON DELETE CASCADE on workspace_id.
+func (s *WorkspaceService) DeleteWorkspace(ctx context.Context, id uuid.UUID) error {
+	return s.store.DeleteWorkspace(ctx, id)
+}

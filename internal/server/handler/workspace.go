@@ -151,3 +151,36 @@ func (h *WorkspaceHandler) Archive(c *gin.Context) {
 
 	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]bool{"archived": true}, 0))
 }
+
+// Delete handles DELETE /api/v1/workspaces/:id/delete (permanent removal).
+func (h *WorkspaceHandler) Delete(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("login required"))
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid workspace id"))
+		return
+	}
+
+	workspace, err := h.workspaces.GetWorkspace(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
+		return
+	}
+	if workspace.UserID != user.ID {
+		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
+		return
+	}
+
+	if err := h.workspaces.DeleteWorkspace(c.Request.Context(), id); err != nil {
+		slog.Error("delete workspace", "error", err)
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to delete workspace"))
+		return
+	}
+
+	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]bool{"deleted": true}, 0))
+}

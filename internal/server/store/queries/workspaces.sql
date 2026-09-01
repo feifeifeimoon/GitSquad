@@ -25,3 +25,6 @@ WHERE w.id = $1;
 
 -- name: UpdateWorkspaceStatus :exec
 UPDATE workspaces SET status = $2, updated_at = now() WHERE id = $1;
+
+-- name: DeleteWorkspace :exec
+DELETE FROM workspaces WHERE id = $1;

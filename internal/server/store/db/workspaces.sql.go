@@ -49,6 +49,15 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 	return i, err
 }
 
+const deleteWorkspace = `-- name: DeleteWorkspace :exec
+DELETE FROM workspaces WHERE id = $1
+`
+
+func (q *Queries) DeleteWorkspace(ctx context.Context, id uuid.UUID) error {
+	_, err := q.db.Exec(ctx, deleteWorkspace, id)
+	return err
+}
+
 const getWorkspace = `-- name: GetWorkspace :one
 SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter FROM workspaces WHERE id = $1
 `

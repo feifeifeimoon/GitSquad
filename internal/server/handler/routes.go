@@ -112,6 +112,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.GET("/workspaces", workspaceHandler.List)
 			protected.GET("/workspaces/:id", workspaceHandler.Get)
 			protected.DELETE("/workspaces/:id", workspaceHandler.Archive)
+			protected.DELETE("/workspaces/:id/delete", workspaceHandler.Delete)
 
 			// Issue blackboard
 			protected.POST("/workspaces/:id/issues", issueHandler.Create)
