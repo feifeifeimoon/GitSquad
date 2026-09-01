@@ -215,6 +215,12 @@
     color: var(--body);
   }
   .tiptap-content:focus { outline: none; }
+  .tiptap-content:focus-visible,
+  .tiptap-content .ProseMirror:focus,
+  .tiptap-content .ProseMirror:focus-visible {
+    outline: none;
+    box-shadow: none;
+  }
   .tiptap-content > *:first-child { margin-top: 0; }
   .tiptap-content h1 { font-size: 20px; font-weight: 600; color: var(--ink); margin: 12px 0 6px; letter-spacing: -0.3px; }
   .tiptap-content h2 { font-size: 16px; font-weight: 600; color: var(--ink); margin: 10px 0 4px; }

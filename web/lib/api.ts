@@ -131,7 +131,7 @@ export const issueApi = {
   list: (workspaceId: string) => api.get<Issue[]>(`/api/v1/workspaces/${workspaceId}/issues`),
   get: (workspaceId: string, issueId: string) =>
     api.get<IssueDetail>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`),
-  create: (workspaceId: string, body: { title: string; description?: string }) =>
+  create: (workspaceId: string, body: { title: string; description?: string; status?: IssueStatus }) =>
     api.post<Issue>(`/api/v1/workspaces/${workspaceId}/issues`, body),
   update: (workspaceId: string, issueId: string, body: { status?: IssueStatus; title?: string; description?: string }) =>
     api.patch<Issue>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`, body),

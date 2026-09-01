@@ -45,6 +45,7 @@ func (h *IssueHandler) requireWorkspaceOwner(c *gin.Context) bool {
 type CreateIssueRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
+	Status      string `json:"status"`
 }
 
 // Create handles POST /api/v1/workspaces/:id/issues.
@@ -59,11 +60,13 @@ func (h *IssueHandler) Create(c *gin.Context) {
 	}
 	user := middleware.GetUser(c)
 	workspaceID := uuid.MustParse(c.Param("id"))
-	issue, err := h.issues.CreateIssue(c.Request.Context(), workspaceID, user.ID, user.Login, req.Title, req.Description)
+	issue, err := h.issues.CreateIssue(c.Request.Context(), workspaceID, user.ID, user.Login, req.Title, req.Description, req.Status)
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrEmptyTitle):
 			c.JSON(http.StatusBadRequest, v1.ErrorResponse("title is required"))
+		case errors.Is(err, service.ErrInvalidStatus):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid status"))
 		default:
 			slog.Error("create issue", "error", err)
 			c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to create issue"))

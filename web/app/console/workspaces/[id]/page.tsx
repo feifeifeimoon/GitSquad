@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   MessageSquare,
   Plus,
+  ChevronRight,
   Circle,
   CircleDashed,
   CircleDot,
@@ -15,13 +16,16 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import {
-  Issue, IssueStatus, ISSUE_STATUSES, ISSUE_STATUS_LABELS, issueApi,
+  Issue, IssueStatus, ISSUE_STATUSES, ISSUE_STATUS_LABELS, issueApi, api, Workspace,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/markdown-editor";
 
 const COLUMN_BG: Record<IssueStatus, string> = {
@@ -52,10 +56,12 @@ export default function WorkspaceBoardPage({
   const { id } = use(params);
   const router = useRouter();
   const [issues, setIssues] = useState<Issue[]>([]);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [status, setStatus] = useState<IssueStatus>("backlog");
   const [creating, setCreating] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -68,13 +74,21 @@ export default function WorkspaceBoardPage({
   };
   useEffect(load, [id, router]);
 
+  useEffect(() => {
+    api
+      .get<Workspace>(`/api/v1/workspaces/${id}`)
+      .then(setWorkspace)
+      .catch(() => {});
+  }, [id]);
+
   const create = async () => {
     if (!title.trim()) return;
     setCreating(true);
     try {
-      await issueApi.create(id, { title, description });
+      await issueApi.create(id, { title, description, status });
       setTitle("");
       setDescription("");
+      setStatus("backlog");
       setOpen(false);
       load();
     } finally {
@@ -87,6 +101,7 @@ export default function WorkspaceBoardPage({
     if (!next) {
       setTitle("");
       setDescription("");
+      setStatus("backlog");
     }
   };
 
@@ -124,19 +139,34 @@ export default function WorkspaceBoardPage({
           </DialogTrigger>
           <DialogContent className="flex h-[460px] max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
             <DialogTitle className="sr-only">Create issue</DialogTitle>
+            <div className="flex items-center gap-1.5 px-5 pr-12 pt-3 text-xs text-mute">
+              <span className="truncate">{workspace?.name ?? "Workspace"}</span>
+              <ChevronRight className="size-3 shrink-0 text-mute/50" />
+              <span className="shrink-0 font-medium text-ink">Create issue</span>
+            </div>
             <input
               autoFocus
               placeholder="Issue title"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="border-b-0 px-5 pb-2 pt-5 text-lg font-semibold text-ink outline-none placeholder:text-mute"
+              className="px-5 pb-2 pt-3 text-lg font-semibold text-ink outline-none placeholder:text-mute"
             />
             <MarkdownEditor
               onChange={setDescription}
               placeholder="Describe the issue…"
               className="min-h-0 flex-1 overflow-y-auto px-5 py-3"
             />
-            <div className="flex items-center justify-end border-t border-hairline px-4 py-3">
+            <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
+              <Select value={status} onValueChange={(v) => setStatus(v as IssueStatus)}>
+                <SelectTrigger className="h-8 w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {ISSUE_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>{ISSUE_STATUS_LABELS[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Button disabled={!title.trim() || creating} onClick={create}>
                 Create issue
               </Button>

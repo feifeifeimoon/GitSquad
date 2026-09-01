@@ -137,9 +137,15 @@ func uuidPtr(id uuid.UUID) *uuid.UUID { return &id }
 // CreateIssue creates an issue with a per-workspace sequential number,
 // scans the description for @mentions, and appends system hints for
 // mentions that match no agent. Runs in one transaction.
-func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid.UUID, userLogin, title, description string) (*IssueResponse, error) {
+func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid.UUID, userLogin, title, description, status string) (*IssueResponse, error) {
 	if strings.TrimSpace(title) == "" {
 		return nil, ErrEmptyTitle
+	}
+	if status == "" {
+		status = "backlog"
+	}
+	if !validIssueStatus(status) {
+		return nil, ErrInvalidStatus
 	}
 
 	agents, err := listAgentNames(ctx, workspaceID)
@@ -163,7 +169,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 			Number:         number,
 			Title:          title,
 			Description:    description,
-			Status:         "backlog",
+			Status:         status,
 			CreatorUserID:  uuidPtr(userID),
 			AssignedAgents: matched,
 		})

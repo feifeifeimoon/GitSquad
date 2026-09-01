@@ -92,7 +92,7 @@ func TestIssueServiceIntegration(t *testing.T) {
 	svc := NewIssueService(s)
 
 	// 1. Create with an unmatched @mention → numbering + system hint.
-	issue, err := svc.CreateIssue(ctx, workspace.ID, user.ID, user.Login, "Fix the thing", "please @coder handle this")
+	issue, err := svc.CreateIssue(ctx, workspace.ID, user.ID, user.Login, "Fix the thing", "please @coder handle this", "")
 	if err != nil {
 		t.Fatalf("create issue: %v", err)
 	}
@@ -107,7 +107,7 @@ func TestIssueServiceIntegration(t *testing.T) {
 	}
 
 	// 2. Second issue increments the number.
-	issue2, err := svc.CreateIssue(ctx, workspace.ID, user.ID, user.Login, "Second", "")
+	issue2, err := svc.CreateIssue(ctx, workspace.ID, user.ID, user.Login, "Second", "", "")
 	if err != nil {
 		t.Fatalf("create issue 2: %v", err)
 	}
