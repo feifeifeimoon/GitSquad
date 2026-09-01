@@ -20,9 +20,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 import { MarkdownEditor } from "@/components/markdown-editor";
 
 const COLUMN_BG: Record<IssueStatus, string> = {
@@ -123,19 +122,23 @@ export default function WorkspaceBoardPage({
               New Issue
             </Button>
           </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New Issue</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-3">
-              <Input
-                placeholder="Title"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-              />
-              <MarkdownEditor onChange={setDescription} placeholder="Write a description…" />
-              <Button disabled={!title.trim() || creating} onClick={create} className="w-full">
-                Create
+          <DialogContent className="flex h-[460px] max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+            <DialogTitle className="sr-only">Create issue</DialogTitle>
+            <input
+              autoFocus
+              placeholder="Issue title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="border-b-0 px-5 pb-2 pt-5 text-lg font-semibold text-ink outline-none placeholder:text-mute"
+            />
+            <MarkdownEditor
+              onChange={setDescription}
+              placeholder="Describe the issue…"
+              className="min-h-0 flex-1 overflow-y-auto px-5 py-3"
+            />
+            <div className="flex items-center justify-end border-t border-hairline px-4 py-3">
+              <Button disabled={!title.trim() || creating} onClick={create}>
+                Create issue
               </Button>
             </div>
           </DialogContent>
