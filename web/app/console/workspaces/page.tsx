@@ -80,13 +80,15 @@ export default function WorkspacesPage() {
               onClick={() => router.push(`/console/workspaces/${w.id}`)}
               className="group flex flex-col rounded-lg border border-hairline bg-canvas p-4 text-left shadow-level-2 transition-all hover:border-hairline-strong hover:shadow-level-3"
             >
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex size-8 items-center justify-center rounded-sm bg-primary text-sm font-semibold text-white">
-                  {w.name.slice(0, 2).toUpperCase()}
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-primary text-sm font-semibold text-white">
+                    {w.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <p className="truncate text-sm font-medium text-ink">{w.name}</p>
                 </div>
                 <StatusBadge status={w.status} />
               </div>
-              <p className="truncate text-sm font-medium text-ink">{w.name}</p>
               <p className="mt-1 line-clamp-2 text-xs text-body">
                 {w.last_commit_message || "No commits yet"}
               </p>
