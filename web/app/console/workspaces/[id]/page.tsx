@@ -23,8 +23,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Markdown } from "@/components/markdown";
+import { MarkdownEditor } from "@/components/markdown-editor";
 
 const COLUMN_BG: Record<IssueStatus, string> = {
   backlog: "bg-muted/40",
@@ -134,21 +133,7 @@ export default function WorkspaceBoardPage({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
-              <div>
-                <Textarea
-                  placeholder="Description — markdown supported"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="min-h-[100px]"
-                />
-                <div className="mt-2 max-h-48 overflow-y-auto rounded-md border border-hairline bg-canvas-soft p-3">
-                  {description.trim() ? (
-                    <Markdown>{description}</Markdown>
-                  ) : (
-                    <span className="text-sm text-mute">Live preview</span>
-                  )}
-                </div>
-              </div>
+              <MarkdownEditor onChange={setDescription} placeholder="Write a description…" />
               <Button disabled={!title.trim() || creating} onClick={create} className="w-full">
                 Create
               </Button>

@@ -206,4 +206,47 @@
       radial-gradient(30% 40% at 92% 58%, #f9cb28 0%, transparent 70%);
     filter: blur(60px) saturate(1.1);
   }
+
+  /* TipTap editor content — mirrors Markdown read-only typography. */
+  .tiptap-content {
+    min-height: 8rem;
+    font-size: 14px;
+    line-height: 20px;
+    color: var(--body);
+  }
+  .tiptap-content:focus { outline: none; }
+  .tiptap-content > *:first-child { margin-top: 0; }
+  .tiptap-content h1 { font-size: 20px; font-weight: 600; color: var(--ink); margin: 12px 0 6px; letter-spacing: -0.3px; }
+  .tiptap-content h2 { font-size: 16px; font-weight: 600; color: var(--ink); margin: 10px 0 4px; }
+  .tiptap-content h3 { font-size: 14px; font-weight: 600; color: var(--ink); margin: 8px 0 4px; }
+  .tiptap-content p { margin: 4px 0; }
+  .tiptap-content ul { list-style: disc; padding-left: 20px; margin: 4px 0; }
+  .tiptap-content ol { list-style: decimal; padding-left: 20px; margin: 4px 0; }
+  .tiptap-content li { margin: 2px 0; }
+  .tiptap-content li > p { margin: 0; }
+  .tiptap-content code { font-family: var(--font-geist-mono); font-size: 12px; background: var(--canvas-soft-2); border-radius: 4px; padding: 1px 4px; }
+  .tiptap-content pre { background: var(--canvas-soft-2); border-radius: 8px; padding: 12px; margin: 8px 0; overflow-x: auto; font-family: var(--font-geist-mono); font-size: 12px; color: var(--ink); }
+  .tiptap-content pre code { background: transparent; padding: 0; font-size: inherit; }
+  .tiptap-content blockquote { border-left: 2px solid var(--hairline-strong); padding-left: 12px; margin: 8px 0; color: var(--body); }
+  .tiptap-content hr { border: none; border-top: 1px solid var(--hairline); margin: 12px 0; }
+  .tiptap-content a { color: var(--link); text-decoration: underline; }
+  .tiptap-content p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--mute);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+
+  /* Code syntax highlighting (lowlight via rehype-highlight) — GitHub-ish theme. */
+  .hljs { color: #24292f; }
+  .hljs-comment, .hljs-quote { color: #6e7781; font-style: italic; }
+  .hljs-keyword, .hljs-selector-tag, .hljs-doctag, .hljs-meta { color: #cf222e; }
+  .hljs-string, .hljs-attr, .hljs-template-variable { color: #0a3069; }
+  .hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: #0550ae; }
+  .hljs-title, .hljs-function, .hljs-section { color: #8250df; }
+  .hljs-built_in, .hljs-type, .hljs-variable, .hljs-params { color: #953800; }
+  .hljs-tag, .hljs-name { color: #116329; }
+  .hljs-emphasis { font-style: italic; }
+  .hljs-strong { font-weight: 600; }
 }
