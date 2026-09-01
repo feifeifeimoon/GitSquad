@@ -24,7 +24,7 @@ import {
   Dialog, DialogContent, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/markdown-editor";
 
@@ -47,6 +47,16 @@ const STATUS_ICON: Record<IssueStatus, { icon: LucideIcon; className: string }> 
   blocked: { icon: Ban, className: "text-destructive" },
   cancelled: { icon: CircleX, className: "text-mute" },
 };
+
+function StatusIconLabel({ status }: { status: IssueStatus }) {
+  const { icon: Icon, className } = STATUS_ICON[status];
+  return (
+    <span className="flex items-center gap-1.5">
+      <Icon className={`size-3.5 ${className}`} />
+      <span>{ISSUE_STATUS_LABELS[status]}</span>
+    </span>
+  );
+}
 
 export default function WorkspaceBoardPage({
   params,
@@ -158,12 +168,14 @@ export default function WorkspaceBoardPage({
             />
             <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
               <Select value={status} onValueChange={(v) => setStatus(v as IssueStatus)}>
-                <SelectTrigger className="h-8 w-32">
-                  <SelectValue />
+                <SelectTrigger className="h-8 w-auto">
+                  <StatusIconLabel status={status} />
                 </SelectTrigger>
                 <SelectContent>
                   {ISSUE_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>{ISSUE_STATUS_LABELS[s]}</SelectItem>
+                    <SelectItem key={s} value={s}>
+                      <StatusIconLabel status={s} />
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
