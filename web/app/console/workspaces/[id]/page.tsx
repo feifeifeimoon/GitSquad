@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { STATUS_ICON, StatusIconLabel } from "@/components/status-icon";
+import { stripMarkdown } from "@/lib/utils";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -202,7 +203,9 @@ export default function WorkspaceBoardPage({
                   >
                     <p className="line-clamp-2 text-sm font-medium text-ink">{issue.title}</p>
                     {issue.description ? (
-                      <p className="mt-1 line-clamp-1 text-xs text-body">{issue.description}</p>
+                      <p className="mt-1 line-clamp-1 text-xs text-body">
+                        {stripMarkdown(issue.description)}
+                      </p>
                     ) : (
                       <p className="mt-1 text-xs text-mute">No description</p>
                     )}
