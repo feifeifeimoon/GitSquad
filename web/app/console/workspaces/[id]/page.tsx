@@ -2,12 +2,11 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MessageSquare, Plus, ChevronRight } from "lucide-react";
+import { Plus, ChevronRight } from "lucide-react";
 import {
   Issue, IssueStatus, ISSUE_STATUSES, ISSUE_STATUS_LABELS, issueApi, api, Workspace,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog, DialogContent, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -16,6 +15,24 @@ import {
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { STATUS_ICON, StatusIconLabel } from "@/components/status-icon";
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  const weeks = Math.floor(days / 7);
+  if (weeks < 4) return `${weeks}w ago`;
+  return new Date(iso).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
 
 const COLUMN_BG: Record<IssueStatus, string> = {
   backlog: "bg-muted/40",
@@ -183,21 +200,20 @@ export default function WorkspaceBoardPage({
                     onClick={() => router.push(`/console/workspaces/${id}/issues/${issue.id}`)}
                     className="cursor-pointer rounded-lg border bg-card p-3 transition-shadow hover:shadow-md"
                   >
-                    <div className="mb-1 flex items-center justify-between">
-                      <span className="text-xs text-body">{issue.issue_key}</span>
-                      <span className="flex items-center gap-1 text-xs text-body">
-                        <MessageSquare className="size-3" />
-                        {issue.comments_count ?? 0}
-                      </span>
-                    </div>
-                    <p className="line-clamp-2 text-sm font-medium">{issue.title}</p>
-                    {issue.assigned_agents.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1">
-                        {issue.assigned_agents.map((a) => (
-                          <Badge key={a} variant="outline">{a}</Badge>
-                        ))}
-                      </div>
+                    <p className="line-clamp-2 text-sm font-medium text-ink">{issue.title}</p>
+                    {issue.description ? (
+                      <p className="mt-1 line-clamp-1 text-xs text-body">{issue.description}</p>
+                    ) : (
+                      <p className="mt-1 text-xs text-mute">No description</p>
                     )}
+                    <div className="mt-2 flex items-center justify-between gap-2 text-xs">
+                      <span className="truncate text-body">
+                        {issue.assigned_agents.length > 0
+                          ? issue.assigned_agents.join(", ")
+                          : "未分配"}
+                      </span>
+                      <span className="shrink-0 text-mute">{timeAgo(issue.updated_at)}</span>
+                    </div>
                   </div>
                 ))}
               </div>
