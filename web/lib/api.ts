@@ -145,6 +145,7 @@ export interface Workspace {
   id: string;
   name: string;
   status: string;
+  avatar_url: string;
   repo_full_name: string;
   repo_owner: string;
   repo_name: string;

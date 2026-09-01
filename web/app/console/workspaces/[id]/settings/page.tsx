@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Trash2 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +24,9 @@ export default function WorkspaceSettingsPage() {
   const [confirmText, setConfirmText] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState("");
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api
@@ -36,6 +40,36 @@ export default function WorkspaceSettingsPage() {
     typeof window !== "undefined"
       ? `${window.location.origin}/console/workspaces/${id}`
       : "";
+
+  const updateAvatar = async (avatarUrl: string) => {
+    setUploading(true);
+    setAvatarError("");
+    try {
+      await api.put(`/api/v1/workspaces/${id}/avatar`, { avatar_url: avatarUrl });
+      setWorkspace((prev) => (prev ? { ...prev, avatar_url: avatarUrl } : prev));
+    } catch {
+      setAvatarError("Failed to update avatar.");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      setAvatarError("Image must be under 1MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      updateAvatar(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveAvatar = () => updateAvatar("");
 
   const handleDelete = async () => {
     if (confirmText !== workspace?.name || deleting) return;
@@ -90,10 +124,45 @@ export default function WorkspaceSettingsPage() {
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-medium text-ink">Avatar</h2>
           <div className="flex items-center gap-4 rounded-lg border border-hairline bg-canvas p-5 shadow-level-2">
-            <div className="flex size-14 items-center justify-center rounded-sm bg-primary text-xl font-semibold text-white">
-              {workspace.name.slice(0, 2).toUpperCase()}
+            <WorkspaceAvatar
+              name={workspace.name}
+              avatarUrl={workspace.avatar_url}
+              className="size-14"
+            />
+            <div className="space-y-2">
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={uploading}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  {uploading ? "Uploading…" : "Upload"}
+                </Button>
+                {workspace.avatar_url && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={uploading}
+                    onClick={handleRemoveAvatar}
+                  >
+                    Remove
+                  </Button>
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              {avatarError ? (
+                <p className="text-xs text-destructive">{avatarError}</p>
+              ) : (
+                <p className="text-xs text-mute">PNG, JPG or SVG, up to 1MB</p>
+              )}
             </div>
-            <p className="text-xs text-mute">Workspace avatar</p>
           </div>
         </section>
 

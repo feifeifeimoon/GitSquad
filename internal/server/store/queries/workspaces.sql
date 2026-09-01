@@ -28,3 +28,6 @@ UPDATE workspaces SET status = $2, updated_at = now() WHERE id = $1;
 
 -- name: DeleteWorkspace :exec
 DELETE FROM workspaces WHERE id = $1;
+
+-- name: UpdateWorkspaceAvatar :exec
+UPDATE workspaces SET avatar_url = $2, updated_at = now() WHERE id = $1;

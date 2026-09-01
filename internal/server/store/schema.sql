@@ -83,7 +83,8 @@ CREATE TABLE workspaces (
 
 ALTER TABLE workspaces
     ADD COLUMN issue_prefix TEXT NOT NULL DEFAULT '',
-    ADD COLUMN issue_counter INT NOT NULL DEFAULT 0;
+    ADD COLUMN issue_counter INT NOT NULL DEFAULT 0,
+    ADD COLUMN avatar_url TEXT NOT NULL DEFAULT '';
 
 CREATE TABLE issues (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

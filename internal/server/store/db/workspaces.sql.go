@@ -14,7 +14,7 @@ import (
 
 const createWorkspace = `-- name: CreateWorkspace :one
 INSERT INTO workspaces (user_id, installation_id, github_repo_id, name, issue_prefix)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter
+VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url
 `
 
 type CreateWorkspaceParams struct {
@@ -45,6 +45,7 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		&i.UpdatedAt,
 		&i.IssuePrefix,
 		&i.IssueCounter,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
@@ -59,7 +60,7 @@ func (q *Queries) DeleteWorkspace(ctx context.Context, id uuid.UUID) error {
 }
 
 const getWorkspace = `-- name: GetWorkspace :one
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter FROM workspaces WHERE id = $1
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url FROM workspaces WHERE id = $1
 `
 
 func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, error) {
@@ -76,6 +77,7 @@ func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, er
 		&i.UpdatedAt,
 		&i.IssuePrefix,
 		&i.IssueCounter,
+		&i.AvatarUrl,
 	)
 	return i, err
 }
@@ -124,7 +126,7 @@ func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWo
 }
 
 const listWorkspacesByUser = `-- name: ListWorkspacesByUser :many
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
 `
 
 func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([]Workspace, error) {
@@ -147,6 +149,7 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([
 			&i.UpdatedAt,
 			&i.IssuePrefix,
 			&i.IssueCounter,
+			&i.AvatarUrl,
 		); err != nil {
 			return nil, err
 		}
@@ -213,6 +216,20 @@ func (q *Queries) ListWorkspacesWithRepo(ctx context.Context, userID uuid.UUID) 
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateWorkspaceAvatar = `-- name: UpdateWorkspaceAvatar :exec
+UPDATE workspaces SET avatar_url = $2, updated_at = now() WHERE id = $1
+`
+
+type UpdateWorkspaceAvatarParams struct {
+	ID        uuid.UUID `json:"id"`
+	AvatarUrl string    `json:"avatar_url"`
+}
+
+func (q *Queries) UpdateWorkspaceAvatar(ctx context.Context, arg UpdateWorkspaceAvatarParams) error {
+	_, err := q.db.Exec(ctx, updateWorkspaceAvatar, arg.ID, arg.AvatarUrl)
+	return err
 }
 
 const updateWorkspaceStatus = `-- name: UpdateWorkspaceStatus :exec

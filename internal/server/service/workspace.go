@@ -169,3 +169,11 @@ func (s *WorkspaceService) ArchiveWorkspace(ctx context.Context, id uuid.UUID) e
 func (s *WorkspaceService) DeleteWorkspace(ctx context.Context, id uuid.UUID) error {
 	return s.store.DeleteWorkspace(ctx, id)
 }
+
+// UpdateWorkspaceAvatar sets the workspace avatar URL.
+func (s *WorkspaceService) UpdateWorkspaceAvatar(ctx context.Context, id uuid.UUID, avatarURL string) error {
+	return s.store.UpdateWorkspaceAvatar(ctx, db.UpdateWorkspaceAvatarParams{
+		ID:        id,
+		AvatarUrl: avatarURL,
+	})
+}

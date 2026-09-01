@@ -126,6 +126,8 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 				UPDATE workspaces SET issue_prefix = UPPER(LEFT(REGEXP_REPLACE(name, '[^a-zA-Z]', '', 'g'), 3)) WHERE issue_prefix = '';
 				UPDATE workspaces SET issue_prefix = 'WS' WHERE issue_prefix = '';
 			END $$`},
+		{name: "016_workspace_avatar", sql: `ALTER TABLE workspaces
+			ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT ''`},
 	}
 
 	for _, m := range migrations {

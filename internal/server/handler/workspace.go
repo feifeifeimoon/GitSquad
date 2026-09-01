@@ -184,3 +184,44 @@ func (h *WorkspaceHandler) Delete(c *gin.Context) {
 
 	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]bool{"deleted": true}, 0))
 }
+
+// UpdateAvatar handles PUT /api/v1/workspaces/:id/avatar.
+func (h *WorkspaceHandler) UpdateAvatar(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("login required"))
+		return
+	}
+
+	id, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid workspace id"))
+		return
+	}
+
+	workspace, err := h.workspaces.GetWorkspace(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
+		return
+	}
+	if workspace.UserID != user.ID {
+		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
+		return
+	}
+
+	var req struct {
+		AvatarURL string `json:"avatar_url"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid request body"))
+		return
+	}
+
+	if err := h.workspaces.UpdateWorkspaceAvatar(c.Request.Context(), id, req.AvatarURL); err != nil {
+		slog.Error("update workspace avatar", "error", err)
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to update avatar"))
+		return
+	}
+
+	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]string{"avatar_url": req.AvatarURL}, 0))
+}

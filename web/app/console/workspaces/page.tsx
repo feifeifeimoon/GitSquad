@@ -7,6 +7,7 @@ import { FolderGit2, GitCommitHorizontal, Lock, Plus } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { WorkspaceAvatar } from "@/components/workspace-avatar";
 
 function timeAgo(iso: string): string {
   const diff = Date.now() - new Date(iso).getTime();
@@ -83,9 +84,11 @@ export default function WorkspacesPage() {
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-sm bg-primary text-sm font-semibold text-white">
-                    {w.name.slice(0, 2).toUpperCase()}
-                  </div>
+                  <WorkspaceAvatar
+                    name={w.name}
+                    avatarUrl={w.avatar_url}
+                    className="size-8"
+                  />
                   <p className="truncate text-sm font-medium text-ink">{w.name}</p>
                 </div>
                 <StatusBadge status={w.status} />
