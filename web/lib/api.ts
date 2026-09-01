@@ -150,4 +150,7 @@ export interface Workspace {
   repo_name: string;
   repo_private: boolean;
   created_at: string;
+  last_commit_message: string;
+  last_commit_author: string;
+  last_commit_at: string;
 }

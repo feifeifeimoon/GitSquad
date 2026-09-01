@@ -34,7 +34,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	daemonHandler := NewDaemonHandler(cfg, daemonSvc)
 
 	githubSvc := service.NewGitHubAppService(s, cfg, memory.NewPendingInstallationStore())
-	workspaceSvc := service.NewWorkspaceService(s)
+	workspaceSvc := service.NewWorkspaceService(s, githubSvc)
 	githubHandler := NewGitHubHandler(cfg, githubSvc)
 	workspaceHandler := NewWorkspaceHandler(workspaceSvc)
 	issueSvc := service.NewIssueService(s)

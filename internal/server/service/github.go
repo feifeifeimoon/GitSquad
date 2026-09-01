@@ -126,6 +126,36 @@ func (s *GitHubAppService) ListRepos(ctx context.Context, installationID uuid.UU
 	return repos, nil
 }
 
+// GetLatestCommit returns the latest commit on a repo (message, author name,
+// committed-at RFC3339) using the installation's token. Empty strings with a
+// nil error mean the repo has no commits.
+func (s *GitHubAppService) GetLatestCommit(ctx context.Context, installationDBID uuid.UUID, owner, repo string) (message, author, committedAt string, err error) {
+	inst, err := s.store.GetInstallationByDBID(ctx, installationDBID)
+	if err != nil {
+		return "", "", "", fmt.Errorf("get installation: %w", err)
+	}
+	client, err := s.newInstallationClient(ctx, inst.InstallationID)
+	if err != nil {
+		return "", "", "", fmt.Errorf("installation client: %w", err)
+	}
+	commits, _, err := client.Repositories.ListCommits(ctx, owner, repo, &github.CommitsListOptions{
+		ListOptions: github.ListOptions{PerPage: 1},
+	})
+	if err != nil {
+		return "", "", "", fmt.Errorf("list commits: %w", err)
+	}
+	if len(commits) == 0 {
+		return "", "", "", nil
+	}
+	c := commits[0]
+	message = c.GetCommit().GetMessage()
+	if a := c.GetCommit().GetAuthor(); a != nil {
+		author = a.GetName()
+		committedAt = a.GetDate().Format(time.RFC3339)
+	}
+	return message, author, committedAt, nil
+}
+
 // ── Token generation (fetch-on-use, no caching) ───────────────────────────
 
 // GetInstallationToken returns a short-lived GitHub App installation token.

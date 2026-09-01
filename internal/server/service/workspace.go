@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
+	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
@@ -17,11 +19,12 @@ var (
 )
 
 type WorkspaceService struct {
-	store *store.Store
+	store  *store.Store
+	github *GitHubAppService
 }
 
-func NewWorkspaceService(s *store.Store) *WorkspaceService {
-	return &WorkspaceService{store: s}
+func NewWorkspaceService(s *store.Store, githubSvc *GitHubAppService) *WorkspaceService {
+	return &WorkspaceService{store: s, github: githubSvc}
 }
 
 // CreateWorkspace creates a new Workspace bound to a specific repo.
@@ -68,10 +71,13 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID
 // WorkspaceWithRepo combines workspace and repo information for the list view.
 type WorkspaceWithRepo struct {
 	db.Workspace
-	RepoFullName string `json:"repo_full_name"`
-	RepoOwner    string `json:"repo_owner"`
-	RepoName     string `json:"repo_name"`
-	RepoPrivate  bool   `json:"repo_private"`
+	RepoFullName      string `json:"repo_full_name"`
+	RepoOwner         string `json:"repo_owner"`
+	RepoName          string `json:"repo_name"`
+	RepoPrivate       bool   `json:"repo_private"`
+	LastCommitMessage string `json:"last_commit_message"`
+	LastCommitAuthor  string `json:"last_commit_author"`
+	LastCommitAt      string `json:"last_commit_at"`
 }
 
 func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID) ([]WorkspaceWithRepo, error) {
@@ -98,6 +104,33 @@ func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID)
 			RepoPrivate:  row.RepoPrivate,
 		}
 	}
+
+	// Best-effort: fetch the latest commit per workspace in parallel so the
+	// card can show repo activity. Failures degrade to empty commit fields.
+	if s.github != nil {
+		type commitInfo struct{ msg, author, at string }
+		results := make([]commitInfo, len(list))
+		var wg sync.WaitGroup
+		for i := range list {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				fetchCtx, cancel := context.WithTimeout(ctx, 3*time.Second)
+				defer cancel()
+				msg, author, at, err := s.github.GetLatestCommit(fetchCtx, list[i].InstallationID, list[i].RepoOwner, list[i].RepoName)
+				if err == nil {
+					results[i] = commitInfo{msg: msg, author: author, at: at}
+				}
+			}(i)
+		}
+		wg.Wait()
+		for i := range list {
+			list[i].LastCommitMessage = results[i].msg
+			list[i].LastCommitAuthor = results[i].author
+			list[i].LastCommitAt = results[i].at
+		}
+	}
+
 	return list, nil
 }
 

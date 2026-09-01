@@ -80,20 +80,27 @@ export default function WorkspacesPage() {
               onClick={() => router.push(`/console/workspaces/${w.id}`)}
               className="group flex flex-col rounded-lg border border-hairline bg-canvas p-4 text-left shadow-level-2 transition-all hover:border-hairline-strong hover:shadow-level-3"
             >
-              <div className="mb-3 flex items-center justify-between">
+              <div className="mb-2 flex items-center justify-between">
                 <div className="flex size-8 items-center justify-center rounded-sm bg-primary text-sm font-semibold text-white">
                   {w.name.slice(0, 2).toUpperCase()}
                 </div>
                 <StatusBadge status={w.status} />
               </div>
               <p className="truncate text-sm font-medium text-ink">{w.name}</p>
-              <p className="mt-0.5 flex items-center gap-1.5 truncate font-mono text-xs text-body">
-                {w.repo_full_name || `${w.repo_owner}/${w.repo_name}`}
-                {w.repo_private && <Lock className="size-3 shrink-0 text-mute" />}
+              <p className="mt-1 line-clamp-2 text-xs text-body">
+                {w.last_commit_message || "No commits yet"}
               </p>
-              <p className="mt-3 font-mono text-xs tabular-nums text-mute">
-                {timeAgo(w.created_at)}
-              </p>
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-1">
+                  <span className="truncate font-mono text-xs text-mute">
+                    {w.repo_full_name || `${w.repo_owner}/${w.repo_name}`}
+                  </span>
+                  {w.repo_private && <Lock className="size-3 shrink-0 text-mute" />}
+                </span>
+                <span className="shrink-0 font-mono text-xs tabular-nums text-mute">
+                  {timeAgo(w.last_commit_at || w.created_at)}
+                </span>
+              </div>
             </button>
           ))}
         </div>
