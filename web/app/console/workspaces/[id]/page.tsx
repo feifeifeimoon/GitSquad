@@ -171,7 +171,7 @@ export default function WorkspaceBoardPage({
                 <SelectTrigger className="h-8 w-auto">
                   <StatusIconLabel status={status} />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent position="popper" sideOffset={4}>
                   {ISSUE_STATUSES.map((s) => (
                     <SelectItem key={s} value={s}>
                       <StatusIconLabel status={s} />
