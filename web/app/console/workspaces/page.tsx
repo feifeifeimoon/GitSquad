@@ -49,12 +49,7 @@ export default function WorkspacesPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-8 pt-8">
-        <div className="flex items-center gap-2">
-          <h1 className="text-sm font-medium text-ink">Workspaces</h1>
-          <span className="font-mono text-xs tabular-nums text-mute">
-            {workspaces.length}
-          </span>
-        </div>
+        <h1 className="text-sm font-medium text-ink">Workspaces</h1>
         <Button onClick={() => router.push("/console/workspaces/new")}>
           <Plus className="size-4" />
           New Workspace

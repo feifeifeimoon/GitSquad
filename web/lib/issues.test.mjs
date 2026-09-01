@@ -39,7 +39,7 @@ test("issue board supports create, drag, and status coloring", () => {
   assert.match(board, /onDragStart/);
   assert.match(board, /onDrop/);
   assert.match(board, /issueApi\.update/);
-  assert.match(board, /STATUS_BG/);
+  assert.match(board, /COLUMN_BG/);
 });
 
 test("issue detail renders comments and a status selector", () => {

@@ -30,6 +30,8 @@
   --color-error-soft: var(--error-soft);
   --color-violet-soft: var(--violet-soft);
   --color-cyan-soft: var(--cyan-soft);
+  --color-violet: var(--violet);
+  --color-cyan-deep: var(--cyan-deep);
 
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
@@ -111,6 +113,8 @@
   --error-soft: #f7d4d6;
   --violet-soft: #d8ccf1;
   --cyan-soft: #aaffec;
+  --violet: #7928ca;
+  --cyan-deep: #29bc9b;
 
   --chart-1: #007cf0;
   --chart-2: #7928ca;
