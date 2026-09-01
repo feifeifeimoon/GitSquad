@@ -26,6 +26,8 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
     if (returnURL) {
       localStorage.setItem("gitsquad_return_url", returnURL);
     }
+    // Full-page navigation to the backend OAuth endpoint (external to Next.js).
+    // eslint-disable-next-line @next/next/no-location-assign-relative-destination
     window.location.href = `${API_URL}/api/v1/auth/google`;
   }, [returnURL]);
 

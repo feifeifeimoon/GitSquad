@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Settings, User, Key } from "lucide-react";
+import { User, Key } from "lucide-react";
 import { api } from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -19,10 +19,9 @@ export default function SettingsPage() {
   }, []);
 
   return (
-    <div className="p-6">
-      <div className="mb-6 flex items-center gap-2">
-        <Settings className="size-5 text-ink" />
-        <h1 className="text-xl font-semibold tracking-[-0.02em] text-ink">Settings</h1>
+    <div className="px-8 pt-8 pb-8">
+      <div className="mb-6">
+        <h1 className="text-sm font-medium text-ink">Settings</h1>
       </div>
 
       {/* Profile */}

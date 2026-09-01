@@ -29,6 +29,8 @@ async function fetchAPI<T = unknown>(
   if (res.status === 401) {
     if (typeof window !== "undefined") {
       localStorage.removeItem("gitsquad_token");
+      // Hard redirect on auth expiry — clears app state and reloads.
+      // eslint-disable-next-line @next/next/no-location-assign-relative-destination
       window.location.href = "/login";
     }
     throw new ApiError("Unauthorized", 401);

@@ -47,7 +47,7 @@ export function Markdown({ children }: { children: string }) {
           return (
             <code
               className={cn(
-                "font-mono text-[0.9em]",
+                "font-mono text-xs",
                 !isBlock && "rounded bg-muted px-1 py-0.5",
                 className,
               )}

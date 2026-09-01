@@ -80,14 +80,11 @@ export default function DaemonsPage() {
   }
 
   return (
-    <div className="p-6">
+    <div className="px-8 pt-8 pb-8">
       <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Monitor className="size-5 text-ink" />
-          <h1 className="text-xl font-semibold tracking-[-0.02em] text-ink">Daemons</h1>
-        </div>
-        <Button size="sm" onClick={() => setShowConnect(true)}>
-          <Plus className="size-3.5" />
+        <h1 className="text-sm font-medium text-ink">Daemons</h1>
+        <Button onClick={() => setShowConnect(true)}>
+          <Plus className="size-4" />
           Connect Daemon
         </Button>
       </div>
@@ -99,14 +96,14 @@ export default function DaemonsPage() {
             <Monitor className="size-4" />
             Total
           </div>
-          <p className="text-2xl font-bold text-ink">{daemons.length}</p>
+          <p className="text-2xl font-semibold text-ink">{daemons.length}</p>
         </div>
         <div className="rounded-md border border-hairline bg-canvas p-4 shadow-level-2">
           <div className="mb-1 flex items-center gap-2 text-sm text-body">
-            <CheckCircle2 className="size-4 text-[#0070f3]" />
+            <CheckCircle2 className="size-4 text-success" />
             Online
           </div>
-          <p className="text-2xl font-bold text-ink">
+          <p className="text-2xl font-semibold text-ink">
             {daemons.filter((d) => d.status === "online").length}
           </p>
         </div>
@@ -115,17 +112,18 @@ export default function DaemonsPage() {
             <Cpu className="size-4" />
             Runtimes
           </div>
-          <p className="text-2xl font-bold text-ink">
+          <p className="text-2xl font-semibold text-ink">
             {daemons.reduce((s, d) => s + (Array.isArray(d.runtimes) ? d.runtimes.length : 0), 0)}
           </p>
         </div>
       </div>
 
       {daemons.length === 0 ? (
-        <div className="rounded-md border border-dashed border-hairline-strong p-8 text-center">
-          <p className="mb-2 text-sm text-body">No daemons registered yet.</p>
-          <p className="text-xs text-mute">
-            Run <code className="rounded-sm bg-muted px-1 font-mono">gitsquad daemon login</code> on your machine
+        <div className="flex flex-col items-center justify-center rounded-lg bg-canvas-soft py-16 text-center">
+          <Monitor className="mb-3 size-6 text-mute" />
+          <p className="text-sm font-medium text-ink">No daemons registered yet</p>
+          <p className="mt-1 text-sm text-body">
+            Run <code className="rounded-sm bg-muted px-1 font-mono text-xs">gitsquad daemon login</code> on your machine
             to register a daemon.
           </p>
         </div>
@@ -137,7 +135,7 @@ export default function DaemonsPage() {
               <div className="flex items-center gap-3 px-5 py-4">
                 <span
                   className={`size-2.5 rounded-full ${
-                    d.status === "online" ? "bg-[#0070f3]" : "bg-hairline-strong"
+                    d.status === "online" ? "bg-success" : "bg-hairline-strong"
                   }`}
                 />
                 <div className="flex-1">
@@ -149,7 +147,7 @@ export default function DaemonsPage() {
                 <span
                   className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     d.status === "online"
-                      ? "bg-[#0070f3]/10 text-[#0070f3]"
+                      ? "bg-success/10 text-success"
                       : "bg-muted text-mute"
                   }`}
                 >
@@ -159,7 +157,7 @@ export default function DaemonsPage() {
 
               {/* Capabilities */}
               <div className="border-t border-hairline px-5 py-3">
-                <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-wider text-mute">
+                <p className="mb-2 font-mono text-xs font-semibold uppercase text-mute">
                   Runtimes
                 </p>
                 <div className="flex flex-wrap gap-1.5">
@@ -170,12 +168,12 @@ export default function DaemonsPage() {
                       .map((c) => (
                         <span
                           key={c.kind}
-                          className="inline-flex items-center gap-1 rounded-sm bg-[#0070f3]/10 px-2 py-1 text-xs font-medium text-[#0070f3]"
+                          className="inline-flex items-center gap-1 rounded-sm bg-success/10 px-2 py-1 text-xs font-medium text-success"
                         >
                           <CheckCircle2 className="size-3" />
                           {c.kind}
                           {c.version && (
-                            <span className="text-[10px] opacity-60">{c.version}</span>
+                            <span className="text-xs opacity-60">{c.version}</span>
                           )}
                         </span>
                       ))
@@ -184,12 +182,12 @@ export default function DaemonsPage() {
               </div>
 
               {/* Footer */}
-              <div className="flex items-center justify-between border-t border-hairline px-5 py-2 text-[11px] text-mute">
+              <div className="flex items-center justify-between border-t border-hairline px-5 py-2 text-xs text-mute">
                 <span>
                   Last seen: {timeAgo(d.last_seen_at)}
                 </span>
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-[10px]">{d.id.slice(0, 8)}</span>
+                  <span className="font-mono text-xs">{d.id.slice(0, 8)}</span>
                   {deleting === d.id ? (
                     <span className="flex items-center gap-1.5">
                       <span className="text-destructive">Remove?</span>
@@ -257,7 +255,7 @@ export default function DaemonsPage() {
                       onClick={() => handleCopy("curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash", "install")}
                       className="text-mute hover:text-ink"
                     >
-                      {copied === "install" ? <Check className="size-3 text-[#0070f3]" /> : <Copy className="size-3" />}
+                      {copied === "install" ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
                     </button>
                   </div>
                   <p className="text-mute">curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash</p>
@@ -270,7 +268,7 @@ export default function DaemonsPage() {
                       onClick={() => handleCopy("gitsquad daemon login", "login")}
                       className="text-mute hover:text-ink"
                     >
-                      {copied === "login" ? <Check className="size-3 text-[#0070f3]" /> : <Copy className="size-3" />}
+                      {copied === "login" ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
                     </button>
                   </div>
                   <p className="text-mute">gitsquad daemon login</p>
@@ -283,7 +281,7 @@ export default function DaemonsPage() {
                       onClick={() => handleCopy("gitsquad daemon run", "run")}
                       className="text-mute hover:text-ink"
                     >
-                      {copied === "run" ? <Check className="size-3 text-[#0070f3]" /> : <Copy className="size-3" />}
+                      {copied === "run" ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
                     </button>
                   </div>
                   <p className="text-mute">gitsquad daemon run</p>

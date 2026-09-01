@@ -84,6 +84,14 @@ export default function WorkspaceBoardPage({
     }
   };
 
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      setTitle("");
+      setDescription("");
+    }
+  };
+
   const move = async (issueId: string, status: IssueStatus) => {
     setIssues((prev) =>
       prev.map((i) => (i.id === issueId ? { ...i, status } : i))
@@ -109,7 +117,7 @@ export default function WorkspaceBoardPage({
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-end px-8 pb-4 pt-6">
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
           <DialogTrigger asChild>
             <Button>
               <Plus className="size-4" />

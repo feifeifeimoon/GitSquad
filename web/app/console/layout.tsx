@@ -47,10 +47,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const dragging = useRef(false);
 
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [ws, setWs] = useState<{ id: string; data: Workspace } | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const wsMatch = pathname?.match(/^\/console\/workspaces\/([^/]+)/);
   const wsId = wsMatch ? decodeURIComponent(wsMatch[1]) : null;
+  // Derived so a stale workspace is never shown when the route id changes.
+  const workspace = ws && ws.id === wsId ? ws.data : null;
 
   useEffect(() => {
     api
@@ -72,10 +74,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     api
       .get<Workspace>(`/api/v1/workspaces/${wsId}`)
       .then((w) => {
-        if (!cancelled) setWorkspace(w);
+        if (!cancelled) setWs({ id: wsId, data: w });
       })
       .catch(() => {
-        if (!cancelled) setWorkspace(null);
+        if (!cancelled) setWs(null);
       });
     return () => {
       cancelled = true;
