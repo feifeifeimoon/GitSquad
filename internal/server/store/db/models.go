@@ -145,4 +145,5 @@ type Workspace struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 	IssuePrefix    string    `json:"issue_prefix"`
 	IssueCounter   int32     `json:"issue_counter"`
+	AvatarUrl      string    `json:"avatar_url"`
 }
