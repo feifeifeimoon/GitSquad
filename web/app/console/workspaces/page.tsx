@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { FolderGit2, Lock, Plus } from "lucide-react";
+import Image from "next/image";
+import { FolderGit2, GitCommitHorizontal, Lock, Plus } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -89,11 +90,21 @@ export default function WorkspacesPage() {
                 </div>
                 <StatusBadge status={w.status} />
               </div>
-              <p className="mt-1 line-clamp-2 text-xs text-body">
-                {w.last_commit_message || "No commits yet"}
+              <p className="mt-1 flex items-start gap-1.5 text-xs text-body">
+                <GitCommitHorizontal className="mt-0.5 size-3.5 shrink-0 text-mute" />
+                <span className="line-clamp-2 min-w-0 flex-1">
+                  {w.last_commit_message || "No commits yet"}
+                </span>
               </p>
               <div className="mt-3 flex items-center justify-between gap-2">
-                <span className="flex min-w-0 items-center gap-1">
+                <span className="flex min-w-0 items-center gap-1.5">
+                  <Image
+                    src="/logo-github-light.svg"
+                    alt="GitHub"
+                    width={14}
+                    height={14}
+                    className="size-3.5 shrink-0"
+                  />
                   <span className="truncate font-mono text-xs text-mute">
                     {w.repo_full_name || `${w.repo_owner}/${w.repo_name}`}
                   </span>
