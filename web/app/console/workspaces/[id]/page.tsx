@@ -13,6 +13,8 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Markdown } from "@/components/markdown";
+import { cn } from "@/lib/utils";
 
 const STATUS_BG: Record<IssueStatus, string> = {
   backlog: "bg-muted",
@@ -35,6 +37,7 @@ export default function WorkspaceBoardPage({
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [preview, setPreview] = useState(false);
   const [creating, setCreating] = useState(false);
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -107,11 +110,46 @@ export default function WorkspaceBoardPage({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
               />
-              <Textarea
-                placeholder="Description (optional)"
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
+              <div>
+                <div className="mb-1 flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setPreview(false)}
+                    className={cn(
+                      "rounded-sm px-2 py-1 text-xs transition-colors",
+                      !preview ? "bg-muted font-medium text-ink" : "text-body hover:text-ink",
+                    )}
+                  >
+                    Write
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPreview(true)}
+                    className={cn(
+                      "rounded-sm px-2 py-1 text-xs transition-colors",
+                      preview ? "bg-muted font-medium text-ink" : "text-body hover:text-ink",
+                    )}
+                  >
+                    Preview
+                  </button>
+                </div>
+                {preview ? (
+                  <div className="min-h-[120px] rounded-md border border-hairline p-3">
+                    {description.trim() ? (
+                      <Markdown>{description}</Markdown>
+                    ) : (
+                      <span className="text-sm text-mute">Nothing to preview</span>
+                    )}
+                  </div>
+                ) : (
+                  <Textarea
+                    placeholder="Description — markdown supported"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="min-h-[120px]"
+                  />
+                )}
+              </div>
               <Button disabled={!title.trim() || creating} onClick={create} className="w-full">
                 Create
               </Button>

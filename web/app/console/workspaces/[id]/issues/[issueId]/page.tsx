@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { Markdown } from "@/components/markdown";
 
 export default function IssueDetailPage({
   params,
@@ -90,7 +91,9 @@ export default function IssueDetailPage({
 
       <h1 className="mb-2 text-2xl font-semibold">{issue.title}</h1>
       {issue.description && (
-        <p className="mb-6 whitespace-pre-wrap text-body">{issue.description}</p>
+        <div className="mb-6">
+          <Markdown>{issue.description}</Markdown>
+        </div>
       )}
 
       <div className="space-y-3">
@@ -110,7 +113,9 @@ export default function IssueDetailPage({
                 <Badge variant="secondary">{c.type}</Badge>
               )}
             </div>
-            <p className="whitespace-pre-wrap text-sm">{c.content}</p>
+            <div className="text-sm">
+              <Markdown>{c.content}</Markdown>
+            </div>
           </div>
         ))}
       </div>

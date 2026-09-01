@@ -3,9 +3,25 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import { Monitor, Settings, LogOut, FolderGit2 } from "lucide-react";
+import {
+  Monitor,
+  Settings,
+  LogOut,
+  FolderGit2,
+  ChevronsUpDown,
+  Plus,
+  Check,
+} from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 interface User {
   id: string;
@@ -32,6 +48,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const dragging = useRef(false);
 
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const wsMatch = pathname?.match(/^\/console\/workspaces\/([^/]+)/);
   const wsId = wsMatch ? decodeURIComponent(wsMatch[1]) : null;
 
@@ -41,6 +58,13 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       .then(setUser)
       .catch(() => router.push("/login"));
   }, [router]);
+
+  useEffect(() => {
+    api
+      .get<Workspace[]>("/api/v1/workspaces")
+      .then((d) => setWorkspaces(d || []))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!wsId) return;
@@ -96,23 +120,48 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         style={{ width: sidebarWidth }}
       >
         {/* Logo / workspace switcher */}
-        <div className="flex h-16 items-center gap-2 border-b border-hairline px-5">
-          {wsId && workspace ? (
-            <>
-              <div className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-primary text-xs font-semibold text-white">
-                {workspace.name.slice(0, 2).toUpperCase()}
-              </div>
-              <span className="truncate text-sm font-semibold tracking-tight">
-                {workspace.name}
-              </span>
-            </>
-          ) : (
-            <>
-              <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
-              <span className="text-sm font-semibold tracking-tight">GitSquad</span>
-            </>
-          )}
-        </div>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex h-16 w-full items-center gap-2 border-b border-hairline px-5 text-left outline-none transition-colors hover:bg-muted/40">
+              {wsId && workspace ? (
+                <>
+                  <div className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-primary text-xs font-semibold text-white">
+                    {workspace.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight">
+                    {workspace.name}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
+                  <span className="min-w-0 flex-1 text-sm font-semibold tracking-tight">GitSquad</span>
+                </>
+              )}
+              <ChevronsUpDown className="size-3.5 shrink-0 text-mute" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+            {workspaces.map((w) => (
+              <DropdownMenuItem
+                key={w.id}
+                onClick={() => router.push(`/console/workspaces/${w.id}`)}
+              >
+                <div className="flex size-5 shrink-0 items-center justify-center rounded-sm bg-primary text-xs font-semibold text-white">
+                  {w.name.slice(0, 2).toUpperCase()}
+                </div>
+                <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                {wsId === w.id && <Check className="size-4 shrink-0 text-ink" />}
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/console/workspaces/new")}>
+              <Plus className="size-4" />
+              Create workspace
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         {/* Nav */}
         <nav className="flex-1 space-y-1 px-3 py-4">
