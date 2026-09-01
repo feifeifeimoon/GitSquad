@@ -23,3 +23,6 @@ dist/
 
 # generated Windows resource
 .vercel
+
+# local agent tooling
+.zcode/
