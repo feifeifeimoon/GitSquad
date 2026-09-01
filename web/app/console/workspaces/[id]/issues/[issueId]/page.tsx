@@ -1,30 +1,28 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { ChevronLeft, Send } from "lucide-react";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
-  IssueDetail, IssueStatus, ISSUE_STATUSES, ISSUE_STATUS_LABELS, issueApi,
+  IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
 import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+  Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
 import { Markdown } from "@/components/markdown";
+import { MarkdownEditor } from "@/components/markdown-editor";
+import { StatusIconLabel } from "@/components/status-icon";
 
-export default function IssueDetailPage({
-  params,
-}: {
-  params: Promise<{ id: string; issueId: string }>;
-}) {
-  const { id, issueId } = use(params);
+export default function IssueDetailPage() {
+  const { id, issueId } = useParams<{ id: string; issueId: string }>();
   const router = useRouter();
   const [issue, setIssue] = useState<IssueDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState("");
   const [posting, setPosting] = useState(false);
+  const [editorKey, setEditorKey] = useState(0);
 
   const load = () => {
     issueApi
@@ -37,9 +35,8 @@ export default function IssueDetailPage({
 
   const changeStatus = async (status: IssueStatus) => {
     if (!issue || status === issue.status) return;
-    const updated = await issueApi.update(id, issueId, { status });
-    setIssue((prev) => (prev ? { ...prev, ...updated } : prev));
-    load(); // pick up the new status_change comment
+    await issueApi.update(id, issueId, { status });
+    load();
   };
 
   const post = async () => {
@@ -48,6 +45,7 @@ export default function IssueDetailPage({
     try {
       await issueApi.addComment(id, issueId, content);
       setContent("");
+      setEditorKey((k) => k + 1);
       load();
     } finally {
       setPosting(false);
@@ -64,76 +62,131 @@ export default function IssueDetailPage({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-8 pb-4 pt-6">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4">
         <button
           onClick={() => router.push(`/console/workspaces/${id}`)}
-          className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
+          className="flex shrink-0 items-center gap-1 text-sm text-body transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />
           Issues
         </button>
+        <ChevronRight className="size-3.5 shrink-0 text-mute" />
+        <span className="shrink-0 font-mono text-sm text-body">{issue.issue_key}</span>
+        <ChevronRight className="size-3.5 shrink-0 text-mute" />
+        <span className="truncate text-sm font-medium text-ink">{issue.title}</span>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl flex-1 px-8 pb-8">
-        <div className="mb-4 flex items-center gap-3">
-        <span className="text-sm text-body">{issue.issue_key}</span>
-        <Select value={issue.status} onValueChange={(v) => changeStatus(v as IssueStatus)}>
-          <SelectTrigger className="w-40">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {ISSUE_STATUSES.map((s) => (
-              <SelectItem key={s} value={s}>{ISSUE_STATUS_LABELS[s]}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {issue.assigned_agents.map((a) => (
-          <Badge key={a} variant="outline">{a}</Badge>
-        ))}
-      </div>
-
-      <h1 className="mb-2 text-2xl font-semibold">{issue.title}</h1>
-      {issue.description && (
-        <div className="mb-6">
-          <Markdown>{issue.description}</Markdown>
-        </div>
-      )}
-
-      <div className="space-y-3">
-        {issue.comments.map((c) => (
-          <div
-            key={c.id}
-            className={`rounded-lg border p-3 ${
-              c.type !== "comment" ? "bg-muted/30 text-body" : "bg-card"
-            }`}
-          >
-            <div className="mb-1 flex items-center gap-2 text-xs text-body">
-              <span className="font-medium">
-                {c.type === "system" ? "System" : c.author_name}
-              </span>
-              <span>{new Date(c.created_at).toLocaleString()}</span>
-              {c.type !== "comment" && (
-                <Badge variant="secondary">{c.type}</Badge>
-              )}
+      {/* Two-column body */}
+      <div className="flex min-h-0 flex-1">
+        {/* Main column */}
+        <div className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
+          {issue.description ? (
+            <div className="mb-8">
+              <Markdown>{issue.description}</Markdown>
             </div>
-            <div className="text-sm">
-              <Markdown>{c.content}</Markdown>
+          ) : (
+            <p className="mb-8 text-sm text-mute">No description.</p>
+          )}
+
+          {/* Activity */}
+          <h2 className="mb-3 text-sm font-medium text-ink">Activity</h2>
+          <div className="space-y-4">
+            {issue.comments.map((c) => (
+              <div key={c.id} className="flex gap-3">
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-body">
+                  {c.type === "comment"
+                    ? (c.author_name[0] ?? "?").toUpperCase()
+                    : "·"}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 text-xs">
+                    <span className="font-medium text-ink">
+                      {c.type === "system" ? "System" : c.author_name}
+                    </span>
+                    <span className="text-mute">
+                      {new Date(c.created_at).toLocaleString()}
+                    </span>
+                    {c.type !== "comment" && (
+                      <Badge variant="secondary">{c.type}</Badge>
+                    )}
+                  </div>
+                  <div className="mt-1 text-sm text-body">
+                    <Markdown>{c.content}</Markdown>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {issue.comments.length === 0 && (
+              <p className="text-sm text-mute">No activity yet.</p>
+            )}
+          </div>
+
+          {/* Comment composer */}
+          <div className="mt-8 overflow-hidden rounded-lg border border-hairline bg-canvas">
+            <MarkdownEditor
+              key={editorKey}
+              onChange={setContent}
+              placeholder="Add a comment… (@mention an agent)"
+              className="min-h-[100px] px-3 py-2"
+            />
+            <div className="flex items-center justify-end border-t border-hairline px-3 py-2">
+              <Button disabled={!content.trim() || posting} onClick={post}>
+                {posting ? "Posting…" : "Comment"}
+              </Button>
             </div>
           </div>
-        ))}
-      </div>
+        </div>
 
-      <div className="mt-6 flex gap-2">
-        <Textarea
-          placeholder="Add a comment… (@mention an agent)"
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-        />
-        <Button disabled={!content.trim() || posting} onClick={post} className="shrink-0">
-          <Send className="size-4" />
-          Post
-        </Button>
-      </div>
+        {/* Right sidebar */}
+        <div className="w-64 shrink-0 overflow-y-auto border-l border-hairline px-5 py-6">
+          <h2 className="mb-4 text-xs font-medium uppercase text-mute">Details</h2>
+          <div className="space-y-5">
+            <div>
+              <label className="mb-1.5 block text-xs text-mute">Status</label>
+              <Select
+                value={issue.status}
+                onValueChange={(v) => changeStatus(v as IssueStatus)}
+              >
+                <SelectTrigger className="h-8 w-full">
+                  <StatusIconLabel status={issue.status} />
+                </SelectTrigger>
+                <SelectContent position="popper" sideOffset={4}>
+                  {ISSUE_STATUSES.map((s) => (
+                    <SelectItem key={s} value={s}>
+                      <StatusIconLabel status={s} />
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs text-mute">Assignee</label>
+              {issue.assigned_agents.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {issue.assigned_agents.map((a) => (
+                    <Badge key={a} variant="outline">{a}</Badge>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-body">Unassigned</p>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs text-mute">Creator</label>
+              <p className="text-sm text-body">{issue.creator_name || "—"}</p>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs text-mute">Created</label>
+              <p className="font-mono text-sm text-body">
+                {new Date(issue.created_at).toLocaleString()}
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

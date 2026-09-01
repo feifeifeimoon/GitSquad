@@ -2,19 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  MessageSquare,
-  Plus,
-  ChevronRight,
-  Circle,
-  CircleDashed,
-  CircleDot,
-  Eye,
-  CheckCircle2,
-  Ban,
-  CircleX,
-  type LucideIcon,
-} from "lucide-react";
+import { MessageSquare, Plus, ChevronRight } from "lucide-react";
 import {
   Issue, IssueStatus, ISSUE_STATUSES, ISSUE_STATUS_LABELS, issueApi, api, Workspace,
 } from "@/lib/api";
@@ -27,6 +15,7 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/markdown-editor";
+import { STATUS_ICON, StatusIconLabel } from "@/components/status-icon";
 
 const COLUMN_BG: Record<IssueStatus, string> = {
   backlog: "bg-muted/40",
@@ -37,26 +26,6 @@ const COLUMN_BG: Record<IssueStatus, string> = {
   blocked: "bg-error-soft",
   cancelled: "bg-muted/40",
 };
-
-const STATUS_ICON: Record<IssueStatus, { icon: LucideIcon; className: string }> = {
-  backlog: { icon: CircleDashed, className: "text-mute" },
-  todo: { icon: Circle, className: "text-mute" },
-  in_progress: { icon: CircleDot, className: "text-warning" },
-  in_review: { icon: Eye, className: "text-violet" },
-  done: { icon: CheckCircle2, className: "text-cyan-deep" },
-  blocked: { icon: Ban, className: "text-destructive" },
-  cancelled: { icon: CircleX, className: "text-mute" },
-};
-
-function StatusIconLabel({ status }: { status: IssueStatus }) {
-  const { icon: Icon, className } = STATUS_ICON[status];
-  return (
-    <span className="flex items-center gap-1.5">
-      <Icon className={`size-3.5 ${className}`} />
-      <span>{ISSUE_STATUS_LABELS[status]}</span>
-    </span>
-  );
-}
 
 export default function WorkspaceBoardPage({
   params,
