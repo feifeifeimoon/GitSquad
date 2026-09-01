@@ -157,15 +157,18 @@ export default function NewWorkspacePage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
-      <button
-        onClick={() => router.push("/console/workspaces")}
-        className="mb-6 flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
-      >
-        <ChevronLeft className="size-4" />
-        All Workspaces
-      </button>
+    <div className="flex h-full flex-col">
+      <div className="px-8 pb-4 pt-6">
+        <button
+          onClick={() => router.push("/console/workspaces")}
+          className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
+        >
+          <ChevronLeft className="size-4" />
+          All Workspaces
+        </button>
+      </div>
 
+      <div className="mx-auto w-full max-w-3xl flex-1 px-8 pb-8">
       <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
         Create a Workspace
       </h1>
@@ -361,6 +364,7 @@ export default function NewWorkspacePage() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

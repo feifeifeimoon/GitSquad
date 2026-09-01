@@ -56,15 +56,18 @@ function ConfigureContent() {
   };
 
   return (
-    <div className="mx-auto max-w-xl p-8">
-      <button
-        onClick={() => router.push("/console/workspaces/new")}
-        className="mb-6 flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
-      >
-        <ChevronLeft className="size-4" />
-        Back to repositories
-      </button>
+    <div className="flex h-full flex-col">
+      <div className="px-8 pb-4 pt-6">
+        <button
+          onClick={() => router.push("/console/workspaces/new")}
+          className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
+        >
+          <ChevronLeft className="size-4" />
+          Back to repositories
+        </button>
+      </div>
 
+      <div className="mx-auto w-full max-w-xl flex-1 px-8 pb-8">
       <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
         Configure Workspace
       </h1>
@@ -132,6 +135,7 @@ function ConfigureContent() {
           </Button>
         </div>
       </form>
+      </div>
     </div>
   );
 }

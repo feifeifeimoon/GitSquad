@@ -63,16 +63,19 @@ export default function IssueDetailPage({
   }
 
   return (
-    <div className="mx-auto max-w-3xl p-8">
-      <button
-        onClick={() => router.push(`/console/workspaces/${id}`)}
-        className="mb-6 flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
-      >
-        <ChevronLeft className="size-4" />
-        Issues
-      </button>
+    <div className="flex h-full flex-col">
+      <div className="px-8 pb-4 pt-6">
+        <button
+          onClick={() => router.push(`/console/workspaces/${id}`)}
+          className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
+        >
+          <ChevronLeft className="size-4" />
+          Issues
+        </button>
+      </div>
 
-      <div className="mb-4 flex items-center gap-3">
+      <div className="mx-auto w-full max-w-3xl flex-1 px-8 pb-8">
+        <div className="mb-4 flex items-center gap-3">
         <span className="text-sm text-body">{issue.issue_key}</span>
         <Select value={issue.status} onValueChange={(v) => changeStatus(v as IssueStatus)}>
           <SelectTrigger className="w-40">
@@ -130,6 +133,7 @@ export default function IssueDetailPage({
           <Send className="size-4" />
           Post
         </Button>
+      </div>
       </div>
     </div>
   );
