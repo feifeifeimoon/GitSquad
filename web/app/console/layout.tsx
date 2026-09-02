@@ -131,57 +131,59 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         className="relative flex shrink-0 flex-col border-r border-hairline bg-canvas"
         style={{ width: sidebarWidth }}
       >
-        {/* Workspace switcher + search */}
-        <div className="border-b border-hairline">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-2 px-5 pb-1 pt-2.5 text-left outline-none transition-colors hover:bg-muted/40">
-                {wsId && workspace ? (
-                  <>
-                    <WorkspaceAvatar
-                      name={workspace.name}
-                      avatarUrl={workspace.avatar_url}
-                      className="size-6"
-                    />
-                    <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight">
-                      {workspace.name}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
-                    <span className="min-w-0 flex-1 text-sm font-semibold tracking-tight">GitSquad</span>
-                  </>
-                )}
-                <ChevronsUpDown className="size-3.5 shrink-0 text-mute" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-56">
-              <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-              {workspaces.map((w) => (
-                <DropdownMenuItem
-                  key={w.id}
-                  onClick={() => router.push(`/console/workspaces/${w.id}`)}
-                >
+        {/* Logo / workspace switcher */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button className="flex h-16 w-full items-center gap-2 border-b border-hairline px-5 text-left outline-none transition-colors hover:bg-muted/40">
+              {wsId && workspace ? (
+                <>
                   <WorkspaceAvatar
-                    name={w.name}
-                    avatarUrl={w.avatar_url}
-                    className="size-5"
+                    name={workspace.name}
+                    avatarUrl={workspace.avatar_url}
+                    className="size-6"
                   />
-                  <span className="min-w-0 flex-1 truncate">{w.name}</span>
-                  {wsId === w.id && <Check className="size-4 shrink-0 text-ink" />}
-                </DropdownMenuItem>
-              ))}
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => router.push("/console/workspaces/new")}>
-                <Plus className="size-4" />
-                Create workspace
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight">
+                    {workspace.name}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
+                  <span className="min-w-0 flex-1 text-sm font-semibold tracking-tight">GitSquad</span>
+                </>
+              )}
+              <ChevronsUpDown className="size-3.5 shrink-0 text-mute" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" className="w-56">
+            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+            {workspaces.map((w) => (
+              <DropdownMenuItem
+                key={w.id}
+                onClick={() => router.push(`/console/workspaces/${w.id}`)}
+              >
+                <WorkspaceAvatar
+                  name={w.name}
+                  avatarUrl={w.avatar_url}
+                  className="size-5"
+                />
+                <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                {wsId === w.id && <Check className="size-4 shrink-0 text-ink" />}
               </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            ))}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => router.push("/console/workspaces/new")}>
+              <Plus className="size-4" />
+              Create workspace
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* Nav */}
+        <nav className="flex-1 space-y-1 px-3 py-4">
           <button
             onClick={() => setPaletteOpen(true)}
-            className="flex w-full items-center gap-2 px-5 pb-2.5 pt-1 text-sm font-medium text-body transition-colors hover:bg-muted/40"
+            className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-body transition-colors hover:bg-muted hover:text-ink"
           >
             <Search className="size-4" />
             <span>Search</span>
@@ -189,10 +191,6 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               {isMac ? "⌘K" : "Ctrl K"}
             </kbd>
           </button>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
           {navItems.map((item) => {
             const href =
               item.href === "/console/settings" && wsId
