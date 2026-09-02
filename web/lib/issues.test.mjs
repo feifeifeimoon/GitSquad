@@ -3,7 +3,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const board = readFileSync(
+  new URL(
+    "../app/console/workspaces/[id]/issues/page.tsx",
+    import.meta.url,
+  ),
+  "utf8",
+);
+const overview = readFileSync(
   new URL("../app/console/workspaces/[id]/page.tsx", import.meta.url),
+  "utf8",
+);
+const layout = readFileSync(
+  new URL("../app/console/workspaces/[id]/layout.tsx", import.meta.url),
   "utf8",
 );
 const card = readFileSync(
@@ -84,6 +95,14 @@ test("issue mutations surface toast feedback", () => {
   assert.match(board, /toast\.success/);
   assert.match(board, /toast\.error/);
   assert.match(detail, /toast\.error/);
+});
+
+test("workspace detail has header tabs and an overview page", () => {
+  assert.match(layout, /All workspaces/);
+  assert.match(layout, /Overview/);
+  assert.match(layout, /Issues/);
+  assert.match(overview, /Repository/);
+  assert.match(overview, /Details/);
 });
 
 test("issue board filters and sorts with counts", () => {

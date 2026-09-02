@@ -7,6 +7,12 @@ import { timeAgo } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
+import {
+  Empty,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
 
 interface Runtime {
   kind: string;
@@ -141,14 +147,19 @@ export default function DaemonsPage() {
       </div>
 
       {daemons.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-lg bg-canvas-soft py-16 text-center">
-          <Monitor className="mb-3 size-6 text-mute" />
-          <p className="text-sm font-medium text-ink">No daemons registered yet</p>
-          <p className="mt-1 text-sm text-body">
-            Run <code className="rounded-sm bg-muted px-1 font-mono text-xs">gitsquad daemon login</code> on your machine
-            to register a daemon.
-          </p>
-        </div>
+        <Empty className="rounded-lg bg-canvas-soft py-16">
+          <EmptyMedia>
+            <Monitor className="size-5" />
+          </EmptyMedia>
+          <EmptyTitle>No daemons registered yet</EmptyTitle>
+          <EmptyDescription>
+            Run{" "}
+            <code className="rounded-sm bg-muted px-1 font-mono text-xs">
+              gitsquad daemon login
+            </code>{" "}
+            on your machine to register a daemon.
+          </EmptyDescription>
+        </Empty>
       ) : (
         <div className="space-y-4">
           {daemons.map((d) => (

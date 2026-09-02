@@ -21,6 +21,12 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
+import {
+  Empty,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+} from "@/components/ui/empty";
 
 type ViewMode = "cards" | "list";
 type SortKey = "name" | "created";
@@ -145,13 +151,30 @@ export default function WorkspacesPage() {
       </div>
 
       {workspaces.length === 0 ? (
-        <EmptyState onCreate={() => router.push("/console/workspaces/new")} />
+        <Empty className="pb-16">
+          <EmptyMedia>
+            <FolderGit2 className="size-5" />
+          </EmptyMedia>
+          <EmptyTitle>No workspaces yet</EmptyTitle>
+          <EmptyDescription>
+            Link a GitHub repository and configure your agent team to get
+            started.
+          </EmptyDescription>
+          <Button
+            onClick={() => router.push("/console/workspaces/new")}
+            className="mt-1"
+          >
+            Create your first Workspace
+          </Button>
+        </Empty>
       ) : sorted.length === 0 ? (
-        <EmptyState
-          icon="search"
-          title="No workspaces match"
-          description="Try a different search term."
-        />
+        <Empty className="pb-16">
+          <EmptyMedia>
+            <Search className="size-5" />
+          </EmptyMedia>
+          <EmptyTitle>No workspaces match</EmptyTitle>
+          <EmptyDescription>Try a different search term.</EmptyDescription>
+        </Empty>
       ) : view === "cards" ? (
         <div className="grid grid-cols-1 gap-3 px-8 py-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {sorted.map((w) => (
@@ -377,30 +400,3 @@ function WorkspaceTable({
   );
 }
 
-function EmptyState({
-  onCreate,
-  icon = "folder",
-  title = "No workspaces yet",
-  description = "Link a GitHub repository and configure your agent team to get started.",
-}: {
-  onCreate?: () => void;
-  icon?: "folder" | "search";
-  title?: string;
-  description?: string;
-}) {
-  const Icon = icon === "search" ? Search : FolderGit2;
-  return (
-    <div className="flex flex-1 flex-col items-center justify-center pb-16">
-      <div className="mb-3 flex size-12 items-center justify-center rounded-lg bg-canvas-soft">
-        <Icon className="size-6 text-mute" />
-      </div>
-      <p className="text-sm font-medium text-ink">{title}</p>
-      <p className="mt-1 max-w-xs text-center text-sm text-body">{description}</p>
-      {onCreate && (
-        <Button onClick={onCreate} className="mt-4">
-          Create your first Workspace
-        </Button>
-      )}
-    </div>
-  );
-}

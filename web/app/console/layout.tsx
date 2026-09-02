@@ -25,6 +25,7 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { CommandPalette } from "@/components/command-palette";
+import { ThemeToggle } from "@/components/theme-toggle";
 
 const emptySubscribe = () => () => {};
 const getIsMac = () =>
@@ -230,6 +231,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                 @{user?.login}
               </p>
             </div>
+            <ThemeToggle />
             <button
               onClick={() => setLogoutConfirm(true)}
               className="text-mute transition-colors hover:text-ink"
