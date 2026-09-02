@@ -22,9 +22,13 @@ const time = readFileSync(
 test("workspace list renders a card grid by default", () => {
   assert.match(list, /grid-cols-1/);
   assert.match(list, /StatusBadge/);
-  assert.match(list, /timeAgo/);
+  assert.match(list, /TimeAgo/);
   assert.doesNotMatch(list, /font-bold/);
   assert.doesNotMatch(list, /text-\[10px\]/);
+});
+
+test("workspace list shows a skeleton while loading", () => {
+  assert.match(list, /Skeleton/);
 });
 
 test("workspace list offers a cards/list view switcher persisted to localStorage", () => {

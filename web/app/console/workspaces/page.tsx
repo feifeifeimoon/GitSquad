@@ -15,9 +15,10 @@ import {
   Search,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
-import { timeAgo } from "@/lib/time";
+import { TimeAgo } from "@/components/time-ago";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 
@@ -86,8 +87,37 @@ export default function WorkspacesPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between gap-3 px-8 pt-8">
+          <Skeleton className="h-5 w-28" />
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-56" />
+            <Skeleton className="h-8 w-16" />
+            <Skeleton className="h-8 w-32" />
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-3 px-8 py-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-hairline bg-canvas p-4"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Skeleton className="size-8 rounded-lg" />
+                  <Skeleton className="h-4 w-24" />
+                </div>
+                <Skeleton className="h-4 w-14" />
+              </div>
+              <Skeleton className="mt-3 h-3 w-full" />
+              <Skeleton className="mt-1.5 h-3 w-2/3" />
+              <div className="mt-4 flex items-center justify-between">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -216,9 +246,10 @@ function WorkspaceCard({
           </span>
           {workspace.repo_private && <Lock className="size-3 shrink-0 text-mute" />}
         </span>
-        <span className="shrink-0 font-mono text-xs tabular-nums text-mute">
-          {timeAgo(workspace.last_commit_at || workspace.created_at)}
-        </span>
+        <TimeAgo
+          iso={workspace.last_commit_at || workspace.created_at}
+          className="shrink-0 font-mono text-xs tabular-nums text-mute"
+        />
       </div>
     </button>
   );
@@ -335,7 +366,7 @@ function WorkspaceTable({
                   </p>
                 </td>
                 <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-mute">
-                  {timeAgo(w.created_at)}
+                  <TimeAgo iso={w.created_at} />
                 </td>
               </tr>
             ))}

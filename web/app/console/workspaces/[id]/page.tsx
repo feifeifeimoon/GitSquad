@@ -21,6 +21,7 @@ import {
   Workspace,
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
   DialogContent,
@@ -152,8 +153,33 @@ export default function WorkspaceBoardPage({
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="flex h-full flex-col">
+        <div className="flex items-center justify-between px-8 pb-4 pt-6">
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-52" />
+            <Skeleton className="h-8 w-20" />
+            <Skeleton className="h-8 w-20" />
+          </div>
+          <Skeleton className="h-8 w-28" />
+        </div>
+        <div className="flex flex-1 gap-4 overflow-x-auto p-8 pt-0">
+          {Array.from({ length: 7 }).map((_, i) => (
+            <div
+              key={i}
+              className="w-72 shrink-0 rounded-xl border border-hairline/50 bg-muted/40 p-2"
+            >
+              <div className="flex items-center gap-2 px-1.5 py-2">
+                <Skeleton className="size-3.5 rounded-full" />
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="ml-auto h-4 w-4" />
+              </div>
+              <div className="space-y-2 p-1">
+                <Skeleton className="h-24 w-full rounded-lg" />
+                <Skeleton className="h-24 w-full rounded-lg" />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

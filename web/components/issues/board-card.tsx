@@ -3,7 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { MessageSquare } from "lucide-react";
 import type { Issue } from "@/lib/api";
-import { timeAgo } from "@/lib/time";
+import { TimeAgo } from "@/components/time-ago";
 import { stripMarkdown } from "@/lib/utils";
 
 export function IssueCard({
@@ -44,9 +44,10 @@ export function IssueCard({
             ? issue.assigned_agents.join(", ")
             : "Unassigned"}
         </span>
-        <span className="shrink-0 tabular-nums text-mute">
-          {timeAgo(issue.updated_at)}
-        </span>
+        <TimeAgo
+          iso={issue.updated_at}
+          className="shrink-0 tabular-nums text-mute"
+        />
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle, Monitor, Cpu, Trash2, Plus, Laptop, Cloud, Copy,
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/time";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface Runtime {
   kind: string;
@@ -63,8 +64,37 @@ export default function DaemonsPage() {
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="px-8 pb-8 pt-8">
+        <div className="mb-6 flex items-center justify-between">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="h-8 w-32" />
+        </div>
+        <div className="mb-8 grid grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-md border border-hairline bg-canvas p-4 shadow-level-2"
+            >
+              <Skeleton className="h-4 w-16" />
+              <Skeleton className="mt-3 h-7 w-10" />
+            </div>
+          ))}
+        </div>
+        <div className="space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="rounded-md border border-hairline bg-canvas p-5 shadow-level-2"
+            >
+              <div className="flex items-center gap-3">
+                <Skeleton className="size-2.5 rounded-full" />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="ml-auto h-4 w-14" />
+              </div>
+              <Skeleton className="mt-3 h-3 w-2/3" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

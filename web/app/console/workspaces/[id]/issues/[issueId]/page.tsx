@@ -8,6 +8,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
@@ -54,8 +55,45 @@ export default function IssueDetailPage() {
 
   if (loading || !issue) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+      <div className="flex h-full flex-col">
+        <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4">
+          <Skeleton className="h-4 w-16" />
+          <Skeleton className="h-4 w-4" />
+          <Skeleton className="h-4 w-24" />
+        </div>
+        <div className="flex min-h-0 flex-1">
+          <div className="min-w-0 flex-1 px-8 py-6">
+            <Skeleton className="h-6 w-3/4" />
+            <div className="mt-4 space-y-2">
+              <Skeleton className="h-3 w-full" />
+              <Skeleton className="h-3 w-5/6" />
+              <Skeleton className="h-3 w-2/3" />
+            </div>
+            <Skeleton className="mt-8 h-4 w-20" />
+            <div className="mt-3 space-y-3">
+              {Array.from({ length: 2 }).map((_, i) => (
+                <div key={i} className="flex gap-3">
+                  <Skeleton className="size-6 rounded-full" />
+                  <div className="flex-1 space-y-2">
+                    <Skeleton className="h-3 w-32" />
+                    <Skeleton className="h-16 w-full rounded-lg" />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="w-64 shrink-0 border-l border-hairline px-5 py-6">
+            <Skeleton className="h-3 w-14" />
+            <div className="mt-5 space-y-4">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="space-y-1.5">
+                  <Skeleton className="h-3 w-16" />
+                  <Skeleton className="h-5 w-28" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

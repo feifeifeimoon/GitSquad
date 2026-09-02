@@ -68,6 +68,11 @@ test("issue board supports create, empty columns, and per-column add", () => {
   assert.match(card, /Unassigned/);
 });
 
+test("issue board and cards use skeletons and timestamp tooltips", () => {
+  assert.match(board, /Skeleton/);
+  assert.match(card, /TimeAgo/);
+});
+
 test("issue board filters and sorts with counts", () => {
   assert.match(toolbar, /Filter/);
   assert.match(toolbar, /Assignee/);
