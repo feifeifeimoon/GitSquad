@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
 import {
@@ -11,6 +11,7 @@ import {
   ChevronsUpDown,
   Plus,
   Check,
+  Search,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -24,6 +25,11 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { CommandPalette } from "@/components/command-palette";
+
+const emptySubscribe = () => () => {};
+const getIsMac = () =>
+  /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+const getIsMacServer = () => false;
 
 interface User {
   id: string;
@@ -47,6 +53,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const dragging = useRef(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const isMac = useSyncExternalStore(emptySubscribe, getIsMac, getIsMacServer);
 
   const [ws, setWs] = useState<{ id: string; data: Workspace } | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -172,6 +180,16 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
         {/* Nav */}
         <nav className="flex-1 space-y-1 px-3 py-4">
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-body transition-colors hover:bg-muted hover:text-ink"
+          >
+            <Search className="size-4" />
+            <span>Search</span>
+            <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-0.5 rounded border border-hairline bg-muted px-1.5 font-mono text-xs text-mute">
+              {isMac ? "⌘K" : "Ctrl K"}
+            </kbd>
+          </button>
           {navItems.map((item) => {
             const href =
               item.href === "/console/settings" && wsId
@@ -233,7 +251,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       <div className="flex-1 overflow-auto">{children}</div>
 
       {/* Global command palette (Cmd/Ctrl+K) */}
-      <CommandPalette />
+      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
 
       {/* Logout confirmation */}
       {logoutConfirm && (

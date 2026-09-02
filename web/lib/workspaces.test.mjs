@@ -90,6 +90,18 @@ test("command palette opens with Cmd/Ctrl+K and searches workspaces", () => {
   assert.match(palette, /get<Workspace\[\]>/);
 });
 
+test("sidebar has a search entry that opens the palette", () => {
+  assert.match(shell, /setPaletteOpen/);
+  assert.match(shell, /Search/);
+  assert.match(shell, /kbd/);
+});
+
+test("command palette searches issues within the active workspace", () => {
+  assert.match(palette, /usePathname/);
+  assert.match(palette, /issueApi/);
+  assert.match(palette, /Issues/);
+});
+
 test("command and toast primitives are wired", () => {
   assert.match(command, /CommandPrimitive/);
   assert.match(sonner, /Sonner/);
