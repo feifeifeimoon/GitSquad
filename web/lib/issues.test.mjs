@@ -73,6 +73,13 @@ test("issue board and cards use skeletons and timestamp tooltips", () => {
   assert.match(card, /TimeAgo/);
 });
 
+test("issue board pans horizontally by dragging empty space", () => {
+  assert.match(board, /onBoardMouseDown/);
+  assert.match(board, /scrollLeft/);
+  assert.match(board, /cursor-grab/);
+  assert.match(card, /data-issue-card/);
+});
+
 test("issue board filters and sorts with counts", () => {
   assert.match(toolbar, /Filter/);
   assert.match(toolbar, /Assignee/);

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -65,10 +65,44 @@ export default function WorkspaceBoardPage({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filters, setFilters] = useState<IssueFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
+  const [isPanning, setIsPanning] = useState(false);
+  const boardRef = useRef<HTMLDivElement | null>(null);
+  const panRef = useRef<{ startX: number; scrollLeft: number } | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   );
+
+  // Grab empty board space and drag to pan horizontally. Cards still drag
+  // via dnd-kit — mousedown on a card (or any control) never starts a pan.
+  const onBoardMouseDown = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("[data-issue-card], button, a, input, select")) return;
+    const el = boardRef.current;
+    if (!el) return;
+    e.preventDefault();
+    panRef.current = { startX: e.clientX, scrollLeft: el.scrollLeft };
+    setIsPanning(true);
+  };
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent) => {
+      const pan = panRef.current;
+      const el = boardRef.current;
+      if (!pan || !el) return;
+      el.scrollLeft = pan.scrollLeft - (e.clientX - pan.startX);
+    };
+    const onUp = () => {
+      panRef.current = null;
+      setIsPanning(false);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+    return () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+  }, []);
 
   const load = () => {
     issueApi
@@ -203,7 +237,13 @@ export default function WorkspaceBoardPage({
         </Button>
       </div>
 
-      <div className="flex flex-1 gap-4 overflow-x-auto p-8 pt-0">
+      <div
+        ref={boardRef}
+        onMouseDown={onBoardMouseDown}
+        className={`flex flex-1 gap-4 overflow-x-auto p-8 pt-0 ${
+          isPanning ? "cursor-grabbing select-none" : "cursor-grab"
+        }`}
+      >
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}

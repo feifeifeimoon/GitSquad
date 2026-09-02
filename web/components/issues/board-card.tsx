@@ -68,6 +68,7 @@ export function DraggableIssueCard({
   return (
     <div
       ref={setNodeRef}
+      data-issue-card
       {...listeners}
       {...attributes}
       onClick={() => onOpen(issue.id)}

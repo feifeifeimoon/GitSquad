@@ -44,7 +44,7 @@ export function BoardColumn({
         <button
           onClick={() => onCreate(status)}
           title={`Add to ${ISSUE_STATUS_LABELS[status]}`}
-          className="ml-auto rounded-sm p-1 text-mute transition-colors hover:bg-white/40 hover:text-ink"
+          className="ml-auto cursor-pointer rounded-sm p-1 text-mute transition-colors hover:bg-white/40 hover:text-ink"
         >
           <Plus className="size-3.5" />
         </button>
