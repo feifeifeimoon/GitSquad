@@ -131,21 +131,11 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         className="relative flex shrink-0 flex-col border-r border-hairline bg-canvas"
         style={{ width: sidebarWidth }}
       >
-        {/* Search + workspace switcher */}
+        {/* Workspace switcher + search */}
         <div className="border-b border-hairline">
-          <button
-            onClick={() => setPaletteOpen(true)}
-            className="flex w-full items-center gap-2 px-5 py-2 text-sm font-medium text-body transition-colors hover:bg-muted/40"
-          >
-            <Search className="size-4" />
-            <span>Search</span>
-            <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-0.5 rounded border border-hairline bg-muted px-1.5 font-mono text-xs text-mute">
-              {isMac ? "⌘K" : "Ctrl K"}
-            </kbd>
-          </button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-2 px-5 pb-3 text-left outline-none transition-colors hover:bg-muted/40">
+              <button className="flex w-full items-center gap-2 px-5 pb-1 pt-2.5 text-left outline-none transition-colors hover:bg-muted/40">
                 {wsId && workspace ? (
                   <>
                     <WorkspaceAvatar
@@ -189,6 +179,16 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          <button
+            onClick={() => setPaletteOpen(true)}
+            className="flex w-full items-center gap-2 px-5 pb-2.5 pt-1 text-sm font-medium text-body transition-colors hover:bg-muted/40"
+          >
+            <Search className="size-4" />
+            <span>Search</span>
+            <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-0.5 rounded border border-hairline bg-muted px-1.5 font-mono text-xs text-mute">
+              {isMac ? "⌘K" : "Ctrl K"}
+            </kbd>
+          </button>
         </div>
 
         {/* Nav */}
