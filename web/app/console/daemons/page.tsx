@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, XCircle, Monitor, Cpu, Trash2, Plus, Laptop, Cloud, Copy, Terminal, Check } from "lucide-react";
 import { api } from "@/lib/api";
+import { timeAgo } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 
 interface Runtime {
@@ -22,17 +23,6 @@ interface Daemon {
   last_seen_at: string | null;
   registered_at: string;
   runtimes: Runtime[];
-}
-
-function timeAgo(dateStr: string | null): string {
-  if (!dateStr) return "never";
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = Math.floor((now - then) / 1000);
-  if (diff < 60) return "just now";
-  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 export default function DaemonsPage() {
