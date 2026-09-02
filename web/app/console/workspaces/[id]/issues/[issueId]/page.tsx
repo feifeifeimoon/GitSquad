@@ -189,7 +189,7 @@ export default function IssueDetailPage() {
 
         {/* Right sidebar */}
         <div className="w-64 shrink-0 overflow-y-auto border-l border-hairline px-5 py-6">
-          <h2 className="mb-4 text-xs font-medium uppercase text-mute">Details</h2>
+          <h2 className="mb-4 font-mono text-xs font-medium uppercase text-mute">Details</h2>
           <div className="space-y-5">
             <div>
               <label className="mb-1.5 block text-xs text-mute">Status</label>

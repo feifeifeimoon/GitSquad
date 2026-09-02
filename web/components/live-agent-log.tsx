@@ -28,7 +28,7 @@ export function LiveAgentLog() {
   );
 
   return (
-    <div className="h-[132px] overflow-hidden bg-black px-6 py-5 font-mono text-[12px] leading-6 sm:px-8">
+    <div className="h-[132px] overflow-hidden bg-black px-6 py-5 font-mono text-xs leading-6 sm:px-8">
       <div className="transition-transform duration-500 ease-out">
         {visibleLines.map(([time, agent, message]) => (
           <p key={time + agent + message} className="grid grid-cols-[78px_82px_1fr] gap-2 text-white/40 max-sm:grid-cols-1 max-sm:gap-0 max-sm:py-1">

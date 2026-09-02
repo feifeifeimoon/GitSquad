@@ -125,14 +125,14 @@ function DaemonAuthContent() {
                         {part.split("").map((ch, j) => (
                           <span
                             key={j}
-                            className="flex size-10 items-center justify-center rounded-sm border border-hairline bg-canvas-soft text-lg font-bold uppercase text-ink"
+                            className="flex size-10 items-center justify-center rounded-sm border border-hairline bg-canvas-soft text-lg font-semibold uppercase text-ink"
                           >
                             {ch}
                           </span>
                         ))}
                       </div>
                       {i < codeParts.length - 1 && (
-                        <span className="text-lg font-bold text-hairline-strong">—</span>
+                        <span className="text-lg font-semibold text-hairline-strong">—</span>
                       )}
                     </div>
                   ))}
@@ -162,8 +162,8 @@ function DaemonAuthContent() {
           {/* Confirmed */}
           {status === "confirmed" && (
             <div className="space-y-4 text-center">
-              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-[#0070f3]/10">
-                <Check className="size-6 text-[#0070f3]" />
+              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-link/10">
+                <Check className="size-6 text-link" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-ink">Device Connected</h2>
@@ -178,7 +178,7 @@ function DaemonAuthContent() {
           {status === "error" && (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10">
-                <span className="text-xl font-bold text-destructive">!</span>
+                <span className="text-xl font-semibold text-destructive">!</span>
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-ink">Verification Failed</h2>

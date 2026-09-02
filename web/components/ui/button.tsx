@@ -20,7 +20,7 @@ const buttonVariants = cva(
       },
       size: {
         default: "h-8 gap-1.5 rounded-sm px-3 text-sm font-medium",
-        sm: "h-7 gap-1 rounded-sm px-2.5 text-[0.8rem] font-medium",
+        sm: "h-7 gap-1 rounded-sm px-2.5 text-xs font-medium",
         lg: "h-9 gap-1.5 rounded-sm px-4 text-sm font-medium",
         pill: "h-12 rounded-full px-6 text-base font-medium gap-2",
         "pill-sm": "h-8 rounded-full px-4 text-sm font-medium gap-1.5",

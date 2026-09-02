@@ -159,12 +159,12 @@ export default function Home() {
                 <span className="size-2.5 rounded-full bg-white/20" />
                 <span className="size-2.5 rounded-full bg-white/20" />
               </div>
-              <p className="font-mono text-[10px] uppercase tracking-[0.28em] text-white/40">
+              <p className="font-mono text-xs uppercase tracking-[0.28em] text-white/40">
                 Squad control center v2.4.0
               </p>
             </div>
 
-            <div className="grid border-b border-white/10 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/40 sm:grid-cols-3">
+            <div className="grid border-b border-white/10 text-xs font-semibold uppercase tracking-[0.18em] text-white/40 sm:grid-cols-3">
               <div className="border-b border-white/10 bg-white/5 px-6 py-4 text-white sm:border-b-0 sm:border-r sm:px-8">
                 Active agents
               </div>
@@ -176,7 +176,7 @@ export default function Home() {
 
             <div className="border-b border-white/10">
               <div>
-                <div className="grid grid-cols-[1.1fr_0.8fr_1.5fr_0.45fr_0.45fr] border-b border-white/10 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.16em] text-white/40 max-md:hidden">
+                <div className="grid grid-cols-[1.1fr_0.8fr_1.5fr_0.45fr_0.45fr] border-b border-white/10 px-5 py-3 font-mono text-xs uppercase tracking-[0.16em] text-white/40 max-md:hidden">
                   <span>Agent identity</span>
                   <span>Status</span>
                   <span>Current task</span>
@@ -196,16 +196,16 @@ export default function Home() {
                         </span>
                         <div>
                           <p className="text-sm font-semibold text-white">{agent.name}</p>
-                          <p className="font-mono text-[10px] uppercase text-white/40">{agent.id}</p>
+                          <p className="font-mono text-xs uppercase text-white/40">{agent.id}</p>
                         </div>
                       </div>
-                      <span className="w-fit rounded-full bg-[#0070f3]/15 px-2.5 py-1 font-mono text-[10px] font-semibold uppercase text-[#0070f3]">
-                        <span className="mr-1 inline-block size-2 rounded-full bg-[#0070f3]" />
+                      <span className="w-fit rounded-full bg-link/15 px-2.5 py-1 font-mono text-xs font-semibold uppercase text-link">
+                        <span className="mr-1 inline-block size-2 rounded-full bg-link" />
                         {agent.status}
                       </span>
                       <p className="truncate font-mono text-xs text-white/80">{agent.task}</p>
-                      <p className="font-mono text-xs font-bold text-white">{agent.cpu}</p>
-                      <p className="font-mono text-xs font-bold text-white">{agent.uptime}</p>
+                      <p className="font-mono text-xs font-semibold text-white">{agent.cpu}</p>
+                      <p className="font-mono text-xs font-semibold text-white">{agent.uptime}</p>
                     </div>
                   );
                 })}
@@ -214,9 +214,9 @@ export default function Home() {
 
             <LiveAgentLog />
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 font-mono text-[10px] uppercase tracking-[0.18em] text-white/40">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 font-mono text-xs uppercase tracking-[0.18em] text-white/40">
               <span>
-                Status: <b className="text-[#0070f3]">nominal</b>
+                Status: <b className="text-link">nominal</b>
               </span>
               <span>Squad net uptime: 1,482 hours</span>
               <span>Latency: 12ms</span>
