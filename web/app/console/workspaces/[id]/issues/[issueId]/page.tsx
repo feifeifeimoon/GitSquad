@@ -114,7 +114,7 @@ export default function IssueDetailPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4">
         <button
-          onClick={() => router.push(`/console/workspaces/${id}/issues`)}
+          onClick={() => router.push(`/console/workspaces/${id}`)}
           className="flex shrink-0 items-center gap-1 text-sm text-body transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />
