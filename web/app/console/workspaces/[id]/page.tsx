@@ -241,7 +241,7 @@ export default function WorkspaceBoardPage({
         ref={boardRef}
         onMouseDown={onBoardMouseDown}
         className={`flex flex-1 gap-4 overflow-x-auto p-8 pt-0 ${
-          isPanning ? "cursor-grabbing select-none" : "cursor-grab"
+          isPanning ? "cursor-grabbing select-none" : ""
         }`}
       >
         <DndContext
