@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
@@ -36,8 +37,14 @@ export default function IssueDetailPage() {
 
   const changeStatus = async (status: IssueStatus) => {
     if (!issue || status === issue.status) return;
-    await issueApi.update(id, issueId, { status });
-    load();
+    try {
+      await issueApi.update(id, issueId, { status });
+      load();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to update status",
+      );
+    }
   };
 
   const post = async () => {
@@ -48,6 +55,10 @@ export default function IssueDetailPage() {
       setContent("");
       setEditorKey((k) => k + 1);
       load();
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Failed to post comment",
+      );
     } finally {
       setPosting(false);
     }

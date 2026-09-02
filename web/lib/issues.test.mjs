@@ -80,6 +80,12 @@ test("issue board pans horizontally by dragging empty space", () => {
   assert.match(card, /data-issue-card/);
 });
 
+test("issue mutations surface toast feedback", () => {
+  assert.match(board, /toast\.success/);
+  assert.match(board, /toast\.error/);
+  assert.match(detail, /toast\.error/);
+});
+
 test("issue board filters and sorts with counts", () => {
   assert.match(toolbar, /Filter/);
   assert.match(toolbar, /Assignee/);

@@ -22,6 +22,7 @@ import {
 } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -130,6 +131,9 @@ export default function WorkspaceBoardPage({
       setStatus("backlog");
       setOpen(false);
       load();
+      toast.success("Issue created");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to create issue");
     } finally {
       setCreating(false);
     }
@@ -159,6 +163,7 @@ export default function WorkspaceBoardPage({
       await issueApi.update(id, issueId, { status });
     } catch {
       load(); // revert to server truth on failure
+      toast.error("Failed to move issue");
     }
   };
 

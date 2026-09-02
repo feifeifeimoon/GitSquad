@@ -23,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { CommandPalette } from "@/components/command-palette";
 
 interface User {
   id: string;
@@ -230,6 +231,9 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
       {/* Main content */}
       <div className="flex-1 overflow-auto">{children}</div>
+
+      {/* Global command palette (Cmd/Ctrl+K) */}
+      <CommandPalette />
 
       {/* Logout confirmation */}
       {logoutConfirm && (

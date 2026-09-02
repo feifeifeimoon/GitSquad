@@ -6,6 +6,7 @@ import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "sonner";
 
 interface Runtime {
   kind: string;
@@ -50,8 +51,9 @@ export default function DaemonsPage() {
     try {
       await api.delete(`/api/v1/daemons/${id}`);
       setDaemons((prev) => prev.filter((d) => d.id !== id));
+      toast.success("Daemon removed");
     } catch {
-      // ignore
+      toast.error("Failed to remove daemon");
     }
     setDeleting(null);
   };

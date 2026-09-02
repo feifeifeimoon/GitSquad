@@ -18,6 +18,18 @@ const time = readFileSync(
   new URL("./time.ts", import.meta.url),
   "utf8",
 );
+const palette = readFileSync(
+  new URL("../components/command-palette.tsx", import.meta.url),
+  "utf8",
+);
+const command = readFileSync(
+  new URL("../components/ui/command.tsx", import.meta.url),
+  "utf8",
+);
+const sonner = readFileSync(
+  new URL("../components/ui/sonner.tsx", import.meta.url),
+  "utf8",
+);
 
 test("workspace list renders a card grid by default", () => {
   assert.match(list, /grid-cols-1/);
@@ -64,4 +76,22 @@ test("shared time util formats relative time", () => {
   assert.match(time, /timeAgo/);
   assert.match(time, /never/);
   assert.match(time, /ago/);
+});
+
+test("console shell mounts the command palette", () => {
+  assert.match(shell, /CommandPalette/);
+});
+
+test("command palette opens with Cmd/Ctrl+K and searches workspaces", () => {
+  assert.match(palette, /metaKey/);
+  assert.match(palette, /ctrlKey/);
+  assert.match(palette, /CommandDialog/);
+  assert.match(palette, /CommandInput/);
+  assert.match(palette, /get<Workspace\[\]>/);
+});
+
+test("command and toast primitives are wired", () => {
+  assert.match(command, /CommandPrimitive/);
+  assert.match(sonner, /Sonner/);
+  assert.match(sonner, /richColors/);
 });
