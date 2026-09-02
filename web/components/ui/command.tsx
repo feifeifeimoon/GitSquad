@@ -63,6 +63,9 @@ function CommandInput({
         )}
         {...props}
       />
+      <kbd className="pointer-events-none shrink-0 select-none rounded border border-hairline bg-muted px-1.5 py-0.5 font-mono text-xs text-mute">
+        Esc
+      </kbd>
     </div>
   )
 }

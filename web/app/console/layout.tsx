@@ -179,8 +179,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Nav */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        {/* Search */}
+        <div className="border-b border-hairline px-3 py-3">
           <button
             onClick={() => setPaletteOpen(true)}
             className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-body transition-colors hover:bg-muted hover:text-ink"
@@ -191,6 +191,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               {isMac ? "⌘K" : "Ctrl K"}
             </kbd>
           </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 space-y-1 px-3 py-4">
           {navItems.map((item) => {
             const href =
               item.href === "/console/settings" && wsId
