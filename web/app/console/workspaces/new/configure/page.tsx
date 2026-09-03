@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CreateWorkspaceAside } from "@/components/create-workspace-aside";
 
 function ConfigureContent() {
   const router = useRouter();
@@ -67,10 +68,11 @@ function ConfigureContent() {
         </button>
       </div>
 
-      <div className="mx-auto w-full max-w-xl flex-1 px-8 pb-8">
-      <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
-        Configure Workspace
-      </h1>
+      <div className="mx-auto flex w-full max-w-6xl flex-1 gap-12 px-8 pb-8">
+        <div className="min-w-0 flex-1">
+        <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
+          Configure Workspace
+        </h1>
       <p className="mb-8 text-sm text-body">
         Name your workspace and start importing{" "}
         <span className="font-medium text-ink">
@@ -135,6 +137,8 @@ function ConfigureContent() {
           </Button>
         </div>
       </form>
+        </div>
+        <CreateWorkspaceAside />
       </div>
     </div>
   );
