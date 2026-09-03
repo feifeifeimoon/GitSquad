@@ -71,6 +71,10 @@ ORDER BY d.registered_at DESC, r.kind, r.name;
 -- name: ClearRuntimes :exec
 DELETE FROM runtimes WHERE daemon_id = $1;
 
+-- name: DeleteRuntimesNotIn :exec
+DELETE FROM runtimes
+WHERE daemon_id = $1 AND name <> ALL(sqlc.arg(names)::text[]);
+
 -- name: InsertRuntime :exec
 INSERT INTO runtimes (daemon_id, kind, name, executable_path, version, status, diagnostics, max_concurrency)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
