@@ -71,7 +71,7 @@ export function DraggableIssueCard({
       data-issue-card
       {...listeners}
       {...attributes}
-      onClick={() => onOpen(issue.id)}
+      onClick={() => onOpen(issue.issue_key)}
       className={`cursor-grab active:cursor-grabbing ${
         isDragging ? "opacity-40" : ""
       }`}

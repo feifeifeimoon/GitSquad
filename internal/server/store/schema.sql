@@ -84,7 +84,10 @@ CREATE TABLE workspaces (
 ALTER TABLE workspaces
     ADD COLUMN issue_prefix TEXT NOT NULL DEFAULT '',
     ADD COLUMN issue_counter INT NOT NULL DEFAULT 0,
-    ADD COLUMN avatar_url TEXT NOT NULL DEFAULT '';
+    ADD COLUMN avatar_url TEXT NOT NULL DEFAULT '',
+    ADD COLUMN slug TEXT NOT NULL DEFAULT '';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_user_slug ON workspaces(user_id, slug) WHERE slug <> '';
 
 CREATE TABLE issues (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

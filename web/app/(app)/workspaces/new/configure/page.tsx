@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,7 @@ function ConfigureContent() {
   // Missing required params — bounce back to repo selection.
   if (!installationID || !repoID) {
     if (typeof window !== "undefined") {
-      router.replace("/console/workspaces/new");
+      router.replace(paths.newWorkspace());
     }
     return null;
   }
@@ -47,7 +48,7 @@ function ConfigureContent() {
         repo_id: repoID,
         name: name.trim(),
       });
-      router.push("/console/workspaces");
+      router.push(paths.workspaces());
     } catch (err: unknown) {
       setError(
         err instanceof Error ? err.message : "Failed to create workspace."
@@ -60,7 +61,7 @@ function ConfigureContent() {
     <div className="flex h-full flex-col">
       <div className="px-8 pb-4 pt-6">
         <button
-          onClick={() => router.push("/console/workspaces/new")}
+          onClick={() => router.push(paths.newWorkspace())}
           className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />

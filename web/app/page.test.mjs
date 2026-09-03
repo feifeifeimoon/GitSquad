@@ -2,7 +2,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const page = readFileSync(new URL("./page.tsx", import.meta.url), "utf8");
+const page = readFileSync(new URL("./(marketing)/page.tsx", import.meta.url), "utf8");
 const layout = readFileSync(new URL("./layout.tsx", import.meta.url), "utf8");
 const liveLog = readFileSync(
   new URL("../components/live-agent-log.tsx", import.meta.url),

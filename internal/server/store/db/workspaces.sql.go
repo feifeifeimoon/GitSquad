@@ -13,8 +13,8 @@ import (
 )
 
 const createWorkspace = `-- name: CreateWorkspace :one
-INSERT INTO workspaces (user_id, installation_id, github_repo_id, name, issue_prefix)
-VALUES ($1, $2, $3, $4, $5) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url
+INSERT INTO workspaces (user_id, installation_id, github_repo_id, name, issue_prefix, slug)
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug
 `
 
 type CreateWorkspaceParams struct {
@@ -23,6 +23,7 @@ type CreateWorkspaceParams struct {
 	GithubRepoID   uuid.UUID `json:"github_repo_id"`
 	Name           string    `json:"name"`
 	IssuePrefix    string    `json:"issue_prefix"`
+	Slug           string    `json:"slug"`
 }
 
 func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams) (Workspace, error) {
@@ -32,6 +33,7 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		arg.GithubRepoID,
 		arg.Name,
 		arg.IssuePrefix,
+		arg.Slug,
 	)
 	var i Workspace
 	err := row.Scan(
@@ -46,6 +48,7 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		&i.IssuePrefix,
 		&i.IssueCounter,
 		&i.AvatarUrl,
+		&i.Slug,
 	)
 	return i, err
 }
@@ -60,7 +63,7 @@ func (q *Queries) DeleteWorkspace(ctx context.Context, id uuid.UUID) error {
 }
 
 const getWorkspace = `-- name: GetWorkspace :one
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url FROM workspaces WHERE id = $1
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug FROM workspaces WHERE id = $1
 `
 
 func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, error) {
@@ -78,12 +81,42 @@ func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, er
 		&i.IssuePrefix,
 		&i.IssueCounter,
 		&i.AvatarUrl,
+		&i.Slug,
+	)
+	return i, err
+}
+
+const getWorkspaceBySlug = `-- name: GetWorkspaceBySlug :one
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug FROM workspaces WHERE user_id = $1 AND slug = $2 AND status != 'archived'
+`
+
+type GetWorkspaceBySlugParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Slug   string    `json:"slug"`
+}
+
+func (q *Queries) GetWorkspaceBySlug(ctx context.Context, arg GetWorkspaceBySlugParams) (Workspace, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceBySlug, arg.UserID, arg.Slug)
+	var i Workspace
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.InstallationID,
+		&i.GithubRepoID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IssuePrefix,
+		&i.IssueCounter,
+		&i.AvatarUrl,
+		&i.Slug,
 	)
 	return i, err
 }
 
 const getWorkspaceWithRepo = `-- name: GetWorkspaceWithRepo :one
-SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at,
+SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at, w.slug,
        r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private
 FROM workspaces w
 JOIN github_repos r ON r.id = w.github_repo_id
@@ -99,6 +132,7 @@ type GetWorkspaceWithRepoRow struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	Slug           string    `json:"slug"`
 	RepoFullName   string    `json:"repo_full_name"`
 	RepoOwner      string    `json:"repo_owner"`
 	RepoName       string    `json:"repo_name"`
@@ -117,6 +151,7 @@ func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWo
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Slug,
 		&i.RepoFullName,
 		&i.RepoOwner,
 		&i.RepoName,
@@ -126,7 +161,7 @@ func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWo
 }
 
 const listWorkspacesByUser = `-- name: ListWorkspacesByUser :many
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
 `
 
 func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([]Workspace, error) {
@@ -150,6 +185,7 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([
 			&i.IssuePrefix,
 			&i.IssueCounter,
 			&i.AvatarUrl,
+			&i.Slug,
 		); err != nil {
 			return nil, err
 		}
@@ -162,7 +198,7 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([
 }
 
 const listWorkspacesWithRepo = `-- name: ListWorkspacesWithRepo :many
-SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at,
+SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at, w.slug,
        r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private
 FROM workspaces w
 JOIN github_repos r ON r.id = w.github_repo_id
@@ -179,6 +215,7 @@ type ListWorkspacesWithRepoRow struct {
 	Status         string    `json:"status"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	Slug           string    `json:"slug"`
 	RepoFullName   string    `json:"repo_full_name"`
 	RepoOwner      string    `json:"repo_owner"`
 	RepoName       string    `json:"repo_name"`
@@ -203,6 +240,7 @@ func (q *Queries) ListWorkspacesWithRepo(ctx context.Context, userID uuid.UUID) 
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Slug,
 			&i.RepoFullName,
 			&i.RepoOwner,
 			&i.RepoName,

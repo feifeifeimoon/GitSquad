@@ -146,4 +146,5 @@ type Workspace struct {
 	IssuePrefix    string    `json:"issue_prefix"`
 	IssueCounter   int32     `json:"issue_counter"`
 	AvatarUrl      string    `json:"avatar_url"`
+	Slug           string    `json:"slug"`
 }

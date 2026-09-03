@@ -19,6 +19,14 @@ JOIN workspaces w ON w.id = i.workspace_id
 LEFT JOIN users u ON u.id = i.creator_user_id
 WHERE i.id = $1 AND i.workspace_id = $2;
 
+-- name: GetIssueByNumber :one
+SELECT i.*, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
+       (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count
+FROM issues i
+JOIN workspaces w ON w.id = i.workspace_id
+LEFT JOIN users u ON u.id = i.creator_user_id
+WHERE i.workspace_id = $1 AND i.number = $2;
+
 -- name: IncrementWorkspaceIssueCounter :one
 UPDATE workspaces SET issue_counter = issue_counter + 1 WHERE id = $1 RETURNING issue_counter;
 

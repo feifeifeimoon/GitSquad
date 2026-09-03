@@ -20,6 +20,7 @@ import {
   api,
   Workspace,
 } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -51,9 +52,9 @@ import {
 export default function WorkspaceBoardPage({
   params,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ slug: string }>;
 }) {
-  const { id } = use(params);
+  const { slug } = use(params);
   const router = useRouter();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -107,25 +108,25 @@ export default function WorkspaceBoardPage({
 
   const load = () => {
     issueApi
-      .list(id)
+      .list(slug)
       .then(setIssues)
-      .catch(() => router.push("/console/workspaces"))
+      .catch(() => router.push(paths.workspaces()))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [id, router]);
+  useEffect(load, [slug, router]);
 
   useEffect(() => {
     api
-      .get<Workspace>(`/api/v1/workspaces/${id}`)
+      .get<Workspace>(`/api/v1/workspaces/${slug}`)
       .then(setWorkspace)
       .catch(() => {});
-  }, [id]);
+  }, [slug]);
 
   const create = async () => {
     if (!title.trim()) return;
     setCreating(true);
     try {
-      await issueApi.create(id, { title, description, status });
+      await issueApi.create(slug, { title, description, status });
       setTitle("");
       setDescription("");
       setStatus("backlog");
@@ -160,7 +161,7 @@ export default function WorkspaceBoardPage({
       prev.map((i) => (i.id === issueId ? { ...i, status } : i)),
     );
     try {
-      await issueApi.update(id, issueId, { status });
+      await issueApi.update(slug, issueId, { status });
     } catch {
       load(); // revert to server truth on failure
       toast.error("Failed to move issue");
@@ -261,9 +262,7 @@ export default function WorkspaceBoardPage({
               status={status}
               issues={byStatus(status)}
               onCreate={openCreate}
-              onOpen={(issueId) =>
-                router.push(`/console/workspaces/${id}/issues/${issueId}`)
-              }
+              onOpen={(issueKey) => router.push(paths.workspace(slug).issue(issueKey))}
             />
           ))}
           <DragOverlay dropAnimation={null}>

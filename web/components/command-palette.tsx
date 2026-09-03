@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { FolderGit2, Monitor, Plus, Settings } from "lucide-react";
 import { api, Workspace, Issue, issueApi } from "@/lib/api";
+import { paths, workspaceSlugFromPath } from "@/lib/paths";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { StatusIcon } from "@/components/status-icon";
 import {
@@ -33,8 +34,7 @@ export function CommandPalette({
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [issues, setIssues] = useState<WorkspaceIssues | null>(null);
 
-  const wsMatch = pathname?.match(/^\/console\/workspaces\/([^/]+)/);
-  const wsId = wsMatch ? decodeURIComponent(wsMatch[1]) : null;
+  const wsId = workspaceSlugFromPath(pathname);
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -84,26 +84,26 @@ export function CommandPalette({
       <CommandList>
         <CommandEmpty>No results found.</CommandEmpty>
         <CommandGroup heading="Pages">
-          <CommandItem onSelect={() => run("/console/workspaces")}>
+          <CommandItem onSelect={() => run(paths.workspaces())}>
             <FolderGit2 className="size-4" />
             Workspaces
           </CommandItem>
-          <CommandItem onSelect={() => run("/console/daemons")}>
+          <CommandItem onSelect={() => run(paths.daemons())}>
             <Monitor className="size-4" />
             Daemons
           </CommandItem>
-          <CommandItem onSelect={() => run("/console/settings")}>
+          <CommandItem onSelect={() => run(paths.settings())}>
             <Settings className="size-4" />
             Settings
           </CommandItem>
         </CommandGroup>
         <CommandGroup heading="Actions">
-          <CommandItem onSelect={() => run("/console/workspaces/new")}>
+          <CommandItem onSelect={() => run(paths.newWorkspace())}>
             <Plus className="size-4" />
             New Workspace
           </CommandItem>
         </CommandGroup>
-        {currentIssues.length > 0 && (
+        {wsId && currentIssues.length > 0 && (
           <>
             <CommandSeparator />
             <CommandGroup heading="Issues">
@@ -112,7 +112,7 @@ export function CommandPalette({
                   key={issue.id}
                   value={`${issue.issue_key} ${issue.title}`}
                   onSelect={() =>
-                    run(`/console/workspaces/${wsId}/issues/${issue.id}`)
+                    run(paths.workspace(wsId).issue(issue.issue_key))
                   }
                 >
                   <StatusIcon status={issue.status} />
@@ -131,7 +131,7 @@ export function CommandPalette({
             <CommandItem
               key={w.id}
               value={`${w.name} ${w.repo_full_name || ""}`}
-              onSelect={() => run(`/console/workspaces/${w.id}`)}
+              onSelect={() => run(paths.workspace(w.slug).board())}
             >
               <WorkspaceAvatar
                 name={w.name}

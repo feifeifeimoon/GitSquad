@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { LogOut, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 
 interface User {
@@ -67,7 +68,7 @@ export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
                 <p className="text-sm font-semibold text-ink">@{user.login}</p>
               </div>
               <button
-                onClick={() => { router.push("/console"); setOpen(false); }}
+                onClick={() => { router.push(paths.workspaces()); setOpen(false); }}
                 className="flex w-full items-center gap-2 px-3 py-2 text-sm text-body transition-colors hover:bg-muted hover:text-ink"
               >
                 <LayoutDashboard className="size-3.5" />

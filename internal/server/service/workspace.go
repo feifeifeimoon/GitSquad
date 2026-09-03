@@ -4,19 +4,50 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"regexp"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var (
-	ErrWorkspaceNotFound    = errors.New("workspace not found")
-	ErrInstallationMismatch = errors.New("installation does not belong to user")
-	ErrRepoMismatch         = errors.New("repo does not belong to installation")
+	ErrWorkspaceNotFound     = errors.New("workspace not found")
+	ErrInstallationMismatch  = errors.New("installation does not belong to user")
+	ErrRepoMismatch          = errors.New("repo does not belong to installation")
+	ErrInvalidWorkspaceName  = errors.New("workspace name must contain at least one letter or number")
+	ErrWorkspaceSlugReserved = errors.New("workspace slug is reserved")
+	ErrWorkspaceSlugTaken    = errors.New("workspace slug already exists")
 )
+
+var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
+
+// reservedSlugs are root-level slugs that would collide with top-level routes
+// or framework assets now that workspaces live at /{slug}. Rejected at creation.
+var reservedSlugs = map[string]bool{
+	"login": true, "auth": true, "daemon": true, "daemons": true,
+	"workspaces": true, "settings": true, "new": true, "api": true,
+	"_next": true, "_vercel": true, "favicon.ico": true, "manifest": true,
+	"robots.txt": true, "sitemap.xml": true, "icons": true,
+	"home": true, "homepage": true, "dashboard": true, "docs": true,
+	"about": true, "pricing": true, "changelog": true, "blog": true,
+	"help": true, "support": true, "status": true, "admin": true,
+	"account": true, "profile": true, "billing": true, "www": true,
+}
+
+func isReservedSlug(slug string) bool { return reservedSlugs[slug] }
+
+// deriveSlug normalizes a workspace name into a URL slug. It returns an empty
+// string when the name contains no letters or digits; the caller treats that
+// as ErrInvalidWorkspaceName rather than silently substituting a placeholder.
+func deriveSlug(name string) string {
+	return strings.Trim(slugRe.ReplaceAllString(strings.ToLower(name), "-"), "-")
+}
 
 type WorkspaceService struct {
 	store  *store.Store
@@ -55,14 +86,34 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID
 		return nil, ErrRepoMismatch
 	}
 
+	slug := deriveSlug(name)
+	if slug == "" {
+		return nil, ErrInvalidWorkspaceName
+	}
+	if isReservedSlug(slug) {
+		return nil, ErrWorkspaceSlugReserved
+	}
+	if _, err := s.store.GetWorkspaceBySlug(ctx, db.GetWorkspaceBySlugParams{UserID: userID, Slug: slug}); err == nil {
+		return nil, ErrWorkspaceSlugTaken
+	} else if !errors.Is(err, pgx.ErrNoRows) {
+		return nil, fmt.Errorf("check workspace slug: %w", err)
+	}
+
 	w, err := s.store.CreateWorkspace(ctx, db.CreateWorkspaceParams{
 		UserID:         userID,
 		InstallationID: installationID,
 		GithubRepoID:   repoID,
 		Name:           name,
 		IssuePrefix:    deriveIssuePrefix(name),
+		Slug:           slug,
 	})
 	if err != nil {
+		// Unique-index backstop for concurrent creates and for reusing an
+		// archived workspace's slug (the pre-check above skips archived rows).
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+			return nil, ErrWorkspaceSlugTaken
+		}
 		return nil, fmt.Errorf("create workspace: %w", err)
 	}
 	return &w, nil
@@ -94,6 +145,7 @@ func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID)
 				InstallationID: row.InstallationID,
 				GithubRepoID:   row.GithubRepoID,
 				Name:           row.Name,
+				Slug:           row.Slug,
 				Status:         row.Status,
 				CreatedAt:      row.CreatedAt,
 				UpdatedAt:      row.UpdatedAt,
@@ -146,6 +198,7 @@ func (s *WorkspaceService) GetWorkspace(ctx context.Context, id uuid.UUID) (*Wor
 			InstallationID: row.InstallationID,
 			GithubRepoID:   row.GithubRepoID,
 			Name:           row.Name,
+			Slug:           row.Slug,
 			Status:         row.Status,
 			CreatedAt:      row.CreatedAt,
 			UpdatedAt:      row.UpdatedAt,
@@ -155,6 +208,28 @@ func (s *WorkspaceService) GetWorkspace(ctx context.Context, id uuid.UUID) (*Wor
 		RepoName:     row.RepoName,
 		RepoPrivate:  row.RepoPrivate,
 	}, nil
+}
+
+// ResolveWorkspace resolves a workspace by UUID or slug, scoped to the
+// authenticated user. Returns ErrWorkspaceNotFound for unknown refs and for
+// refs that belong to another user.
+func (s *WorkspaceService) ResolveWorkspace(ctx context.Context, userID uuid.UUID, ref string) (*WorkspaceWithRepo, error) {
+	if id, err := uuid.Parse(ref); err == nil {
+		ws, err := s.GetWorkspace(ctx, id)
+		if err != nil {
+			return nil, ErrWorkspaceNotFound
+		}
+		if ws.UserID != userID {
+			return nil, ErrWorkspaceNotFound
+		}
+		return ws, nil
+	}
+
+	w, err := s.store.GetWorkspaceBySlug(ctx, db.GetWorkspaceBySlugParams{UserID: userID, Slug: ref})
+	if err != nil {
+		return nil, ErrWorkspaceNotFound
+	}
+	return s.GetWorkspace(ctx, w.ID)
 }
 
 func (s *WorkspaceService) ArchiveWorkspace(ctx context.Context, id uuid.UUID) error {

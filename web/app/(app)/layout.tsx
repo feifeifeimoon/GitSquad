@@ -14,6 +14,7 @@ import {
   Search,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
+import { paths, workspaceSlugFromPath } from "@/lib/paths";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import {
@@ -39,9 +40,9 @@ interface User {
 }
 
 const navItems = [
-  { href: "/console/workspaces", label: "Workspaces", icon: FolderGit2 },
-  { href: "/console/daemons", label: "Daemons", icon: Monitor },
-  { href: "/console/settings", label: "Settings", icon: Settings },
+  { href: "/workspaces", label: "Workspaces", icon: FolderGit2 },
+  { href: "/daemons", label: "Daemons", icon: Monitor },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
@@ -57,12 +58,11 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const isMac = useSyncExternalStore(emptySubscribe, getIsMac, getIsMacServer);
 
-  const [ws, setWs] = useState<{ id: string; data: Workspace } | null>(null);
+  const [ws, setWs] = useState<{ slug: string; data: Workspace } | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const wsMatch = pathname?.match(/^\/console\/workspaces\/([^/]+)/);
-  const wsId = wsMatch ? decodeURIComponent(wsMatch[1]) : null;
-  // Derived so a stale workspace is never shown when the route id changes.
-  const workspace = ws && ws.id === wsId ? ws.data : null;
+  const wsId = workspaceSlugFromPath(pathname);
+  // Derived so a stale workspace is never shown when the route slug changes.
+  const workspace = ws && ws.slug === wsId ? ws.data : null;
 
   useEffect(() => {
     api
@@ -84,7 +84,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     api
       .get<Workspace>(`/api/v1/workspaces/${wsId}`)
       .then((w) => {
-        if (!cancelled) setWs({ id: wsId, data: w });
+        if (!cancelled) setWs({ slug: wsId, data: w });
       })
       .catch(() => {
         if (!cancelled) setWs(null);
@@ -160,7 +160,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
             {workspaces.map((w) => (
               <DropdownMenuItem
                 key={w.id}
-                onClick={() => router.push(`/console/workspaces/${w.id}`)}
+                onClick={() => router.push(paths.workspace(w.slug).board())}
               >
                 <WorkspaceAvatar
                   name={w.name}
@@ -168,11 +168,11 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                   className="size-5"
                 />
                 <span className="min-w-0 flex-1 truncate">{w.name}</span>
-                {wsId === w.id && <Check className="size-4 shrink-0 text-ink" />}
+                {wsId === w.slug && <Check className="size-4 shrink-0 text-ink" />}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push("/console/workspaces/new")}>
+            <DropdownMenuItem onClick={() => router.push(paths.newWorkspace())}>
               <Plus className="size-4" />
               Create workspace
             </DropdownMenuItem>
@@ -193,8 +193,8 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           </button>
           {navItems.map((item) => {
             const href =
-              item.href === "/console/settings" && wsId
-                ? `/console/workspaces/${wsId}/settings`
+              item.href === "/settings" && wsId
+                ? paths.workspace(wsId).settings()
                 : item.href;
             const active = pathname.startsWith(href);
             return (

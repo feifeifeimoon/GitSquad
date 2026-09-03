@@ -15,6 +15,7 @@ import {
   Search,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { TimeAgo } from "@/components/time-ago";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -143,7 +144,7 @@ export default function WorkspacesPage() {
             />
           </div>
           <ViewSwitcher view={view} onChange={setView} />
-          <Button onClick={() => router.push("/console/workspaces/new")}>
+          <Button onClick={() => router.push(paths.newWorkspace())}>
             <Plus className="size-4" />
             New Workspace
           </Button>
@@ -161,7 +162,7 @@ export default function WorkspacesPage() {
             started.
           </EmptyDescription>
           <Button
-            onClick={() => router.push("/console/workspaces/new")}
+            onClick={() => router.push(paths.newWorkspace())}
             className="mt-1"
           >
             Create your first Workspace
@@ -181,7 +182,7 @@ export default function WorkspacesPage() {
             <WorkspaceCard
               key={w.id}
               workspace={w}
-              onOpen={() => router.push(`/console/workspaces/${w.id}`)}
+              onOpen={() => router.push(paths.workspace(w.slug).board())}
             />
           ))}
         </div>
@@ -191,7 +192,7 @@ export default function WorkspacesPage() {
           sortKey={sortKey}
           sortDir={sortDir}
           onSort={toggleSort}
-          onOpen={(id) => router.push(`/console/workspaces/${id}`)}
+          onOpen={(slug) => router.push(paths.workspace(slug).board())}
         />
       )}
     </div>
@@ -306,7 +307,7 @@ function WorkspaceTable({
   sortKey: SortKey;
   sortDir: "asc" | "desc";
   onSort: (key: SortKey) => void;
-  onOpen: (id: string) => void;
+  onOpen: (slug: string) => void;
 }) {
   const th =
     "px-4 py-2 text-left font-mono text-xs font-medium uppercase tracking-wide text-mute";
@@ -352,7 +353,7 @@ function WorkspaceTable({
             {workspaces.map((w) => (
               <tr
                 key={w.id}
-                onClick={() => onOpen(w.id)}
+                onClick={() => onOpen(w.slug)}
                 className="cursor-pointer border-b border-hairline last:border-b-0 transition-colors hover:bg-muted/40"
               >
                 <td className="px-4 py-3">

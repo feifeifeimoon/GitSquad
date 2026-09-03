@@ -164,6 +164,61 @@ func (q *Queries) GetIssue(ctx context.Context, arg GetIssueParams) (GetIssueRow
 	return i, err
 }
 
+const getIssueByNumber = `-- name: GetIssueByNumber :one
+SELECT i.id, i.workspace_id, i.number, i.title, i.description, i.status, i.creator_user_id, i.assigned_agents, i.linked_prs, i.source_upstream_issue, i.created_at, i.updated_at, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
+       (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count
+FROM issues i
+JOIN workspaces w ON w.id = i.workspace_id
+LEFT JOIN users u ON u.id = i.creator_user_id
+WHERE i.workspace_id = $1 AND i.number = $2
+`
+
+type GetIssueByNumberParams struct {
+	WorkspaceID uuid.UUID `json:"workspace_id"`
+	Number      int32     `json:"number"`
+}
+
+type GetIssueByNumberRow struct {
+	ID                  uuid.UUID  `json:"id"`
+	WorkspaceID         uuid.UUID  `json:"workspace_id"`
+	Number              int32      `json:"number"`
+	Title               string     `json:"title"`
+	Description         string     `json:"description"`
+	Status              string     `json:"status"`
+	CreatorUserID       *uuid.UUID `json:"creator_user_id"`
+	AssignedAgents      []string   `json:"assigned_agents"`
+	LinkedPrs           []string   `json:"linked_prs"`
+	SourceUpstreamIssue *string    `json:"source_upstream_issue"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	IssuePrefix         string     `json:"issue_prefix"`
+	CreatorName         string     `json:"creator_name"`
+	CommentsCount       int64      `json:"comments_count"`
+}
+
+func (q *Queries) GetIssueByNumber(ctx context.Context, arg GetIssueByNumberParams) (GetIssueByNumberRow, error) {
+	row := q.db.QueryRow(ctx, getIssueByNumber, arg.WorkspaceID, arg.Number)
+	var i GetIssueByNumberRow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Number,
+		&i.Title,
+		&i.Description,
+		&i.Status,
+		&i.CreatorUserID,
+		&i.AssignedAgents,
+		&i.LinkedPrs,
+		&i.SourceUpstreamIssue,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IssuePrefix,
+		&i.CreatorName,
+		&i.CommentsCount,
+	)
+	return i, err
+}
+
 const getWorkspaceNumbering = `-- name: GetWorkspaceNumbering :one
 SELECT issue_prefix FROM workspaces WHERE id = $1
 `

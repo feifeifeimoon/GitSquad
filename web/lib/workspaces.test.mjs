@@ -3,11 +3,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const list = readFileSync(
-  new URL("../app/console/workspaces/page.tsx", import.meta.url),
+  new URL("../app/(app)/workspaces/page.tsx", import.meta.url),
   "utf8",
 );
 const shell = readFileSync(
-  new URL("../app/console/layout.tsx", import.meta.url),
+  new URL("../app/(app)/layout.tsx", import.meta.url),
   "utf8",
 );
 const badge = readFileSync(

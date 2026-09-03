@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import {
   IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi,
 } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,7 +19,7 @@ import { MarkdownEditor } from "@/components/markdown-editor";
 import { StatusIconLabel } from "@/components/status-icon";
 
 export default function IssueDetailPage() {
-  const { id, issueId } = useParams<{ id: string; issueId: string }>();
+  const { slug, issueKey } = useParams<{ slug: string; issueKey: string }>();
   const router = useRouter();
   const [issue, setIssue] = useState<IssueDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,17 +29,17 @@ export default function IssueDetailPage() {
 
   const load = () => {
     issueApi
-      .get(id, issueId)
+      .get(slug, issueKey)
       .then(setIssue)
-      .catch(() => router.push(`/console/workspaces/${id}`))
+      .catch(() => router.push(paths.workspace(slug).board()))
       .finally(() => setLoading(false));
   };
-  useEffect(load, [id, issueId, router]);
+  useEffect(load, [slug, issueKey, router]);
 
   const changeStatus = async (status: IssueStatus) => {
     if (!issue || status === issue.status) return;
     try {
-      await issueApi.update(id, issueId, { status });
+      await issueApi.update(slug, issueKey, { status });
       load();
     } catch (err) {
       toast.error(
@@ -51,7 +52,7 @@ export default function IssueDetailPage() {
     if (!content.trim()) return;
     setPosting(true);
     try {
-      await issueApi.addComment(id, issueId, content);
+      await issueApi.addComment(slug, issueKey, content);
       setContent("");
       setEditorKey((k) => k + 1);
       load();
@@ -114,7 +115,7 @@ export default function IssueDetailPage() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4">
         <button
-          onClick={() => router.push(`/console/workspaces/${id}`)}
+          onClick={() => router.push(paths.workspace(slug).board())}
           className="flex shrink-0 items-center gap-1 text-sm text-body transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />

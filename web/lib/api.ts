@@ -143,6 +143,7 @@ export const issueApi = {
 
 export interface Workspace {
   id: string;
+  slug: string;
   name: string;
   status: string;
   avatar_url: string;

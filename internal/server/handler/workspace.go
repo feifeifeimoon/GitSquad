@@ -58,6 +58,12 @@ func (h *WorkspaceHandler) Create(c *gin.Context) {
 			c.JSON(http.StatusForbidden, v1.ErrorResponse("installation does not belong to you"))
 		case errors.Is(err, service.ErrRepoMismatch):
 			c.JSON(http.StatusForbidden, v1.ErrorResponse("repo does not belong to this installation"))
+		case errors.Is(err, service.ErrInvalidWorkspaceName):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("workspace name must contain at least one letter or number"))
+		case errors.Is(err, service.ErrWorkspaceSlugReserved):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("workspace slug is reserved"))
+		case errors.Is(err, service.ErrWorkspaceSlugTaken):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("workspace slug already exists"))
 		default:
 			slog.Error("create workspace", "error", err)
 			c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to create workspace"))
@@ -86,7 +92,7 @@ func (h *WorkspaceHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(list, len(list)))
 }
 
-// Get handles GET /api/v1/workspaces/:id.
+// Get handles GET /api/v1/workspaces/:id (id = UUID or slug).
 func (h *WorkspaceHandler) Get(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -94,13 +100,7 @@ func (h *WorkspaceHandler) Get(c *gin.Context) {
 		return
 	}
 
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid workspace id"))
-		return
-	}
-
-	workspace, err := h.workspaces.GetWorkspace(c.Request.Context(), id)
+	workspace, err := h.workspaces.ResolveWorkspace(c.Request.Context(), user.ID, c.Param("id"))
 	if err != nil {
 		if errors.Is(err, service.ErrWorkspaceNotFound) {
 			c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
@@ -111,15 +111,10 @@ func (h *WorkspaceHandler) Get(c *gin.Context) {
 		return
 	}
 
-	if workspace.UserID != user.ID {
-		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
-		return
-	}
-
 	c.JSON(http.StatusOK, v1.SuccessResponse(workspace, 0))
 }
 
-// Archive handles DELETE /api/v1/workspaces/:id.
+// Archive handles DELETE /api/v1/workspaces/:id (id = UUID or slug).
 func (h *WorkspaceHandler) Archive(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -127,23 +122,13 @@ func (h *WorkspaceHandler) Archive(c *gin.Context) {
 		return
 	}
 
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid workspace id"))
-		return
-	}
-
-	workspace, err := h.workspaces.GetWorkspace(c.Request.Context(), id)
+	workspace, err := h.workspaces.ResolveWorkspace(c.Request.Context(), user.ID, c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
 		return
 	}
-	if workspace.UserID != user.ID {
-		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
-		return
-	}
 
-	if err := h.workspaces.ArchiveWorkspace(c.Request.Context(), id); err != nil {
+	if err := h.workspaces.ArchiveWorkspace(c.Request.Context(), workspace.ID); err != nil {
 		slog.Error("archive workspace", "error", err)
 		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to archive workspace"))
 		return
@@ -152,7 +137,7 @@ func (h *WorkspaceHandler) Archive(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]bool{"archived": true}, 0))
 }
 
-// Delete handles DELETE /api/v1/workspaces/:id/delete (permanent removal).
+// Delete handles DELETE /api/v1/workspaces/:id/delete (id = UUID or slug).
 func (h *WorkspaceHandler) Delete(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -160,23 +145,13 @@ func (h *WorkspaceHandler) Delete(c *gin.Context) {
 		return
 	}
 
-	id, err := uuid.Parse(c.Param("id"))
-	if err != nil {
-		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid workspace id"))
-		return
-	}
-
-	workspace, err := h.workspaces.GetWorkspace(c.Request.Context(), id)
+	workspace, err := h.workspaces.ResolveWorkspace(c.Request.Context(), user.ID, c.Param("id"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
 		return
 	}
-	if workspace.UserID != user.ID {
-		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
-		return
-	}
 
-	if err := h.workspaces.DeleteWorkspace(c.Request.Context(), id); err != nil {
+	if err := h.workspaces.DeleteWorkspace(c.Request.Context(), workspace.ID); err != nil {
 		slog.Error("delete workspace", "error", err)
 		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to delete workspace"))
 		return
@@ -185,7 +160,7 @@ func (h *WorkspaceHandler) Delete(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]bool{"deleted": true}, 0))
 }
 
-// UpdateAvatar handles PUT /api/v1/workspaces/:id/avatar.
+// UpdateAvatar handles PUT /api/v1/workspaces/:id/avatar (id = UUID or slug).
 func (h *WorkspaceHandler) UpdateAvatar(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {
@@ -193,18 +168,8 @@ func (h *WorkspaceHandler) UpdateAvatar(c *gin.Context) {
 		return
 	}
 
-	id, err := uuid.Parse(c.Param("id"))
+	workspace, err := h.workspaces.ResolveWorkspace(c.Request.Context(), user.ID, c.Param("id"))
 	if err != nil {
-		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid workspace id"))
-		return
-	}
-
-	workspace, err := h.workspaces.GetWorkspace(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
-		return
-	}
-	if workspace.UserID != user.ID {
 		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
 		return
 	}
@@ -217,7 +182,7 @@ func (h *WorkspaceHandler) UpdateAvatar(c *gin.Context) {
 		return
 	}
 
-	if err := h.workspaces.UpdateWorkspaceAvatar(c.Request.Context(), id, req.AvatarURL); err != nil {
+	if err := h.workspaces.UpdateWorkspaceAvatar(c.Request.Context(), workspace.ID, req.AvatarURL); err != nil {
 		slog.Error("update workspace avatar", "error", err)
 		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to update avatar"))
 		return

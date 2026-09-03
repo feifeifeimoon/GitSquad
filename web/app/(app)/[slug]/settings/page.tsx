@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, Trash2 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
@@ -17,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 
 export default function WorkspaceSettingsPage() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
@@ -30,22 +31,22 @@ export default function WorkspaceSettingsPage() {
 
   useEffect(() => {
     api
-      .get<Workspace>(`/api/v1/workspaces/${id}`)
+      .get<Workspace>(`/api/v1/workspaces/${slug}`)
       .then(setWorkspace)
-      .catch(() => router.push("/console/workspaces"))
+      .catch(() => router.push(paths.workspaces()))
       .finally(() => setLoading(false));
-  }, [id, router]);
+  }, [slug, router]);
 
   const url =
     typeof window !== "undefined"
-      ? `${window.location.origin}/console/workspaces/${id}`
+      ? `${window.location.origin}/${slug}`
       : "";
 
   const updateAvatar = async (avatarUrl: string) => {
     setUploading(true);
     setAvatarError("");
     try {
-      await api.put(`/api/v1/workspaces/${id}/avatar`, { avatar_url: avatarUrl });
+      await api.put(`/api/v1/workspaces/${slug}/avatar`, { avatar_url: avatarUrl });
       setWorkspace((prev) => (prev ? { ...prev, avatar_url: avatarUrl } : prev));
     } catch {
       setAvatarError("Failed to update avatar.");
@@ -75,8 +76,8 @@ export default function WorkspaceSettingsPage() {
     if (confirmText !== workspace?.name || deleting) return;
     setDeleting(true);
     try {
-      await api.delete(`/api/v1/workspaces/${id}/delete`);
-      router.push("/console/workspaces");
+      await api.delete(`/api/v1/workspaces/${slug}/delete`);
+      router.push(paths.workspaces());
     } catch {
       setDeleting(false);
     }
@@ -94,7 +95,7 @@ export default function WorkspaceSettingsPage() {
     <div className="flex h-full flex-col">
       <div className="px-8 pb-4 pt-6">
         <button
-          onClick={() => router.push(`/console/workspaces/${id}`)}
+          onClick={() => router.push(paths.workspace(slug).board())}
           className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />

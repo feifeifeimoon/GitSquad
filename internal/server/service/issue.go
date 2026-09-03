@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -92,6 +93,39 @@ func (s *IssueService) dispatchForMention(ctx context.Context, issueID uuid.UUID
 
 func issueKey(prefix string, number int32) string {
 	return fmt.Sprintf("%s-%d", prefix, number)
+}
+
+// parseIssueNumber extracts the trailing number from an issue reference in
+// "PREFIX-NUMBER" form (e.g. "GTS-42"). Bare numbers and malformed refs are
+// rejected — only UUIDs or PREFIX-NUMBER are valid issue references.
+func parseIssueNumber(ref string) (int32, bool) {
+	i := strings.LastIndex(ref, "-")
+	if i <= 0 || i >= len(ref)-1 {
+		return 0, false
+	}
+	n, err := strconv.Atoi(ref[i+1:])
+	if err != nil {
+		return 0, false
+	}
+	return int32(n), true
+}
+
+// ResolveIssueID resolves an issue reference (UUID or "PREFIX-NUMBER") to its
+// UUID. UUID refs are returned as-is and validated by the downstream
+// Get/Update/AddComment calls; PREFIX-NUMBER refs are looked up by number.
+func (s *IssueService) ResolveIssueID(ctx context.Context, workspaceID uuid.UUID, ref string) (uuid.UUID, error) {
+	if id, err := uuid.Parse(ref); err == nil {
+		return id, nil
+	}
+	num, ok := parseIssueNumber(ref)
+	if !ok {
+		return uuid.Nil, ErrIssueNotFound
+	}
+	row, err := s.store.GetIssueByNumber(ctx, db.GetIssueByNumberParams{WorkspaceID: workspaceID, Number: num})
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("%w: %v", ErrIssueNotFound, err)
+	}
+	return row.ID, nil
 }
 
 // listRowToResponse maps a ListIssuesByWorkspaceRow to the API shape.

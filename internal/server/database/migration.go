@@ -128,6 +128,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			END $$`},
 		{name: "016_workspace_avatar", sql: `ALTER TABLE workspaces
 			ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT ''`},
+		{name: "017_workspace_slug", sql: `ALTER TABLE workspaces
+			ADD COLUMN IF NOT EXISTS slug TEXT NOT NULL DEFAULT ''`},
+		{name: "018_workspace_slug_index", sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_user_slug ON workspaces(user_id, slug) WHERE slug <> ''`},
 	}
 
 	for _, m := range migrations {

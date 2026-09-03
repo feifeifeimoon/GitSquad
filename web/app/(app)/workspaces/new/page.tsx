@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -146,7 +147,7 @@ export default function NewWorkspacePage() {
       name: repo.name,
       private: repo.private ? "1" : "0",
     });
-    router.push(`/console/workspaces/new/configure?${params.toString()}`);
+    router.push(`${paths.newWorkspaceConfigure()}?${params.toString()}`);
   };
 
   if (loading) {
@@ -161,7 +162,7 @@ export default function NewWorkspacePage() {
     <div className="flex h-full flex-col">
       <div className="px-8 pb-4 pt-6">
         <button
-          onClick={() => router.push("/console/workspaces")}
+          onClick={() => router.push(paths.workspaces())}
           className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />
