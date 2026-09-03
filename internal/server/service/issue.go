@@ -79,11 +79,10 @@ func NewIssueService(s *store.Store) *IssueService {
 	return &IssueService{store: s}
 }
 
-// listAgentNames returns the agent names configured in a workspace.
-// Chapter 5 (agent config) will back this with the agents table; until
-// then it returns nothing, so every mention is treated as unmatched.
-func listAgentNames(ctx context.Context, workspaceID uuid.UUID) ([]string, error) {
-	return nil, nil
+// listAgentNames returns the enabled agent names configured in a workspace,
+// backing @mention resolution against the agents table.
+func (s *IssueService) listAgentNames(ctx context.Context, workspaceID uuid.UUID) ([]string, error) {
+	return s.store.ListAgentNamesByWorkspace(ctx, workspaceID)
 }
 
 // dispatchForMention is the seam where Chapter 9 (task dispatch) hooks in:
@@ -182,7 +181,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 		return nil, ErrInvalidStatus
 	}
 
-	agents, err := listAgentNames(ctx, workspaceID)
+	agents, err := s.listAgentNames(ctx, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("list agent names: %w", err)
 	}
@@ -361,7 +360,7 @@ func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, use
 		return nil, ErrEmptyComment
 	}
 
-	agents, err := listAgentNames(ctx, workspaceID)
+	agents, err := s.listAgentNames(ctx, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("list agent names: %w", err)
 	}
