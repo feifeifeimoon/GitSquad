@@ -10,6 +10,40 @@ import (
 	"github.com/google/uuid"
 )
 
+type Agent struct {
+	ID           uuid.UUID  `json:"id"`
+	WorkspaceID  uuid.UUID  `json:"workspace_id"`
+	Name         string     `json:"name"`
+	Description  string     `json:"description"`
+	Instructions string     `json:"instructions"`
+	Model        string     `json:"model"`
+	RuntimeID    uuid.UUID  `json:"runtime_id"`
+	Enabled      bool       `json:"enabled"`
+	CreatedBy    *uuid.UUID `json:"created_by"`
+	CreatedAt    time.Time  `json:"created_at"`
+	UpdatedAt    time.Time  `json:"updated_at"`
+}
+
+type AgentRuntime struct {
+	ID          uuid.UUID  `json:"id"`
+	WorkspaceID uuid.UUID  `json:"workspace_id"`
+	DaemonID    *uuid.UUID `json:"daemon_id"`
+	Name        string     `json:"name"`
+	RuntimeMode string     `json:"runtime_mode"`
+	Provider    string     `json:"provider"`
+	Status      string     `json:"status"`
+	DeviceInfo  string     `json:"device_info"`
+	Metadata    []byte     `json:"metadata"`
+	LastSeenAt  *time.Time `json:"last_seen_at"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
+}
+
+type AgentSkill struct {
+	AgentID uuid.UUID `json:"agent_id"`
+	SkillID uuid.UUID `json:"skill_id"`
+}
+
 type Daemon struct {
 	ID            uuid.UUID  `json:"id"`
 	UserID        uuid.UUID  `json:"user_id"`
@@ -101,6 +135,17 @@ type Runtime struct {
 	CheckedAt      time.Time `json:"checked_at"`
 	Diagnostics    *string   `json:"diagnostics"`
 	MaxConcurrency int32     `json:"max_concurrency"`
+}
+
+type Skill struct {
+	ID          uuid.UUID  `json:"id"`
+	WorkspaceID uuid.UUID  `json:"workspace_id"`
+	Name        string     `json:"name"`
+	Description string     `json:"description"`
+	Content     string     `json:"content"`
+	CreatedBy   *uuid.UUID `json:"created_by"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 type User struct {
