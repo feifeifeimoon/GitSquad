@@ -16,6 +16,7 @@ import { api } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { CreateWorkspaceAside } from "@/components/create-workspace-aside";
 
 interface Repo {
   id: string;
@@ -168,10 +169,11 @@ export default function NewWorkspacePage() {
         </button>
       </div>
 
-      <div className="mx-auto w-full max-w-3xl flex-1 px-8 pb-8">
-      <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
-        Create a Workspace
-      </h1>
+      <div className="mx-auto flex w-full max-w-6xl flex-1 gap-12 px-8 pb-8">
+        <div className="min-w-0 flex-1">
+        <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
+          Create a Workspace
+        </h1>
       <p className="mb-8 text-sm text-body">
         Import a Git repository and configure your agent team.
       </p>
@@ -364,6 +366,8 @@ export default function NewWorkspacePage() {
           )}
         </div>
       )}
+        </div>
+        <CreateWorkspaceAside />
       </div>
     </div>
   );
