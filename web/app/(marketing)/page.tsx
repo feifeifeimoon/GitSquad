@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   ArrowRight,
   Sparkles,
@@ -140,10 +141,10 @@ export default function Home() {
               <ArrowRight className="size-4" />
             </Button>
             <Button variant="secondary" size="pill" asChild>
-              <a href="/docs">
+              <Link href="/docs">
                 Read the docs
                 <ArrowRight className="size-3.5" />
-              </a>
+              </Link>
             </Button>
           </div>
         </div>

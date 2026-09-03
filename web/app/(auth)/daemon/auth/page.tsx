@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Check, Loader2, ArrowRight } from "lucide-react";
@@ -184,12 +185,12 @@ function DaemonAuthContent() {
                 <h2 className="text-lg font-semibold text-ink">Verification Failed</h2>
                 <p className="mt-1 text-sm text-body">{error}</p>
               </div>
-              <a
+              <Link
                 href="/login"
                 className="inline-block text-sm text-body transition-colors hover:text-ink"
               >
                 Back to login
-              </a>
+              </Link>
             </div>
           )}
         </div>
