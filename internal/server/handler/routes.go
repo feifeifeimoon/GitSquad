@@ -39,6 +39,10 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	workspaceHandler := NewWorkspaceHandler(workspaceSvc)
 	issueSvc := service.NewIssueService(s)
 	issueHandler := NewIssueHandler(issueSvc, workspaceSvc)
+	agentSvc := service.NewAgentService(s)
+	skillSvc := service.NewSkillService(s)
+	agentHandler := NewAgentHandler(agentSvc, workspaceSvc)
+	skillHandler := NewSkillHandler(skillSvc, workspaceSvc)
 
 	r.GET("/healthz", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
@@ -121,6 +125,21 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.GET("/workspaces/:id/issues/:issueId", issueHandler.Get)
 			protected.PATCH("/workspaces/:id/issues/:issueId", issueHandler.Update)
 			protected.POST("/workspaces/:id/issues/:issueId/comments", issueHandler.AddComment)
+
+			// Agent configuration
+			protected.GET("/workspaces/:id/agents", agentHandler.List)
+			protected.POST("/workspaces/:id/agents", agentHandler.Create)
+			protected.GET("/workspaces/:id/agents/:agentId", agentHandler.Get)
+			protected.PATCH("/workspaces/:id/agents/:agentId", agentHandler.Update)
+			protected.DELETE("/workspaces/:id/agents/:agentId", agentHandler.Delete)
+			protected.GET("/workspaces/:id/runtimes", agentHandler.ListRuntimes)
+
+			// Skill management
+			protected.GET("/workspaces/:id/skills", skillHandler.List)
+			protected.POST("/workspaces/:id/skills", skillHandler.Create)
+			protected.GET("/workspaces/:id/skills/:skillId", skillHandler.Get)
+			protected.PATCH("/workspaces/:id/skills/:skillId", skillHandler.Update)
+			protected.DELETE("/workspaces/:id/skills/:skillId", skillHandler.Delete)
 		}
 }
 
