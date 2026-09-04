@@ -8,6 +8,7 @@ import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
+import { UserSettings } from "@/components/settings/user-settings";
 import {
   Dialog,
   DialogContent,
@@ -105,6 +106,8 @@ export default function WorkspaceSettingsPage() {
 
       <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8">
         <h1 className="mb-6 text-lg font-semibold text-ink">Settings</h1>
+
+        <UserSettings />
 
         {/* General */}
         <section className="mb-8">
