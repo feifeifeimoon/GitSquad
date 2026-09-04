@@ -106,6 +106,15 @@ export default function WorkspaceSettingsPage() {
       <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8">
         <h1 className="mb-6 text-lg font-semibold text-ink">Settings</h1>
 
+        <div className="mb-8 flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => router.push(paths.workspace(slug).agents())}>
+            Agents
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => router.push(paths.workspace(slug).skills())}>
+            Skills
+          </Button>
+        </div>
+
         {/* General */}
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-medium text-ink">General</h2>

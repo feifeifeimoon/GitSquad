@@ -204,6 +204,21 @@ func (q *Queries) DeleteDaemon(ctx context.Context, id uuid.UUID) error {
 	return err
 }
 
+const deleteRuntimesNotIn = `-- name: DeleteRuntimesNotIn :exec
+DELETE FROM runtimes
+WHERE daemon_id = $1 AND name <> ALL($2::text[])
+`
+
+type DeleteRuntimesNotInParams struct {
+	DaemonID uuid.UUID `json:"daemon_id"`
+	Names    []string  `json:"names"`
+}
+
+func (q *Queries) DeleteRuntimesNotIn(ctx context.Context, arg DeleteRuntimesNotInParams) error {
+	_, err := q.db.Exec(ctx, deleteRuntimesNotIn, arg.DaemonID, arg.Names)
+	return err
+}
+
 const expireToken = `-- name: ExpireToken :exec
 UPDATE daemon_tokens SET status = 'expired' WHERE id = $1
 `

@@ -156,3 +156,86 @@ export interface Workspace {
   last_commit_author: string;
   last_commit_at: string;
 }
+
+// ── Agents ────────────────────────────────────────────────────────────
+
+export interface AgentRuntime {
+  id: string;
+  workspace_id: string;
+  daemon_id?: string | null;
+  name: string;
+  runtime_mode: "local" | "cloud";
+  provider: string;
+  status: "online" | "offline";
+  daemon_name?: string;
+  daemon_status?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Skill {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Agent {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  instructions: string;
+  model: string;
+  runtime_id: string;
+  enabled: boolean;
+  skills?: Skill[];
+  runtime?: AgentRuntime;
+  created_at: string;
+  updated_at: string;
+}
+
+export const agentApi = {
+  list: (workspaceId: string) => api.get<Agent[]>(`/api/v1/workspaces/${workspaceId}/agents`),
+  get: (workspaceId: string, agentId: string) =>
+    api.get<Agent>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`),
+  create: (workspaceId: string, body: {
+    name: string;
+    description?: string;
+    instructions?: string;
+    model?: string;
+    daemon_id: string;
+    provider: string;
+    skill_ids?: string[];
+    enabled?: boolean;
+  }) => api.post<Agent>(`/api/v1/workspaces/${workspaceId}/agents`, body),
+  update: (workspaceId: string, agentId: string, body: {
+    name?: string;
+    description?: string;
+    instructions?: string;
+    model?: string;
+    daemon_id?: string;
+    provider?: string;
+    skill_ids?: string[];
+    enabled?: boolean;
+  }) => api.patch<Agent>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`, body),
+  remove: (workspaceId: string, agentId: string) =>
+    api.delete<{ deleted: boolean }>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`),
+};
+
+export const runtimeApi = {
+  list: (workspaceId: string) => api.get<AgentRuntime[]>(`/api/v1/workspaces/${workspaceId}/runtimes`),
+};
+
+export const skillApi = {
+  list: (workspaceId: string) => api.get<Skill[]>(`/api/v1/workspaces/${workspaceId}/skills`),
+  create: (workspaceId: string, body: { name: string; description?: string; content?: string }) =>
+    api.post<Skill>(`/api/v1/workspaces/${workspaceId}/skills`, body),
+  update: (workspaceId: string, skillId: string, body: { name?: string; description?: string; content?: string }) =>
+    api.patch<Skill>(`/api/v1/workspaces/${workspaceId}/skills/${skillId}`, body),
+  remove: (workspaceId: string, skillId: string) =>
+    api.delete<{ deleted: boolean }>(`/api/v1/workspaces/${workspaceId}/skills/${skillId}`),
+};

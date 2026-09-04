@@ -25,6 +25,8 @@ export const paths = {
   workspace: (slug: string) => ({
     board: () => `/${encode(slug)}`,
     settings: () => `/${encode(slug)}/settings`,
+    agents: () => `/${encode(slug)}/agents`,
+    skills: () => `/${encode(slug)}/skills`,
     issue: (key: string) => `/${encode(slug)}/issues/${encode(key)}`,
   }),
 };

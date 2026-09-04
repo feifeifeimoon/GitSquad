@@ -345,14 +345,12 @@ func (s *DaemonService) FindByUserID(ctx context.Context, userID uuid.UUID) ([]v
 
 func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID, runtimes []v1.Runtime) error {
 	return s.store.ExecTx(ctx, func(q *db.Queries) error {
-		if err := q.ClearRuntimes(ctx, daemonID); err != nil {
-			return err
-		}
+		names := make([]string, 0, len(runtimes))
 		for _, rt := range runtimes {
 			if err := q.InsertRuntime(ctx, db.InsertRuntimeParams{
 				DaemonID:       daemonID,
 				Kind:           rt.Kind,
-				Name:           rt.Kind, // Name mirrors Kind since the shared type has no Name field
+				Name:           rt.Kind, // provider 标识;kind/name 收敛后仅此一处
 				ExecutablePath: rt.ExecutablePath,
 				Version:        rt.Version,
 				Status:         "available",
@@ -361,6 +359,10 @@ func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID,
 			}); err != nil {
 				return err
 			}
+			names = append(names, rt.Kind)
+		}
+		if err := q.DeleteRuntimesNotIn(ctx, db.DeleteRuntimesNotInParams{DaemonID: daemonID, Names: names}); err != nil {
+			return err
 		}
 		return nil
 	})
