@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Plus, Trash2, Pencil, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Sparkles } from "lucide-react";
 import { skillApi, type Skill } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
@@ -89,16 +89,17 @@ export default function WorkspaceSkillsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-8 pb-4 pt-6">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between border-b border-hairline px-8 py-4">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => router.push(paths.workspace(slug).board())}
-            className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
+            className="flex shrink-0 items-center gap-1 text-sm text-body transition-colors hover:text-ink"
           >
             <ChevronLeft className="size-4" />
             Issues
           </button>
-          <h1 className="text-sm font-medium text-ink">Skills</h1>
+          <ChevronRight className="size-3.5 shrink-0 text-mute" />
+          <span className="truncate text-sm font-medium text-ink">Skills</span>
         </div>
         <Button onClick={openCreate}>
           <Plus className="size-4" />
@@ -106,7 +107,7 @@ export default function WorkspaceSkillsPage() {
         </Button>
       </div>
 
-      <div className="flex-1 px-8 pb-8">
+      <div className="flex-1 px-8 pb-8 pt-6">
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (
