@@ -92,11 +92,11 @@ export default function WorkspaceSkillsPage() {
       <div className="flex items-center justify-between px-8 pb-4 pt-6">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push(paths.workspace(slug).settings())}
+            onClick={() => router.push(paths.workspace(slug).board())}
             className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
           >
             <ChevronLeft className="size-4" />
-            Settings
+            Issues
           </button>
           <h1 className="text-sm font-medium text-ink">Skills</h1>
         </div>
