@@ -15,7 +15,6 @@ import {
   Bot,
   CircleDot,
   Sparkles,
-  SlidersHorizontal,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
@@ -53,7 +52,6 @@ const workspaceNavItems = [
   { key: "board", label: "Issues", icon: CircleDot },
   { key: "agents", label: "Agents", icon: Bot },
   { key: "skills", label: "Skills", icon: Sparkles },
-  { key: "settings", label: "Workspace Settings", icon: SlidersHorizontal },
 ];
 
 function workspaceHref(ws: string, key: string): string {
@@ -215,30 +213,9 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               {isMac ? "⌘K" : "Ctrl K"}
             </kbd>
           </button>
-          {globalNavItems.map((item) => {
-            const active = pathname.startsWith(item.href);
-            return (
-              <button
-                key={item.href}
-                onClick={() => router.push(item.href)}
-                className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-muted text-ink"
-                    : "text-body hover:bg-muted hover:text-ink"
-                }`}
-              >
-                {active && (
-                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
-                )}
-                <item.icon className="size-4" />
-                {item.label}
-              </button>
-            );
-          })}
-
           {wsId && (
             <>
-              <div className="mt-5 mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-mute">
+              <div className="mt-4 mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-mute">
                 Workspace
               </div>
               {workspaceNavItems.map((item) => {
@@ -262,8 +239,35 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                   </button>
                 );
               })}
+
+              <div className="my-3 border-t border-hairline" />
             </>
           )}
+
+          {globalNavItems.map((item) => {
+            const href =
+              item.href === "/settings" && wsId
+                ? paths.workspace(wsId).settings()
+                : item.href;
+            const active = pathname.startsWith(href);
+            return (
+              <button
+                key={item.href}
+                onClick={() => router.push(href)}
+                className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
+                  active
+                    ? "bg-muted text-ink"
+                    : "text-body hover:bg-muted hover:text-ink"
+                }`}
+              >
+                {active && (
+                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                )}
+                <item.icon className="size-4" />
+                {item.label}
+              </button>
+            );
+          })}
         </nav>
 
         {/* User */}
