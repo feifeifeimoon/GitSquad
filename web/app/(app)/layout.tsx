@@ -82,7 +82,14 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
 
   const [ws, setWs] = useState<{ slug: string; data: Workspace } | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const wsId = workspaceSlugFromPath(pathname);
+  const pathWorkspaceId = workspaceSlugFromPath(pathname);
+  // Remember the last workspace slug so the workspace context (switcher +
+  // nav) survives navigating to global pages like /workspaces or /daemons.
+  const [lastWorkspaceSlug, setLastWorkspaceSlug] = useState<string | null>(null);
+  if (pathWorkspaceId && pathWorkspaceId !== lastWorkspaceSlug) {
+    setLastWorkspaceSlug(pathWorkspaceId);
+  }
+  const wsId = pathWorkspaceId ?? lastWorkspaceSlug;
   // Derived so a stale workspace is never shown when the route slug changes.
   const workspace = ws && ws.slug === wsId ? ws.data : null;
 
