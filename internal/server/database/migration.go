@@ -131,6 +131,54 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		{name: "017_workspace_slug", sql: `ALTER TABLE workspaces
 			ADD COLUMN IF NOT EXISTS slug TEXT NOT NULL DEFAULT ''`},
 		{name: "018_workspace_slug_index", sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_workspaces_user_slug ON workspaces(user_id, slug) WHERE slug <> ''`},
+		{name: "019_create_agent_runtimes", sql: `CREATE TABLE IF NOT EXISTS agent_runtimes (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			daemon_id UUID REFERENCES daemons(id),
+			name TEXT NOT NULL,
+			runtime_mode TEXT NOT NULL DEFAULT 'local' CHECK (runtime_mode IN ('local','cloud')),
+			provider TEXT NOT NULL,
+			status TEXT NOT NULL DEFAULT 'offline' CHECK (status IN ('online','offline')),
+			device_info TEXT NOT NULL DEFAULT '',
+			metadata JSONB NOT NULL DEFAULT '{}',
+			last_seen_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (workspace_id, daemon_id, provider)
+		)`},
+		{name: "020_create_agents", sql: `CREATE TABLE IF NOT EXISTS agents (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			instructions TEXT NOT NULL DEFAULT '',
+			model TEXT NOT NULL DEFAULT '',
+			runtime_id UUID NOT NULL REFERENCES agent_runtimes(id) ON DELETE RESTRICT,
+			enabled BOOLEAN NOT NULL DEFAULT true,
+			created_by UUID REFERENCES users(id),
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (workspace_id, name)
+		)`},
+		{name: "021_create_skills", sql: `CREATE TABLE IF NOT EXISTS skills (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			name TEXT NOT NULL,
+			description TEXT NOT NULL DEFAULT '',
+			content TEXT NOT NULL DEFAULT '',
+			created_by UUID REFERENCES users(id),
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (workspace_id, name)
+		)`},
+		{name: "022_create_agent_skills", sql: `CREATE TABLE IF NOT EXISTS agent_skills (
+			agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+			skill_id UUID NOT NULL REFERENCES skills(id) ON DELETE CASCADE,
+			PRIMARY KEY (agent_id, skill_id)
+		)`},
+		{name: "023_agent_runtimes_idx", sql: `CREATE INDEX IF NOT EXISTS idx_agent_runtimes_workspace ON agent_runtimes(workspace_id)`},
+		{name: "024_agents_idx", sql: `CREATE INDEX IF NOT EXISTS idx_agents_workspace ON agents(workspace_id)`},
+		{name: "025_skills_idx", sql: `CREATE INDEX IF NOT EXISTS idx_skills_workspace ON skills(workspace_id)`},
 	}
 
 	for _, m := range migrations {
