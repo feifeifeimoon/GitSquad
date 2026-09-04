@@ -12,6 +12,10 @@ import {
   Plus,
   Check,
   Search,
+  Bot,
+  CircleDot,
+  Sparkles,
+  SlidersHorizontal,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
@@ -39,11 +43,31 @@ interface User {
   avatar_url: string;
 }
 
-const navItems = [
+const globalNavItems = [
   { href: "/workspaces", label: "Workspaces", icon: FolderGit2 },
   { href: "/daemons", label: "Daemons", icon: Monitor },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
+
+const workspaceNavItems = [
+  { key: "board", label: "Issues", icon: CircleDot },
+  { key: "agents", label: "Agents", icon: Bot },
+  { key: "skills", label: "Skills", icon: Sparkles },
+  { key: "settings", label: "Workspace Settings", icon: SlidersHorizontal },
+];
+
+function workspaceHref(ws: string, key: string): string {
+  const w = paths.workspace(ws);
+  if (key === "board") return w.board();
+  if (key === "agents") return w.agents();
+  if (key === "skills") return w.skills();
+  return w.settings();
+}
+
+function isWorkspaceItemActive(pathname: string, ws: string, key: string): boolean {
+  const href = workspaceHref(ws, key);
+  return key === "board" ? pathname === href : pathname.startsWith(href);
+}
 const MIN_WIDTH = 200;
 const MAX_WIDTH = 400;
 const DEFAULT_WIDTH = 240;
@@ -191,16 +215,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               {isMac ? "⌘K" : "Ctrl K"}
             </kbd>
           </button>
-          {navItems.map((item) => {
-            const href =
-              item.href === "/settings" && wsId
-                ? paths.workspace(wsId).settings()
-                : item.href;
-            const active = pathname.startsWith(href);
+          {globalNavItems.map((item) => {
+            const active = pathname.startsWith(item.href);
             return (
               <button
                 key={item.href}
-                onClick={() => router.push(href)}
+                onClick={() => router.push(item.href)}
                 className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
                   active
                     ? "bg-muted text-ink"
@@ -215,6 +235,35 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               </button>
             );
           })}
+
+          {wsId && (
+            <>
+              <div className="mt-5 mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-mute">
+                Workspace
+              </div>
+              {workspaceNavItems.map((item) => {
+                const active = isWorkspaceItemActive(pathname, wsId, item.key);
+                const href = workspaceHref(wsId, item.key);
+                return (
+                  <button
+                    key={item.key}
+                    onClick={() => router.push(href)}
+                    className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
+                      active
+                        ? "bg-muted text-ink"
+                        : "text-body hover:bg-muted hover:text-ink"
+                    }`}
+                  >
+                    {active && (
+                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
+                    )}
+                    <item.icon className="size-4" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* User */}
