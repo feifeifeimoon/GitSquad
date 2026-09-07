@@ -304,20 +304,18 @@ function RuntimeChips({ runtimes }: { runtimes: Runtime[] }) {
   return (
     <div className="flex flex-wrap gap-1.5">
       {list.map((c) => {
-        const broken = c.status === "error";
+        const label = [c.kind, c.version].filter(Boolean).join(" ");
+        const title =
+          c.status === "error" && c.diagnostics
+            ? `${label} — ${c.diagnostics}`
+            : label;
         return (
           <span
             key={c.kind}
-            title={broken ? c.diagnostics || c.kind : undefined}
-            className={`inline-flex items-center gap-1 rounded-sm px-2 py-1 text-xs font-medium ${
-              broken
-                ? "bg-destructive/10 text-destructive"
-                : "bg-success/10 text-success"
-            }`}
+            title={title}
+            className="inline-flex size-6 items-center justify-center rounded-sm bg-muted"
           >
             <ProviderIcon provider={c.kind} className="size-3.5" />
-            {c.kind}
-            {c.version && <span className="text-xs opacity-60">{c.version}</span>}
           </span>
         );
       })}
