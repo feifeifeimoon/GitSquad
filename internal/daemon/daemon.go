@@ -74,6 +74,7 @@ func (d *Daemon) Run(ctx context.Context) error {
 	}
 
 	go d.heartbeatLoop(ctx)
+	go d.runtimeRefreshLoop(ctx)
 
 	d.ready.Store(true)
 	return d.serve(ctx)
@@ -231,6 +232,58 @@ func (d *Daemon) sendHeartbeat(ctx context.Context) {
 	if err := d.ws.SendHeartbeat(ctx, payload); err != nil {
 		slog.Warn("heartbeat error", "error", err)
 	}
+}
+
+// runtimeRefreshLoop periodically re-runs runtime detection and re-registers
+// when the capability set changes, so runtimes installed while the daemon is
+// running show up without a restart.
+func (d *Daemon) runtimeRefreshLoop(ctx context.Context) {
+	if d.cfg.RuntimeRefreshInterval <= 0 {
+		return
+	}
+	ticker := time.NewTicker(d.cfg.RuntimeRefreshInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			d.refreshRuntimes(ctx)
+		}
+	}
+}
+
+// refreshRuntimes re-detects runtimes and, if anything changed, re-registers
+// with the server (the endpoint is idempotent: upsert + delete-not-in).
+func (d *Daemon) refreshRuntimes(ctx context.Context) {
+	_, runtimes := d.DetectRuntimes()
+	if runtimesEqual(d.lastRuntime, runtimes) {
+		return
+	}
+	d.lastRuntime = runtimes
+	if err := d.client.Register(ctx, runtimes); err != nil {
+		slog.Warn("register runtimes failed", "error", err)
+		return
+	}
+	slog.Info("runtimes refreshed", "count", len(runtimes))
+}
+
+// runtimesEqual compares two runtime lists for equality in spec order. Only
+// user-visible fields participate — an exact ordering match is sufficient
+// because DetectAll iterates specs in a stable order.
+func runtimesEqual(a, b []v1.Runtime) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i].Kind != b[i].Kind ||
+			a[i].ExecutablePath != b[i].ExecutablePath ||
+			a[i].Version != b[i].Version ||
+			a[i].Status != b[i].Status {
+			return false
+		}
+	}
+	return true
 }
 
 // Status scans and displays the current machine capabilities.

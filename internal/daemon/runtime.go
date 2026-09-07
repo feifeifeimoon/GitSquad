@@ -4,95 +4,131 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"os"
 	"os/exec"
-	"path/filepath"
-	"runtime"
+	"sync"
 	"time"
 
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
-// ── Executor (placeholder) ───────────────────────────────────────────
-
-// Executor drives a CLI tool to execute a coding task.
-// NOT YET IMPLEMENTED — returns nil in all adapters.
-type Executor interface {
-	// Execute runs a task instruction in the given working directory.
-	Execute(ctx context.Context, workDir string, instruction string) (<-chan Output, error)
-}
-
-// Output is a single event emitted during execution.
-type Output struct {
-	Type    string // "stdout" | "stderr" | "artifact" | "error"
-	Content string
-}
-
-// ── Runtime interface ────────────────────────────────────────────────
-
-// Runtime is a CLI tool that the daemon can detect and (in future) execute.
-type Runtime interface {
-	// Detect checks whether the CLI is available on the given PATH directories.
-	// Returns nil if the CLI is not found or not working.
-	Detect(paths []string) *v1.Runtime
-
-	// Executor returns the execution driver for this runtime.
-	// Returns nil until execution is implemented.
-	Executor() Executor
-}
-
-// ── Registry ─────────────────────────────────────────────────────────
-
-// Registry holds all known Runtime implementations.
+// Registry holds the known runtime specs and the resolver used to detect them.
 type Registry struct {
-	items []Runtime
+	specs     []RuntimeSpec
+	resolver  *Resolver
+	versionFn func(exe string, args []string) (string, error)
+
+	shellOnce     sync.Once
+	shellResolved map[string]string
 }
 
-// NewRegistry creates a registry with the given runtimes.
-func NewRegistry(items ...Runtime) *Registry {
-	return &Registry{items: items}
+// NewRegistry creates a registry with the given resolver and specs.
+func NewRegistry(resolver *Resolver, specs ...RuntimeSpec) *Registry {
+	return &Registry{specs: specs, resolver: resolver, versionFn: detectVersion}
 }
 
-// All returns every registered runtime.
-func (r *Registry) All() []Runtime { return r.items }
+// DefaultRegistry returns the MVP set: Claude Code + Codex + Antigravity.
+func DefaultRegistry() *Registry {
+	return NewRegistry(NewDefaultResolver(), defaultSpecs()...)
+}
 
-// DetectAll runs Detect on every registered runtime against the given PATH directories.
-func (r *Registry) DetectAll(paths []string) []v1.Runtime {
-	result := make([]v1.Runtime, 0)
-	for _, rt := range r.items {
-		if detected := rt.Detect(paths); detected != nil {
-			result = append(result, *detected)
+// DetectAll resolves every spec and returns the detected runtimes in spec
+// order. Runtimes that can't be found are absent; found-but-broken runtimes
+// are reported with a non-available status and diagnostics.
+func (r *Registry) DetectAll() []v1.Runtime {
+	result := make([]v1.Runtime, 0, len(r.specs))
+	for _, spec := range r.specs {
+		if rt := r.detect(spec); rt != nil {
+			result = append(result, *rt)
 		}
 	}
 	return result
 }
 
-// DefaultRegistry returns the MVP set: Claude Code + Codex.
-func DefaultRegistry() *Registry {
-	return NewRegistry(
-		&ClaudeRuntime{},
-		&CodexRuntime{},
-	)
-}
-
-// ── Shared helpers ───────────────────────────────────────────────────
-
-func findExe(exeName string, paths []string) (string, error) {
-	exts := []string{""}
-	if runtime.GOOS == "windows" {
-		exts = []string{".exe", ".cmd", ".bat", ".ps1"}
+// detect resolves one spec and reports its runtime (or nil when not found).
+func (r *Registry) detect(spec RuntimeSpec) *v1.Runtime {
+	if r.resolver == nil {
+		return nil
 	}
-	for _, dir := range paths {
-		for _, ext := range exts {
-			full := filepath.Join(dir, exeName+ext)
-			if info, err := os.Stat(full); err == nil && !info.IsDir() {
-				return full, nil
+
+	path, err := r.resolver.Resolve(spec, r.getShellResolved)
+	if err != nil {
+		return nil
+	}
+
+	version, verr := r.versionFn(path, spec.VersionArgs)
+	if verr != nil {
+		return &v1.Runtime{
+			Kind:           spec.Kind,
+			ExecutablePath: path,
+			MaxConcurrency: 1,
+			Status:         "error",
+			Diagnostics:    fmt.Sprintf("version probe failed: %v", verr),
+		}
+	}
+
+	if spec.MinVersion != "" {
+		if err := CheckMinVersion(spec.MinVersion, version); err != nil {
+			return &v1.Runtime{
+				Kind:           spec.Kind,
+				ExecutablePath: path,
+				Version:        version,
+				MaxConcurrency: 1,
+				Status:         "error",
+				Diagnostics:    fmt.Sprintf("%s: %v", spec.Kind, err),
 			}
 		}
 	}
-	return "", fmt.Errorf("%s not found", exeName)
+
+	return &v1.Runtime{
+		Kind:           spec.Kind,
+		ExecutablePath: path,
+		Version:        version,
+		MaxConcurrency: 1,
+		Status:         "available",
+	}
 }
 
+// getShellResolved lazily runs login-shell resolution once per registry, over
+// the union of all bare command names. It is passed as a thunk so the shell is
+// only forked after LookPath has missed.
+func (r *Registry) getShellResolved() map[string]string {
+	r.shellOnce.Do(func() {
+		if r.resolver == nil || r.resolver.Shell == nil {
+			return
+		}
+		r.shellResolved = r.resolver.Shell(r.shellNames())
+	})
+	return r.shellResolved
+}
+
+// shellNames returns the deduplicated set of bare command names across all
+// specs. Names containing a path separator never reach the shell resolver.
+func (r *Registry) shellNames() []string {
+	seen := make(map[string]bool, len(r.specs))
+	names := make([]string, 0, len(r.specs))
+	for _, s := range r.specs {
+		for _, n := range s.CommandNames {
+			if hasPathSeparator(n) || seen[n] {
+				continue
+			}
+			seen[n] = true
+			names = append(names, n)
+		}
+	}
+	return names
+}
+
+// detectVersion runs the version command and extracts a version line.
+func detectVersion(exe string, args []string) (string, error) {
+	raw, err := runVersionCmd(exe, args...)
+	if err != nil {
+		return "", err
+	}
+	return extractVersionLine(raw), nil
+}
+
+// runVersionCmd runs `exe args...` with a short timeout and returns combined
+// stdout/stderr.
 func runVersionCmd(exe string, args ...string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

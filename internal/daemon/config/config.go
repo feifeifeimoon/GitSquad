@@ -23,9 +23,10 @@ type Config struct {
 	WorkDir       string
 
 	// tunables with sensible defaults.
-	HeartbeatInterval time.Duration
-	VersionCmdTimeout  time.Duration
-	PollInterval       time.Duration
+	HeartbeatInterval      time.Duration
+	VersionCmdTimeout      time.Duration
+	PollInterval           time.Duration
+	RuntimeRefreshInterval time.Duration
 }
 
 // defaultAPIURL is the SaaS backend URL. All builds default to the hosted
@@ -39,9 +40,10 @@ const (
 	workspaceDirName = "workspaces"
 
 	// tunable defaults.
-	defaultHeartbeatInterval = 30 * time.Second
-	defaultVersionCmdTimeout = 5 * time.Second
-	defaultPollInterval      = 2 * time.Second
+	defaultHeartbeatInterval      = 30 * time.Second
+	defaultVersionCmdTimeout      = 5 * time.Second
+	defaultPollInterval           = 2 * time.Second
+	defaultRuntimeRefreshInterval = 5 * time.Minute
 )
 
 func configDir() string {
@@ -76,6 +78,7 @@ func Load() Config {
 	cfg.HeartbeatInterval = defaultHeartbeatInterval
 	cfg.VersionCmdTimeout = defaultVersionCmdTimeout
 	cfg.PollInterval = defaultPollInterval
+	cfg.RuntimeRefreshInterval = defaultRuntimeRefreshInterval
 
 	// load config.yaml
 	if data, err := os.ReadFile(configPath()); err == nil {

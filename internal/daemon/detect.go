@@ -31,8 +31,7 @@ func (d *Daemon) DetectRuntimes() (MachineInfo, []v1.Runtime) {
 		WorkDir:       ensureWorkDir(d.cfg.WorkDir),
 	}
 
-	paths := filepath.SplitList(os.Getenv("PATH"))
-	runtimes := d.registry.DetectAll(paths)
+	runtimes := d.registry.DetectAll()
 
 	return info, runtimes
 }

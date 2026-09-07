@@ -353,8 +353,8 @@ func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID,
 				Name:           rt.Kind, // provider 标识;kind/name 收敛后仅此一处
 				ExecutablePath: rt.ExecutablePath,
 				Version:        rt.Version,
-				Status:         "available",
-				Diagnostics:    nil,
+				Status:         runtimeStatus(rt.Status),
+				Diagnostics:    runtimeDiagnostics(rt.Diagnostics),
 				MaxConcurrency: int32(rt.MaxConcurrency),
 			}); err != nil {
 				return err
@@ -366,6 +366,23 @@ func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID,
 		}
 		return nil
 	})
+}
+
+// runtimeStatus normalizes a reported runtime status to the DB value. Older
+// daemons that don't report a status still land as "available".
+func runtimeStatus(status string) string {
+	if status == "" {
+		return "available"
+	}
+	return status
+}
+
+// runtimeDiagnostics converts a diagnostics string to the nullable DB column.
+func runtimeDiagnostics(d string) *string {
+	if d == "" {
+		return nil
+	}
+	return &d
 }
 
 // ── DB → API conversions ──────────────────────────────────────────────
@@ -414,14 +431,24 @@ func toRuntime(row db.ListDaemonsByUserRow) (*v1.Runtime, bool) {
 	if row.RMaxConcurrency != nil {
 		mc = int(*row.RMaxConcurrency)
 	}
+	status := ""
+	if row.RStatus != nil {
+		status = *row.RStatus
+	}
+	diagnostics := ""
+	if row.RDiagnostics != nil {
+		diagnostics = *row.RDiagnostics
+	}
 	return &v1.Runtime{
-			ID:             *row.RID,
-			DaemonID:       row.ID,
-			Kind:           *row.RKind,
-			ExecutablePath: *row.RExecutablePath,
-			Version:        *row.RVersion,
-			MaxConcurrency: mc,
-		}, true
+		ID:             *row.RID,
+		DaemonID:       row.ID,
+		Kind:           *row.RKind,
+		ExecutablePath: *row.RExecutablePath,
+		Version:        *row.RVersion,
+		MaxConcurrency: mc,
+		Status:         status,
+		Diagnostics:    diagnostics,
+	}, true
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────

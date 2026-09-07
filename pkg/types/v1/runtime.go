@@ -10,6 +10,8 @@ type Runtime struct {
 	ExecutablePath string    `json:"executable_path,omitempty"`
 	Version        string    `json:"version,omitempty"`
 	MaxConcurrency int       `json:"max_concurrency"`
+	Status         string    `json:"status,omitempty"`
+	Diagnostics    string    `json:"diagnostics,omitempty"`
 	ID             uuid.UUID `json:"id,omitempty"`
 	DaemonID       uuid.UUID `json:"daemon_id,omitempty"`
 }

@@ -1,73 +1,100 @@
 package daemon
 
 import (
-	"strings"
+	"errors"
 	"testing"
-
-	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
-type mockRuntime struct {
-	kind    string
-	version string
-	path    string
-}
-
-func (m *mockRuntime) Detect(paths []string) *v1.Runtime {
-	for _, p := range paths {
-		if strings.HasPrefix(m.path, p+"/") || strings.HasPrefix(m.path, p+"\\") || m.path == p {
-			return &v1.Runtime{
-				Kind:           m.kind,
-				ExecutablePath: m.path,
-				Version:        m.version,
-				MaxConcurrency: 1,
-			}
-		}
-	}
-	return nil
-}
-
-func (m *mockRuntime) Executor() Executor { return nil }
-
-func TestRegistryDetectAll(t *testing.T) {
-	r := NewRegistry(
-		&mockRuntime{kind: "alpha", version: "1.0", path: "/usr/bin/alpha"},
-		&mockRuntime{kind: "beta", version: "2.0", path: "/opt/beta/bin/beta"},
+func TestRegistryDetectAllAvailable(t *testing.T) {
+	r := NewRegistry(newTestResolver(),
+		RuntimeSpec{Kind: "claude", CommandNames: []string{"claude"}, VersionArgs: []string{"--version"}, MinVersion: "2.0.0"},
 	)
-
-	paths := []string{"/usr/bin", "/usr/local/bin", "/opt/beta/bin"}
-	result := r.DetectAll(paths)
-
-	if len(result) != 2 {
-		t.Fatalf("DetectAll() returned %d runtimes, want 2", len(result))
+	r.resolver.LookPath = func(name string) (string, error) {
+		if name == "claude" {
+			return "/usr/bin/claude", nil
+		}
+		return "", errors.New("not found")
+	}
+	r.versionFn = func(exe string, args []string) (string, error) {
+		return "2.1.5", nil
 	}
 
-	if result[0].Kind != "alpha" {
-		t.Fatalf("result[0].Kind = %q, want alpha", result[0].Kind)
+	result := r.DetectAll()
+	if len(result) != 1 {
+		t.Fatalf("DetectAll() returned %d runtimes, want 1", len(result))
 	}
-	if result[0].Version != "1.0" {
-		t.Fatalf("result[0].Version = %q, want 1.0", result[0].Version)
+	got := result[0]
+	if got.Kind != "claude" || got.Version != "2.1.5" || got.Status != "available" {
+		t.Fatalf("unexpected runtime: %+v", got)
 	}
-
-	if result[1].Kind != "beta" {
-		t.Fatalf("result[1].Kind = %q, want beta", result[1].Kind)
+	if got.Diagnostics != "" {
+		t.Fatalf("Diagnostics = %q, want empty", got.Diagnostics)
 	}
 }
 
-func TestRegistryDetectAllEmpty(t *testing.T) {
-	r := NewRegistry()
-	result := r.DetectAll([]string{"/usr/bin"})
-	if len(result) != 0 {
-		t.Fatalf("DetectAll() returned %d runtimes, want 0", len(result))
+func TestRegistryDetectAllBelowMin(t *testing.T) {
+	r := NewRegistry(newTestResolver(),
+		RuntimeSpec{Kind: "codex", CommandNames: []string{"codex"}, VersionArgs: []string{"version"}, MinVersion: "0.100.0"},
+	)
+	r.resolver.LookPath = func(name string) (string, error) {
+		if name == "codex" {
+			return "/usr/bin/codex", nil
+		}
+		return "", errors.New("not found")
+	}
+	r.versionFn = func(exe string, args []string) (string, error) {
+		return "0.99.0", nil
+	}
+
+	result := r.DetectAll()
+	if len(result) != 1 {
+		t.Fatalf("DetectAll() returned %d runtimes, want 1", len(result))
+	}
+	got := result[0]
+	if got.Status != "error" {
+		t.Fatalf("Status = %q, want error", got.Status)
+	}
+	if got.Diagnostics == "" {
+		t.Fatal("Diagnostics is empty, want a below-minimum message")
+	}
+}
+
+func TestRegistryDetectAllVersionProbeFailed(t *testing.T) {
+	r := NewRegistry(newTestResolver(),
+		RuntimeSpec{Kind: "agy", CommandNames: []string{"agy"}, VersionArgs: []string{"--version"}},
+	)
+	r.resolver.LookPath = func(name string) (string, error) {
+		if name == "agy" {
+			return "/usr/bin/agy", nil
+		}
+		return "", errors.New("not found")
+	}
+	r.versionFn = func(exe string, args []string) (string, error) {
+		return "", errors.New("exit status 1")
+	}
+
+	result := r.DetectAll()
+	if len(result) != 1 {
+		t.Fatalf("DetectAll() returned %d runtimes, want 1", len(result))
+	}
+	got := result[0]
+	if got.Status != "error" || got.Diagnostics == "" {
+		t.Fatalf("unexpected runtime: %+v", got)
 	}
 }
 
 func TestRegistryDetectAllNotFound(t *testing.T) {
-	r := NewRegistry(
-		&mockRuntime{kind: "alpha", version: "1.0", path: "/opt/alpha"},
+	r := NewRegistry(newTestResolver(),
+		RuntimeSpec{Kind: "claude", CommandNames: []string{"claude"}},
 	)
-	result := r.DetectAll([]string{"/usr/bin"})
-	if len(result) != 0 {
+	if result := r.DetectAll(); len(result) != 0 {
+		t.Fatalf("DetectAll() returned %d runtimes, want 0", len(result))
+	}
+}
+
+func TestRegistryDetectAllEmpty(t *testing.T) {
+	r := NewRegistry(nil)
+	if result := r.DetectAll(); len(result) != 0 {
 		t.Fatalf("DetectAll() returned %d runtimes, want 0", len(result))
 	}
 }

@@ -18,7 +18,7 @@ func TestDetectRuntimes(t *testing.T) {
 
 	d := &Daemon{
 		cfg:      cfg,
-		registry: NewRegistry(),
+		registry: NewRegistry(nil),
 	}
 
 	info, runtimes := d.DetectRuntimes()
@@ -44,7 +44,7 @@ func TestMachineInfoFields(t *testing.T) {
 
 	d := &Daemon{
 		cfg:      cfg,
-		registry: NewRegistry(),
+		registry: NewRegistry(nil),
 	}
 
 	info, _ := d.DetectRuntimes()
