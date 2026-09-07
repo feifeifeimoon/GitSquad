@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from "lucide-react";
 import { api, agentApi, skillApi, type Agent, type Skill } from "@/lib/api";
 import { paths } from "@/lib/paths";
+import { ProviderIcon } from "@/components/provider-icon";
+import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -52,8 +54,12 @@ export default function WorkspaceAgentsPage() {
   const [model, setModel] = useState("");
   const [daemonId, setDaemonId] = useState("");
   const [provider, setProvider] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarError, setAvatarError] = useState("");
   const [skillIds, setSkillIds] = useState<string[]>([]);
   const [enabled, setEnabled] = useState(true);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const load = () =>
     agentApi
@@ -96,6 +102,8 @@ export default function WorkspaceAgentsPage() {
     setModel("");
     setDaemonId("");
     setProvider("");
+    setAvatarUrl("");
+    setAvatarError("");
     setSkillIds([]);
     setEnabled(true);
     setOpen(true);
@@ -109,9 +117,27 @@ export default function WorkspaceAgentsPage() {
     setModel(a.model);
     setDaemonId(a.runtime?.daemon_id ?? "");
     setProvider(a.runtime?.provider ?? "");
+    setAvatarUrl(a.avatar_url ?? "");
+    setAvatarError("");
     setSkillIds((a.skills || []).map((s) => s.id));
     setEnabled(a.enabled);
     setOpen(true);
+  };
+
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (file.size > 1024 * 1024) {
+      setAvatarError("Image must be under 1MB.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setAvatarUrl(reader.result as string);
+      setAvatarError("");
+    };
+    reader.readAsDataURL(file);
   };
 
   const save = async () => {
@@ -125,6 +151,7 @@ export default function WorkspaceAgentsPage() {
       model,
       daemon_id: daemonId,
       provider,
+      avatar_url: avatarUrl,
       skill_ids: skillIds,
       enabled,
     };
@@ -203,22 +230,46 @@ export default function WorkspaceAgentsPage() {
                 key={a.id}
                 className="flex items-center gap-4 rounded-md border border-hairline bg-canvas p-4 shadow-level-2"
               >
+                <WorkspaceAvatar
+                  name={a.name}
+                  avatarUrl={a.avatar_url}
+                  className="size-10"
+                />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <p className="truncate text-sm font-semibold text-ink">@{a.name}</p>
-                    {!a.enabled && (
-                      <span className="rounded-full bg-muted px-2 py-0.5 text-xs text-mute">
-                        disabled
-                      </span>
-                    )}
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                        a.enabled
+                          ? "bg-success/10 text-success"
+                          : "bg-muted text-mute"
+                      }`}
+                    >
+                      {a.enabled ? "enabled" : "disabled"}
+                    </span>
                   </div>
                   {a.description && (
                     <p className="mt-0.5 truncate text-xs text-body">{a.description}</p>
                   )}
-                  <p className="mt-1 text-xs text-mute">
-                    {a.runtime?.provider}
-                    {a.runtime?.daemon_name ? ` · ${a.runtime.daemon_name}` : ""}
-                  </p>
+                  <div className="mt-1 flex items-center gap-2 text-xs text-mute">
+                    <span className="flex items-center gap-1.5">
+                      <ProviderIcon
+                        provider={a.runtime?.provider ?? ""}
+                        className="size-3.5"
+                      />
+                      {a.runtime?.provider}
+                      {a.runtime?.daemon_name ? ` · ${a.runtime.daemon_name}` : ""}
+                      <span
+                        className={`size-1.5 rounded-full ${
+                          a.runtime?.status === "online"
+                            ? "bg-success"
+                            : "bg-hairline-strong"
+                        }`}
+                      />
+                    </span>
+                    <span>·</span>
+                    <span>{a.run_count ?? 0} runs</span>
+                  </div>
                 </div>
                 <button
                   onClick={() => openEdit(a)}
@@ -258,6 +309,48 @@ export default function WorkspaceAgentsPage() {
             {editing ? "Edit agent" : "Create agent"}
           </DialogTitle>
           <div className="space-y-4">
+            <div>
+              <label className={labelCls}>Avatar</label>
+              <div className="flex items-center gap-3">
+                <WorkspaceAvatar
+                  name={name || "agent"}
+                  avatarUrl={avatarUrl}
+                  className="size-14"
+                />
+                <div className="space-y-1">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Upload
+                    </Button>
+                    {avatarUrl && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAvatarUrl("")}
+                      >
+                        Remove
+                      </Button>
+                    )}
+                  </div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  {avatarError ? (
+                    <p className="text-xs text-destructive">{avatarError}</p>
+                  ) : (
+                    <p className="text-xs text-mute">PNG, JPG or SVG, up to 1MB</p>
+                  )}
+                </div>
+              </div>
+            </div>
             <div>
               <label className={labelCls}>Name</label>
               <Input
@@ -310,12 +403,22 @@ export default function WorkspaceAgentsPage() {
                 <label className={labelCls}>Provider</label>
                 <Select value={provider} onValueChange={setProvider} disabled={!selectedDaemon}>
                   <SelectTrigger className="w-full">
-                    {provider || "Select provider"}
+                    {provider ? (
+                      <span className="flex items-center gap-1.5">
+                        <ProviderIcon provider={provider} className="size-3.5" />
+                        {provider}
+                      </span>
+                    ) : (
+                      "Select provider"
+                    )}
                   </SelectTrigger>
                   <SelectContent position="popper" sideOffset={4}>
                     {(selectedDaemon?.providers || []).map((p) => (
                       <SelectItem key={p} value={p}>
-                        {p}
+                        <span className="flex items-center gap-1.5">
+                          <ProviderIcon provider={p} className="size-3.5" />
+                          {p}
+                        </span>
                       </SelectItem>
                     ))}
                   </SelectContent>

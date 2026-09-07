@@ -192,6 +192,8 @@ export interface Agent {
   model: string;
   runtime_id: string;
   enabled: boolean;
+  avatar_url?: string;
+  run_count: number;
   skills?: Skill[];
   runtime?: AgentRuntime;
   created_at: string;
@@ -209,6 +211,7 @@ export const agentApi = {
     model?: string;
     daemon_id: string;
     provider: string;
+    avatar_url?: string;
     skill_ids?: string[];
     enabled?: boolean;
   }) => api.post<Agent>(`/api/v1/workspaces/${workspaceId}/agents`, body),
@@ -219,6 +222,7 @@ export const agentApi = {
     model?: string;
     daemon_id?: string;
     provider?: string;
+    avatar_url?: string;
     skill_ids?: string[];
     enabled?: boolean;
   }) => api.patch<Agent>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`, body),
