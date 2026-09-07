@@ -19,6 +19,8 @@ type Agent struct {
 	Model        string     `json:"model"`
 	RuntimeID    uuid.UUID  `json:"runtime_id"`
 	Enabled      bool       `json:"enabled"`
+	AvatarUrl    string     `json:"avatar_url"`
+	RunCount     int32      `json:"run_count"`
 	CreatedBy    *uuid.UUID `json:"created_by"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`

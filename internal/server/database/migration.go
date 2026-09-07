@@ -179,6 +179,10 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		{name: "023_agent_runtimes_idx", sql: `CREATE INDEX IF NOT EXISTS idx_agent_runtimes_workspace ON agent_runtimes(workspace_id)`},
 		{name: "024_agents_idx", sql: `CREATE INDEX IF NOT EXISTS idx_agents_workspace ON agents(workspace_id)`},
 		{name: "025_skills_idx", sql: `CREATE INDEX IF NOT EXISTS idx_skills_workspace ON skills(workspace_id)`},
+		{name: "026_agent_avatar", sql: `ALTER TABLE agents
+			ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT ''`},
+		{name: "027_agent_run_count", sql: `ALTER TABLE agents
+			ADD COLUMN IF NOT EXISTS run_count INT NOT NULL DEFAULT 0`},
 	}
 
 	for _, m := range migrations {

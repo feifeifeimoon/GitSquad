@@ -101,6 +101,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, workspaceID, userID uuid
 		Model:        req.Model,
 		RuntimeID:    runtimeID,
 		Enabled:      enabled,
+		AvatarUrl:    req.AvatarURL,
 		CreatedBy:    &userID,
 	})
 	if err != nil {
@@ -124,7 +125,7 @@ func (s *AgentService) ListAgents(ctx context.Context, workspaceID uuid.UUID) ([
 	}
 	out := make([]v1.Agent, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, buildAgentView(r.ID, r.WorkspaceID, r.RuntimeID, r.Name, r.Description, r.Instructions, r.Model, r.RuntimeProvider, r.RuntimeName, r.Enabled, r.RuntimeDaemonID, r.CreatedAt, r.UpdatedAt))
+		out = append(out, buildAgentView(r.ID, r.WorkspaceID, r.RuntimeID, r.Name, r.Description, r.Instructions, r.Model, r.RuntimeProvider, r.RuntimeName, r.AvatarUrl, r.Enabled, r.RunCount, r.RuntimeDaemonID, r.RuntimeStatus, r.RuntimeDaemonName, r.RuntimeDaemonStatus, r.CreatedAt, r.UpdatedAt))
 	}
 	return out, nil
 }
@@ -134,7 +135,7 @@ func (s *AgentService) GetAgent(ctx context.Context, workspaceID, agentID uuid.U
 	if err != nil {
 		return nil, ErrAgentNotFound
 	}
-	agent := buildAgentView(r.ID, r.WorkspaceID, r.RuntimeID, r.Name, r.Description, r.Instructions, r.Model, r.RuntimeProvider, r.RuntimeName, r.Enabled, r.RuntimeDaemonID, r.CreatedAt, r.UpdatedAt)
+	agent := buildAgentView(r.ID, r.WorkspaceID, r.RuntimeID, r.Name, r.Description, r.Instructions, r.Model, r.RuntimeProvider, r.RuntimeName, r.AvatarUrl, r.Enabled, r.RunCount, r.RuntimeDaemonID, r.RuntimeStatus, r.RuntimeDaemonName, r.RuntimeDaemonStatus, r.CreatedAt, r.UpdatedAt)
 	skills, err := s.store.ListSkillsForAgent(ctx, agentID)
 	if err == nil {
 		agent.Skills = toSkills(skills)
@@ -156,6 +157,7 @@ func (s *AgentService) UpdateAgent(ctx context.Context, workspaceID, agentID uui
 		Model:        cur.Model,
 		RuntimeID:    cur.RuntimeID,
 		Enabled:      cur.Enabled,
+		AvatarUrl:    cur.AvatarUrl,
 	}
 	if req.Name != nil {
 		params.Name, err = normalizeAgentName(*req.Name)
@@ -174,6 +176,9 @@ func (s *AgentService) UpdateAgent(ctx context.Context, workspaceID, agentID uui
 	}
 	if req.Enabled != nil {
 		params.Enabled = *req.Enabled
+	}
+	if req.AvatarURL != nil {
+		params.AvatarUrl = *req.AvatarURL
 	}
 	if req.DaemonID != nil && req.Provider != nil {
 		daemonID, err := uuid.Parse(*req.DaemonID)
@@ -254,9 +259,12 @@ func (s *AgentService) setSkills(ctx context.Context, agentID uuid.UUID, skillID
 // shared by ListAgentsByWorkspaceRow and GetAgentRow.
 func buildAgentView(
 	id, workspaceID, runtimeID uuid.UUID,
-	name, description, instructions, model, runtimeProvider, runtimeName string,
+	name, description, instructions, model, runtimeProvider, runtimeName, avatarURL string,
 	enabled bool,
+	runCount int32,
 	runtimeDaemonID *uuid.UUID,
+	runtimeStatus string,
+	runtimeDaemonName, runtimeDaemonStatus *string,
 	createdAt, updatedAt time.Time,
 ) v1.Agent {
 	return v1.Agent{
@@ -268,13 +276,25 @@ func buildAgentView(
 		Model:        model,
 		RuntimeID:    runtimeID,
 		Enabled:      enabled,
+		AvatarURL:    avatarURL,
+		RunCount:     int(runCount),
 		CreatedAt:    createdAt,
 		UpdatedAt:    updatedAt,
 		Runtime: &v1.AgentRuntime{
-			ID:       runtimeID,
-			Name:     runtimeName,
-			Provider: runtimeProvider,
-			DaemonID: runtimeDaemonID,
+			ID:           runtimeID,
+			Name:         runtimeName,
+			Provider:     runtimeProvider,
+			DaemonID:     runtimeDaemonID,
+			Status:       runtimeStatus,
+			DaemonName:   strPtr(runtimeDaemonName),
+			DaemonStatus: strPtr(runtimeDaemonStatus),
 		},
 	}
+}
+
+func strPtr(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

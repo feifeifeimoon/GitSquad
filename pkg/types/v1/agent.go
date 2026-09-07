@@ -32,6 +32,8 @@ type Agent struct {
 	Model        string        `json:"model"`
 	RuntimeID    uuid.UUID     `json:"runtime_id"`
 	Enabled      bool          `json:"enabled"`
+	AvatarURL    string        `json:"avatar_url,omitempty"`
+	RunCount     int           `json:"run_count"`
 	Skills       []Skill       `json:"skills,omitempty"`
 	Runtime      *AgentRuntime `json:"runtime,omitempty"`
 	CreatedAt    time.Time     `json:"created_at"`
@@ -45,6 +47,7 @@ type CreateAgentRequest struct {
 	Model        string   `json:"model"`
 	DaemonID     string   `json:"daemon_id" binding:"required"`
 	Provider     string   `json:"provider" binding:"required"`
+	AvatarURL    string   `json:"avatar_url"`
 	SkillIDs     []string `json:"skill_ids"`
 	Enabled      *bool    `json:"enabled"`
 }
@@ -56,6 +59,7 @@ type UpdateAgentRequest struct {
 	Model        *string  `json:"model"`
 	DaemonID     *string  `json:"daemon_id"`
 	Provider     *string  `json:"provider"`
+	AvatarURL    *string  `json:"avatar_url"`
 	SkillIDs     []string `json:"skill_ids"`
 	Enabled      *bool    `json:"enabled"`
 }
