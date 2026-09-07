@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
@@ -94,19 +94,11 @@ export default function WorkspaceSettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="px-8 pb-4 pt-6">
-        <button
-          onClick={() => router.push(paths.workspace(slug).board())}
-          className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
-        >
-          <ChevronLeft className="size-4" />
-          Back
-        </button>
+      <div className="border-b border-hairline px-8 py-4">
+        <h1 className="text-sm font-medium text-ink">Settings</h1>
       </div>
 
-      <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8">
-        <h1 className="mb-6 text-lg font-semibold text-ink">Settings</h1>
-
+      <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8 pt-6">
         <UserSettings />
 
         {/* General */}

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil } from "lucide-react";
+import { Plus, Trash2, Pencil } from "lucide-react";
 import { api, agentApi, skillApi, type Agent, type Skill } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { ProviderIcon } from "@/components/provider-icon";
@@ -188,17 +188,7 @@ export default function WorkspaceAgentsPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-hairline px-8 py-4">
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => router.push(paths.workspace(slug).board())}
-            className="flex shrink-0 items-center gap-1 text-sm text-body transition-colors hover:text-ink"
-          >
-            <ChevronLeft className="size-4" />
-            Issues
-          </button>
-          <ChevronRight className="size-3.5 shrink-0 text-mute" />
-          <span className="truncate text-sm font-medium text-ink">Agents</span>
-        </div>
+        <h1 className="text-sm font-medium text-ink">Agents</h1>
         <Button onClick={openCreate}>
           <Plus className="size-4" />
           New Agent

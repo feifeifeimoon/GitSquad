@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Plus, Trash2, Pencil, Sparkles } from "lucide-react";
+import { Plus, Trash2, Pencil, Sparkles } from "lucide-react";
 import { skillApi, type Skill } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
@@ -90,17 +90,7 @@ export default function WorkspaceSkillsPage() {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between border-b border-hairline px-8 py-4">
-        <div className="flex items-center gap-1.5">
-          <button
-            onClick={() => router.push(paths.workspace(slug).board())}
-            className="flex shrink-0 items-center gap-1 text-sm text-body transition-colors hover:text-ink"
-          >
-            <ChevronLeft className="size-4" />
-            Issues
-          </button>
-          <ChevronRight className="size-3.5 shrink-0 text-mute" />
-          <span className="truncate text-sm font-medium text-ink">Skills</span>
-        </div>
+        <h1 className="text-sm font-medium text-ink">Skills</h1>
         <Button onClick={openCreate}>
           <Plus className="size-4" />
           New Skill

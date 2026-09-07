@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import {
   IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi,
 } from "@/lib/api";
@@ -116,13 +116,10 @@ export default function IssueDetailPage() {
       <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4">
         <button
           onClick={() => router.push(paths.workspace(slug).board())}
-          className="flex shrink-0 items-center gap-1 text-sm text-body transition-colors hover:text-ink"
+          className="shrink-0 text-sm text-body transition-colors hover:text-ink"
         >
-          <ChevronLeft className="size-4" />
           Issues
         </button>
-        <ChevronRight className="size-3.5 shrink-0 text-mute" />
-        <span className="shrink-0 font-mono text-sm text-body">{issue.issue_key}</span>
         <ChevronRight className="size-3.5 shrink-0 text-mute" />
         <span className="truncate text-sm font-medium text-ink">{issue.title}</span>
       </div>
