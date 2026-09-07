@@ -1,5 +1,7 @@
 ## ADDED Requirements
 
+> 注(2026-09-07):本 spec 描述第 9 章(未实现)。其中 agent 字段 `environment`/`coder_backend`/`role`/`can_mention` 已被 2026-09-02 agent 子系统设计(`docs/superpowers/specs/2026-09-02-agent-subsystem-design.md`)废弃——agent 改为「人设 + runtime 绑定」,路由依据变为 runtime 的 `runtime_mode`/`provider`,agent 快照字段也相应变化。落地本章前需据此重新设计。
+
 ### Requirement: @mention 解析为目标 agent
 
 系统 SHALL 在 Issue 描述或评论中出现 @mention 时,解析出目标 agent 名称,在所属 Workspace 的 agent 团队中定位该 agent,并生成一个待派发任务。

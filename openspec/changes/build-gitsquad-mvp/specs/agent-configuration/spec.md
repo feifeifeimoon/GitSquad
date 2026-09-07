@@ -1,67 +1,69 @@
 ## ADDED Requirements
 
-### Requirement: Agent 配置实体
+> 注(2026-09-07):本 spec 已按 2026-09-02 agent 子系统设计(`docs/superpowers/specs/2026-09-02-agent-subsystem-design.md`)重写,对齐已落地实现。核心语义变化:agent 是「人设 + runtime 绑定」,不再携带 `role`/`environment`/`coder_backend`/`can_mention`;执行细节下放 runtime(`provider`/`runtime_mode`)。
 
-系统 SHALL 在 Workspace 下管理一组 agent 配置。每个 agent 配置 MUST 描述:唯一 @mention 名称(`name`)、角色(`role`,如 planner / coder / reviewer)、执行环境(`environment`,取值 `cloud` 或 `local`)、coder backend(`coder_backend`,如 `claude-code` / `codex`)、能力边界(`can_mention`,agent 名称列表)、启用状态(`enabled`)以及审计字段(`created_by`, `created_at`, `updated_at`)。
+### Requirement: Agent 配置实体(人设 + runtime 绑定)
 
-#### Scenario: 配置一个 local coder agent
+系统 SHALL 在 Workspace 下管理一组 agent。每个 agent MUST 描述:唯一 @mention 名称(`name`,小写规范化)、人设(`description`、`instructions`)、可选模型覆盖(`model`,空 = 用 provider 默认)、绑定的 runtime(`runtime_id`)、启用状态(`enabled`)、头像(`avatar_url`)、运行次数(`run_count`)以及审计字段(`created_by`、`created_at`、`updated_at`)。
 
-- **WHEN** 用户在某 Workspace 添加 agent,指定 `name=coder`、`role=coder`、`environment=local`、`coder_backend=claude-code`、`can_mention=[]`、`enabled=true`
-- **THEN** 系统 MUST 持久化该 agent 配置,使其可被该 Workspace 内的 Issue 通过 `@coder` 触发
+agent MUST NOT 直接携带 `role`/`environment`/`coder_backend`/`can_mention`——这些执行细节由绑定的 runtime(`provider`、`runtime_mode`)承担。
 
-### Requirement: @mention 名称在 Workspace 内唯一
+#### Scenario: 配置一个绑定 local runtime 的 coder agent
 
-系统 SHALL 保证同一 Workspace 内 agent 的 @mention 名称(role 或显式别名)唯一,以支持 @mention 解析。
+- **WHEN** 用户在某 Workspace 添加 agent,指定 `name=coder`、`description`/`instructions`、`daemon_id` + `provider=claude`、`enabled=true`
+- **THEN** 系统 MUST 创建(或按需 upsert)该 Workspace 下对应的 `agent_runtime`,并持久化 agent 绑定到该 runtime,使其可被该 Workspace 内的 Issue 通过 `@coder` 触发
+
+### Requirement: Agent 名称在 Workspace 内唯一且规范化
+
+系统 SHALL 保证同一 Workspace 内 agent 名称唯一,并在写入前做小写化与格式校验(`^[a-z0-9][a-z0-9_-]{0,63}$`)。
 
 #### Scenario: 重名 agent 被拒绝
 
 - **WHEN** 用户尝试在同一 Workspace 添加与已有 agent 同名的 agent
 - **THEN** 系统 MUST 拒绝并提示名称冲突
 
-### Requirement: coder_backend 与 sandbox_provider 正交选择
+#### Scenario: 名称格式非法被拒绝
 
-系统 SHALL 将 coder_backend(驱动哪个现成编码器)与执行环境/sandbox_provider(在哪里跑)作为两个正交选择轴。用户 MUST 能独立组合二者。
+- **WHEN** 用户提交的 agent 名称包含空格、大写或非法字符
+- **THEN** 系统 MUST 小写化后校验,不满足正则时拒绝
 
-#### Scenario: Codex 跑在 cloud
+### Requirement: Runtime 是 workspace 级执行目标(provider × runtime_mode)
 
-- **WHEN** 用户配置 `coder_backend=codex`、`environment=cloud`(并选定某 sandbox provider)
-- **THEN** 系统 MUST 在任务派发时,在所选 sandbox 中启动携带 Codex 的 Runtime 镜像
+系统 SHALL 将「执行环境」建模为 workspace 级 `agent_runtime`,由 `daemon_id`(local)与 `provider` 构成。`provider`(∈ {claude, codex},MVP)是编码 CLI 短标识;`runtime_mode`(local/cloud,MVP 仅 local)表达执行位置。二者是两个正交轴,agent 通过可变绑定 `runtime_id` 指向一个 runtime。
 
-#### Scenario: Claude Code 跑在 local
+#### Scenario: 绑定 local 的 codex
 
-- **WHEN** 用户配置 `coder_backend=claude-code`、`environment=local`
-- **THEN** 系统 MUST 在任务派发时,将任务派给该用户的 LocalDaemon,由 daemon 驱动用户机器上的 Claude Code
+- **WHEN** 用户创建 agent 并指定 `daemon_id` + `provider=codex`
+- **THEN** 系统 MUST 校验 provider 合法、daemon 属于该 Workspace 的 owner,并 upsert 出 `(workspace_id, daemon_id, provider)` 的 runtime 行后绑定
 
-### Requirement: can_mention 字段为自动接力留接口
+#### Scenario: daemon owner 与 workspace owner 不一致被拒绝
 
-系统 SHALL 在 agent 配置中持久化 `can_mention` 字段。MVP MUST 将其默认值设为空数组,等价于接力模式 A(人工 @ 触发)。系统 MUST NOT 在 MVP 中因该字段非空而执行任何自动 @ 行为。
+- **WHEN** 用户指定的 daemon 不属于该 Workspace 的 owner
+- **THEN** 系统 MUST 拒绝绑定(配置时即做 owner 隔离)
 
-#### Scenario: MVP 默认空数组
+### Requirement: Agent ⇄ Skill 多对多挂载
 
-- **WHEN** 用户创建 agent 未显式指定 `can_mention`
-- **THEN** 系统 MUST 将其设为 `[]`,且该 agent 完成任务后 MUST NOT 自动 @ 其他 agent
+系统 SHALL 提供 workspace 级 `skill`(name/description/content)实体,并允许 agent 通过 `agent_skills` 多对多挂载技能。
 
-#### Scenario: 非空值在 MVP 不触发自动接力
+#### Scenario: 为 agent 挂载技能
 
-- **WHEN** 用户在 MVP 中手动填入 `can_mention=[reviewer]`
-- **THEN** 系统 MUST 接受并持久化该值,但 MUST NOT 在 MVP 中据此执行自动接力(字段仅作为未来模式 C 的预留)
+- **WHEN** 用户在创建/更新 agent 时提交 `skill_ids`
+- **THEN** 系统 MUST 清空并重写该 agent 的 skill 挂载关系
 
-### Requirement: Agent 配置不绑定具体 daemon
+### Requirement: enabled=false 从 @mention 匹配中排除
 
-系统 SHALL 将 `AgentConfig.environment=local` 解释为"任务必须由当前 User 下满足能力的 daemon 执行"。AgentConfig MUST NOT 直接保存 daemon machine id 或 runtime capability id。具体 machine/runtime 的选择 MUST 在任务派发时根据 daemon 在线状态与 RuntimeCapability 动态决定。
+系统 SHALL 仅在 @mention 解析中使用 `enabled=true` 的 agent;`enabled=false` 的 agent MUST NOT 参与匹配,`@该agent` 落入 unmatched 并追加系统提示。MVP MUST NOT 执行任何自动接力(所有接力由人类显式 @ 触发)。
 
-#### Scenario: local agent 不指定 daemon
+#### Scenario: 禁用 agent 不参与匹配
 
-- **WHEN** 用户在 Workspace 中创建 `environment=local` 的 agent
-- **THEN** 系统 MUST 持久化该 agent 配置但不要求选择具体 daemon
-- **AND** 后续派发任务时 MUST 按 User 下 DaemonMachine 与 RuntimeCapability 匹配可执行的 machine/runtime 组合
+- **WHEN** 某 agent `enabled=false` 且 Issue 中出现 `@该agent`
+- **THEN** 系统 MUST 将该 mention 视为 unmatched,且 MUST NOT 生成任务或自动 @ 其他 agent
 
-### Requirement: Agent 名称作为 @mention 主键
+### Requirement: Model 是 agent 的可选覆盖
 
-系统 SHALL 使用 `AgentConfig.name` 作为 Workspace 内 @mention 解析主键。`role` 仅表达职责和默认模板, MUST NOT 被当作唯一身份字段。MVP MAY 默认将 `name` 初始化为 `role`,但一旦用户显式指定 name,解析 MUST 使用 name。
+系统 SHALL 在 agent 上持久化可选 `model` 字段(空 = 用 provider 默认)。可用模型列表由 daemon 按 provider 现查(不落库),模型 ID 字符串直传 CLI;现查失败或 provider 不支持时 fail-open 退化为仅自由输入。
 
-#### Scenario: role 相同但 name 不同
+#### Scenario: 未指定 model 用 provider 默认
 
-- **WHEN** Workspace 中存在 `name=frontend-coder, role=coder` 与 `name=backend-coder, role=coder`
-- **THEN** `@frontend-coder` MUST 只定位 frontend-coder
-- **AND** 系统 MUST NOT 因二者 role 相同而判定冲突
+- **WHEN** 创建 agent 未指定 `model`
+- **THEN** 系统 MUST 持久化空值,执行时由 provider 使用默认模型

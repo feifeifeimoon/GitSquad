@@ -1,4 +1,4 @@
-> 进度基线(2026-08-24 同步):已完成 1.1/1.3–1.6、2.2–2.4、3.1–3.2/3.4、4.1–4.6、7.1–7.3/7.7;未开始 5/6/8/9/10/11 章;部分完成 2.5/3.3(degraded 缺口)、7.4/7.5(依赖第 9 章)、7.6(仅下线检测)。
+> 进度基线(2026-09-07 同步):已完成 1.1/1.3–1.6、2.2–2.4、3.1–3.2/3.4、4.1–4.6、5(agent/runtime/skill 子系统,按 2026-09-02 设计落地)、7.1–7.3/7.7;未开始 6/8/9/10/11 章;部分完成 2.5/3.3(degraded 缺口)、7.4/7.5(依赖第 9 章)、7.6(仅下线检测)。另:daemon runtime 探测重写(openspec change `daemon-runtime-detection`)已完整落地。
 
 ## 1. 技术栈敲定与项目骨架
 
@@ -41,11 +41,13 @@
 
 ## 5. Agent 配置
 
-- [ ] 5.1 实现 AgentConfig 数据模型(name、role、environment、coder_backend、can_mention、enabled、审计字段;不绑定具体 daemon)
-- [ ] 5.2 实现 agent 团队管理 API(在 Workspace 下增删改查)
-- [ ] 5.3 实现同 Workspace 内 agent 名称唯一性校验
-- [ ] 5.4 实现 coder_backend × environment 正交组合校验与派发参数组装
-- [ ] 5.5 验证 MVP 中 `can_mention` 默认空数组,非空值持久化但不触发自动接力
+> 注(2026-09-07):本章按 2026-09-02 agent 子系统设计(`docs/superpowers/specs/2026-09-02-agent-subsystem-design.md`)落地,agent 模型相对本 proposal 有语义调整——agent 不再携带 `role`/`environment`/`coder_backend`/`can_mention`,而是「人设 + runtime 绑定」;执行细节下放 runtime(`provider`/`runtime_mode`)。
+
+- [x] 5.1 实现 agent 数据模型(name/description/instructions/model/runtime_id/enabled/avatar_url/run_count + 审计字段),以及 runtime/skill 数据模型(agent_runtimes / skills / agent_skills)
+- [x] 5.2 实现 agent 团队管理 API(Workspace 下 agent / runtime / skill 的 CRUD)
+- [x] 5.3 实现同 Workspace 内 agent 名称唯一性校验(正则 `^[a-z0-9][a-z0-9_-]{0,63}$`,写入前小写化)
+- [x] 5.4 实现 provider(∈ {claude, codex})× runtime_mode(local/cloud)正交建模:provider 是 runtime 属性,daemon owner 必须等于 workspace owner(配置时隔离)
+- [x] 5.5 实现 @mention 接线:仅 enabled=true 的 agent 参与匹配,disabled 落入 unmatched(取代原 `can_mention` 字段;MVP 仍不自动接力)
 
 ## 6. Agent Runtime(共享内核)
 
@@ -116,3 +118,4 @@
 - 后端单测覆盖 daemon / service / ws / config / client 等层;前端仅 landing 页静态断言测试
 - 工程化:Makefile、goreleaser 发布配置、Dockerfile、.github 工作流
 - Issue 黑板全链路:7 态状态机(backlog 默认)、GIT-42 式编号、评论三类型(user/agent/system)不可编辑、@mention 解析(代码块跳过 + 系统提示 + 派发钩子)、七列看板 + 详情页(设计文档:docs/superpowers/specs/2026-08-24-issue-blackboard-design.md)
+- (2026-09-07)daemon runtime 探测重写:声明式注册表 + login-shell 解析 + 版本门槛 + 三态诊断 + 周期重探,作为独立 openspec change(`daemon-runtime-detection`)完整落地

@@ -40,11 +40,12 @@
 │   │   ├── config/            # Env-based config (godotenv), validates required fields
 │   │   ├── database/          # pgx pool creation + auto-migration (table creation)
 │   │   ├── store/
-│   │   │   ├── schema.sql     # PostgreSQL DDL (users, identities, daemons, runtimes)
+│   │   │   ├── schema.sql     # PostgreSQL DDL (users, daemons, runtimes, workspaces, issues, agents, skills, github_*)
 │   │   │   ├── queries/       # .sql files for sqlc code-gen
-│   │   │   └── db/            # Generated Go types from sqlc
+│   │   │   ├── db/            # Generated Go types from sqlc
+│   │   │   └── memory/        # In-memory stores (pending installation bridge)
 │   │   ├── handler/           # HTTP route wiring, request parsing, response formatting
-│   │   ├── service/           # Business logic (auth flows, daemon lifecycle, OAuth)
+│   │   ├── service/           # Business logic (auth, daemon, workspace, issue, agent, skill)
 │   │   ├── middleware/        # JWT auth, CORS, request logging
 │   │   ├── ws/                # WebSocket hub, dispatcher, connection management
 │   │   ├── auth/              # JWT token generation + validation
@@ -52,40 +53,61 @@
 │   ├── daemon/
 │   │   ├── client/            # HTTP + WebSocket client for server API
 │   │   ├── config/            # Daemon config (YAML file + env overrides, ~/.gitsquad/)
-│   │   ├── daemon.go          # Core Daemon struct (Run, eventLoop, Status)
-│   │   ├── connection.go      # Reconnect loop with exponential backoff
-│   │   ├── detect.go          # Runtime detection (scan PATH for Claude/Codex)
-│   │   ├── login.go           # Login flow (pairing + token)
-│   │   ├── runtime.go         # Runtime interface definition
-│   │   ├── runtime_claude.go  # Claude runtime adapter
-│   │   └── runtime_codex.go   # Codex runtime adapter
+│   │   ├── daemon.go          # Core Daemon struct (Run, eventLoop, Status, refresh ticker)
+│   │   ├── detect.go          # Runtime detection entry (assemble machine info + runtimes)
+│   │   ├── runtime.go         # Runtime interface + registry
+│   │   ├── runtime_specs.go   # Declarative runtime registry (claude/codex/agy + min versions)
+│   │   ├── execpath.go        # Executable resolver (env → LookPath → login shell → fallback)
+│   │   ├── shellpath.go       # Login-shell path resolution (lazy, singleflight, timeout)
+│   │   ├── version.go         # Semver parse/compare + min-version gate
+│   │   ├── models.go          # Provider model discovery (CLI → model list)
+│   │   ├── health.go          # Health / heartbeat reporting
+│   │   ├── helpers.go         # Small shared helpers
+│   │   └── login.go           # Login flow (pairing + token)
 │   ├── crypto/                # Shared crypto utilities (SHA-256 hashing)
 │   └── version/               # Build version info (ldflags-injected)
 ├── pkg/
 │   └── types/
-│       └── v1/                # Shared API types (auth, daemon, runtime, user, ws)
+│       └── v1/                # Shared API types (agent, auth, daemon, response, runtime, user, ws)
 ├── web/                       # Next.js frontend
 │   ├── app/
-│   │   ├── page.tsx           # Landing page ("use client", agent dashboard mock)
 │   │   ├── layout.tsx         # Root layout (fonts, metadata, html/body shell)
-│   │   ├── login/             # Login page
-│   │   ├── auth/callback/     # Google OAuth callback handler
-│   │   ├── console/           # Authenticated dashboard pages
-│   │   └── daemon/auth/       # CLI daemon pairing confirmation page
+│   │   ├── (marketing)/       # Landing/marketing page
+│   │   ├── (auth)/            # Login, Google OAuth callback, daemon pairing confirm
+│   │   └── (app)/             # Authenticated console (route group + shared layout)
+│   │       ├── workspaces/    # Workspace list + create/configure
+│   │       ├── [slug]/        # Workspace overview + agents/issues/skills/settings
+│   │       ├── daemons/       # Daemons page
+│   │       └── settings/      # Global settings
 │   ├── components/
 │   │   ├── ui/                # shadcn/ui primitives (button, card, input, avatar, badge, etc.)
+│   │   ├── issues/            # Issue board (7-column kanban) + detail components
+│   │   ├── settings/          # Settings-related components
 │   │   ├── auth-button.tsx    # Login/logout button with user dropdown
 │   │   ├── login-modal.tsx    # OAuth login modal
-│   │   └── live-agent-log.tsx # Animated agent activity log (useEffect + setInterval)
-│   ├── hooks/
-│   │   └── useAuth.ts         # React auth hook (JWT token + /api/v1/me)
+│   │   ├── command-palette.tsx # Cmd/Ctrl+K palette (workspace + issue search)
+│   │   ├── markdown-editor.tsx # TipTap markdown editor
+│   │   ├── markdown.tsx       # Markdown renderer
+│   │   ├── mesh-gradient.tsx  # Decorative mesh gradient
+│   │   ├── status-icon.tsx    # Status icon family (progress rings)
+│   │   ├── theme-provider.tsx # Dark mode provider
+│   │   ├── theme-toggle.tsx   # Dark mode toggle
+│   │   ├── time-ago.tsx       # Relative time formatting
+│   │   ├── workspace-avatar.tsx # Workspace avatar
+│   │   ├── create-workspace-aside.tsx # Create/configure workspace aside
+│   │   └── live-agent-log.tsx # Animated agent activity log
 │   ├── lib/
 │   │   ├── api.ts             # Typed fetch wrapper with JWT Bearer injection
+│   │   ├── paths.ts           # Route path helpers (slug-based)
+│   │   ├── issue-filters.ts   # Issue board filter/sort state
+│   │   ├── time.ts            # Relative time utilities
 │   │   └── utils.ts           # Tailwind class merge utility (cn)
 │   ├── eslint.config.mjs      # ESLint 9 (next/core-web-vitals + typescript rules)
 │   ├── package.json           # Bun scripts: dev, build, start, lint, test
 │   └── tsconfig.json          # TypeScript config
-├── docs/                      # Documentation assets
+├── docs/                      # Documentation assets + superpowers plans/specs
+├── openspec/                  # OpenSpec changes (proposals + specs + tasks)
+├── scripts/                   # CLI install scripts (install.sh / install.ps1)
 ├── agent.md                   # This file — agent instructions
 ├── Makefile                   # Go build/test/run/release targets
 ├── go.mod / go.sum            # Go module definition

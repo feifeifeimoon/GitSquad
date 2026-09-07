@@ -1,5 +1,7 @@
 ## ADDED Requirements
 
+> 注(2026-09-07):本 spec 描述第 6/7/8 章。其中 agent 字段 `environment`/`coder_backend` 已被 2026-09-02 agent 子系统设计(`docs/superpowers/specs/2026-09-02-agent-subsystem-design.md`)废弃——agent 改为「人设 + runtime 绑定」,执行位置与编码 CLI 下放 runtime(`runtime_mode`/`provider`)。第 6/8 章落地前需据此重新设计(第 7 章 daemon 骨架已落地)。
+
 ### Requirement: 统一 Agent Runtime
 
 系统 SHALL 提供一套与部署位置无关的 Agent Runtime,作为 local 与 cloud 两种外壳共享的内核。Runtime MUST 依次完成:认证/连接 → runtime status check/能力确认 → clone repo → 组装上下文(读 Issue 黑板 + repo 代码) → 驱动 coder backend → 收集产物 → 回写(PR / Issue 评论 / 状态) → 向 SaaS 报告。Runtime MUST NOT 直接调用 LLM API(由 coder backend 完成)。
