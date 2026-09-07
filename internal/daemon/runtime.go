@@ -137,5 +137,8 @@ func runVersionCmd(exe string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, exe, args...)
 	cmd.Stdout = &buf
 	cmd.Stderr = &buf
-	return buf.String(), cmd.Run()
+	if err := cmd.Run(); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
