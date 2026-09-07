@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
-  CheckCircle2,
   XCircle,
   Monitor,
   Trash2,
@@ -20,6 +19,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { timeAgo } from "@/lib/time";
+import { ProviderIcon } from "@/components/provider-icon";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -315,7 +315,7 @@ function RuntimeChips({ runtimes }: { runtimes: Runtime[] }) {
                 : "bg-success/10 text-success"
             }`}
           >
-            {broken ? <XCircle className="size-3" /> : <CheckCircle2 className="size-3" />}
+            <ProviderIcon provider={c.kind} className="size-3.5" />
             {c.kind}
             {c.version && <span className="text-xs opacity-60">{c.version}</span>}
           </span>
