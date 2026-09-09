@@ -96,7 +96,7 @@ jobs:
           bun-version: latest
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: npm
@@ -106,7 +106,7 @@ jobs:
         run: bash scripts/e2e.sh
 
       - name: Upload Playwright report
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
