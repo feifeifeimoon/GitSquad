@@ -34,15 +34,18 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	daemonHandler := NewDaemonHandler(cfg, daemonSvc)
 
 	githubSvc := service.NewGitHubAppService(s, cfg, memory.NewPendingInstallationStore())
+	taskSvc := service.NewTaskService(s, githubSvc)
 	workspaceSvc := service.NewWorkspaceService(s, githubSvc)
 	githubHandler := NewGitHubHandler(cfg, githubSvc)
 	workspaceHandler := NewWorkspaceHandler(workspaceSvc)
-	issueSvc := service.NewIssueService(s)
+	issueSvc := service.NewIssueService(s, taskSvc)
 	issueHandler := NewIssueHandler(issueSvc, workspaceSvc)
 	agentSvc := service.NewAgentService(s)
 	skillSvc := service.NewSkillService(s)
 	agentHandler := NewAgentHandler(agentSvc, workspaceSvc)
 	skillHandler := NewSkillHandler(skillSvc, workspaceSvc)
+	taskHandler := NewTaskHandler(taskSvc)
+	daemonSvc.SetPendingTasks(taskSvc.HasPending)
 
 	r.GET("/healthz", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
@@ -101,6 +104,8 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 				c.JSON(http.StatusOK, v1.SuccessResponse(m, 0))
 			})
 			daemon.PUT("/runtimes", daemonHandler.Register)
+			daemon.POST("/tasks/claim", taskHandler.Claim)
+			daemon.POST("/tasks/:id/status", taskHandler.Report)
 		}
 
 		// Protected user endpoints (user JWT auth).

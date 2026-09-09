@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strconv"
 	"strings"
@@ -72,11 +73,16 @@ type IssueDetailResponse struct {
 }
 
 type IssueService struct {
-	store *store.Store
+	store      *store.Store
+	dispatcher TaskDispatcher // optional; enqueues tasks for matched @mentions
 }
 
-func NewIssueService(s *store.Store) *IssueService {
-	return &IssueService{store: s}
+func NewIssueService(s *store.Store, dispatcher ...TaskDispatcher) *IssueService {
+	svc := &IssueService{store: s}
+	if len(dispatcher) > 0 {
+		svc.dispatcher = dispatcher[0]
+	}
+	return svc
 }
 
 // listAgentNames returns the enabled agent names configured in a workspace,
@@ -85,9 +91,15 @@ func (s *IssueService) listAgentNames(ctx context.Context, workspaceID uuid.UUID
 	return s.store.ListAgentNamesByWorkspace(ctx, workspaceID)
 }
 
-// dispatchForMention is the seam where Chapter 9 (task dispatch) hooks in:
-// a matched mention should enqueue a task for the agent. Empty until then.
-func (s *IssueService) dispatchForMention(ctx context.Context, issueID uuid.UUID, agentName string) {
+// dispatchForMention is the seam where task dispatch hooks in: a matched
+// mention should enqueue a task for the agent.
+func (s *IssueService) dispatchForMention(ctx context.Context, workspaceID, issueID uuid.UUID, agentName string) {
+	if s.dispatcher == nil {
+		return
+	}
+	if err := s.dispatcher.Dispatch(ctx, workspaceID, issueID, agentName); err != nil {
+		slog.Warn("dispatch task", "agent", agentName, "error", err)
+	}
 }
 
 func issueKey(prefix string, number int32) string {
@@ -237,6 +249,9 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 	})
 	if err != nil {
 		return nil, err
+	}
+	for _, name := range matched {
+		s.dispatchForMention(ctx, workspaceID, resp.ID, name)
 	}
 	return resp, nil
 }
@@ -416,7 +431,7 @@ func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, use
 	}
 
 	for _, name := range matched {
-		s.dispatchForMention(ctx, issueID, name)
+		s.dispatchForMention(ctx, workspaceID, issueID, name)
 	}
 	return resp, nil
 }

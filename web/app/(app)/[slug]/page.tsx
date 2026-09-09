@@ -19,6 +19,7 @@ import {
   issueApi,
   api,
   Workspace,
+  agentApi,
 } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
@@ -64,6 +65,7 @@ export default function WorkspaceBoardPage({
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState<IssueStatus>("backlog");
   const [creating, setCreating] = useState(false);
+  const [agentNames, setAgentNames] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filters, setFilters] = useState<IssueFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
@@ -114,6 +116,15 @@ export default function WorkspaceBoardPage({
       .finally(() => setLoading(false));
   };
   useEffect(load, [slug, router]);
+
+  useEffect(() => {
+    agentApi
+      .list(slug)
+      .then((agents) =>
+        setAgentNames(agents.filter((a) => a.enabled).map((a) => a.name)),
+      )
+      .catch(() => {});
+  }, [slug]);
 
   useEffect(() => {
     api
@@ -296,7 +307,8 @@ export default function WorkspaceBoardPage({
           />
           <MarkdownEditor
             onChange={setDescription}
-            placeholder="Describe the issue…"
+            placeholder="Describe the issue… (@mention an agent)"
+            mentionItems={agentNames}
             className="min-h-0 flex-1 overflow-y-auto px-5 py-3"
           />
           <div className="flex items-center justify-between border-t border-hairline px-4 py-3">

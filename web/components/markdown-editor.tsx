@@ -1,6 +1,7 @@
 "use client";
 
-import { useEditor, EditorContent } from "@tiptap/react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown as MarkdownExtension } from "@tiptap/markdown";
@@ -50,15 +51,69 @@ function BubbleDivider() {
   return <span className="mx-0.5 h-4 w-px bg-hairline" />;
 }
 
+interface MentionState {
+  query: string;
+  from: number;
+  to: number;
+  x: number;
+  y: number;
+}
+
 export function MarkdownEditor({
   onChange,
   placeholder,
   className,
+  mentionItems = [],
 }: {
   onChange?: (md: string) => void;
   placeholder?: string;
   className?: string;
+  mentionItems?: string[];
 }) {
+  const [mention, setMention] = useState<MentionState | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+
+  // Refs so the ProseMirror keydown handler (created once) always sees the
+  // latest suggestion state without recreating the editor.
+  const editorRef = useRef<Editor | null>(null);
+  const mentionRef = useRef<MentionState | null>(null);
+  const filteredRef = useRef<string[]>([]);
+  const selectedIndexRef = useRef(0);
+
+  // Detect an active `@query` immediately before the caret and surface the
+  // suggestion popup. Suppressed inside code (blocks and inline).
+  const computeMention = useCallback((editor: Editor) => {
+    const { from, empty } = editor.state.selection;
+    if (!empty || editor.isActive("codeBlock") || editor.isActive("code")) {
+      setMention(null);
+      return;
+    }
+    const before = editor.state.doc.textBetween(0, from, "\n", " ");
+    const m = /(?:^|\s)@([\w-]*)$/.exec(before);
+    if (!m) {
+      setMention(null);
+      return;
+    }
+    const query = m[1];
+    const atPos = from - query.length - 1;
+    const coords = editor.view.coordsAtPos(atPos);
+    setMention({ query, from: atPos, to: from, x: coords.left, y: coords.bottom });
+    setSelectedIndex(0);
+  }, []);
+
+  const selectMention = useCallback((name: string) => {
+    const editor = editorRef.current;
+    const m = mentionRef.current;
+    if (!editor || !m) return;
+    editor
+      .chain()
+      .focus()
+      .deleteRange({ from: m.from, to: m.to })
+      .insertContent("@" + name + " ")
+      .run();
+    setMention(null);
+  }, []);
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -67,15 +122,62 @@ export function MarkdownEditor({
     ],
     onUpdate: ({ editor }) => {
       onChange?.(editor.getMarkdown());
+      computeMention(editor);
+    },
+    onSelectionUpdate: ({ editor }) => {
+      computeMention(editor);
+    },
+    editorProps: {
+      handleKeyDown: (_view, event) => {
+        if (!mentionRef.current) return false;
+        const items = filteredRef.current;
+        if (event.key === "Escape") {
+          setMention(null);
+          return true;
+        }
+        if (items.length === 0) return false;
+        if (event.key === "ArrowDown") {
+          event.preventDefault();
+          setSelectedIndex((i) => (i + 1) % items.length);
+          return true;
+        }
+        if (event.key === "ArrowUp") {
+          event.preventDefault();
+          setSelectedIndex((i) => (i - 1 + items.length) % items.length);
+          return true;
+        }
+        if (event.key === "Enter" || event.key === "Tab") {
+          event.preventDefault();
+          selectMention(items[selectedIndexRef.current]);
+          return true;
+        }
+        return false;
+      },
     },
   });
+
+  useEffect(() => {
+    editorRef.current = editor;
+  }, [editor]);
+
+  const filtered = useMemo(() => {
+    if (!mention) return [];
+    const q = mention.query.toLowerCase();
+    return mentionItems.filter((n) => n.toLowerCase().includes(q));
+  }, [mention, mentionItems]);
+
+  useEffect(() => {
+    mentionRef.current = mention;
+    selectedIndexRef.current = selectedIndex;
+    filteredRef.current = filtered;
+  }, [mention, selectedIndex, filtered]);
 
   if (!editor) {
     return <div className={className} />;
   }
 
   return (
-    <>
+    <div className="relative">
       <BubbleMenu
         editor={editor}
         className="flex items-center gap-0.5 rounded-md border border-hairline bg-canvas p-1 shadow-level-4"
@@ -161,6 +263,32 @@ export function MarkdownEditor({
         </BubbleButton>
       </BubbleMenu>
       <EditorContent editor={editor} className={cn("tiptap-content", className)} />
-    </>
+
+      {mention && filtered.length > 0 && (
+        <div
+          className="fixed z-50 max-h-56 w-56 overflow-y-auto rounded-md border border-hairline bg-canvas py-1 shadow-level-4"
+          style={{ left: mention.x, top: mention.y }}
+        >
+          {filtered.map((name, i) => (
+            <button
+              key={name}
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                selectMention(name);
+              }}
+              className={cn(
+                "flex w-full items-center px-3 py-1.5 text-left text-sm transition-colors",
+                i === selectedIndex
+                  ? "bg-muted text-ink"
+                  : "text-body hover:bg-muted/50",
+              )}
+            >
+              @{name}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

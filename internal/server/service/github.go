@@ -174,6 +174,28 @@ func (s *GitHubAppService) GetInstallationToken(ctx context.Context, installatio
 	return token.GetToken(), expires, nil
 }
 
+// CreatePullRequest opens a PR on the installation's repo and returns its number.
+func (s *GitHubAppService) CreatePullRequest(ctx context.Context, installationDBID uuid.UUID, owner, repo, head, base, title, body string) (int, error) {
+	inst, err := s.store.GetInstallationByDBID(ctx, installationDBID)
+	if err != nil {
+		return 0, fmt.Errorf("get installation: %w", err)
+	}
+	client, err := s.newInstallationClient(ctx, inst.InstallationID)
+	if err != nil {
+		return 0, fmt.Errorf("installation client: %w", err)
+	}
+	pr, _, err := client.PullRequests.Create(ctx, owner, repo, &github.NewPullRequest{
+		Title: &title,
+		Head:  &head,
+		Base:  &base,
+		Body:  &body,
+	})
+	if err != nil {
+		return 0, fmt.Errorf("create pull request: %w", err)
+	}
+	return pr.GetNumber(), nil
+}
+
 // ── GitHub API client factories ───────────────────────────────────────────
 
 // newAppClient returns a *github.Client authenticated as the GitHub App

@@ -15,10 +15,18 @@ import (
 
 type DaemonService struct {
 	store *store.Store
+	// hasPending reports whether a daemon has queued tasks; wired to the
+	// TaskService after construction. Nil means "never".
+	hasPending func(uuid.UUID) bool
 }
 
 func NewDaemonService(s *store.Store) *DaemonService {
 	return &DaemonService{store: s}
+}
+
+// SetPendingTasks wires the task-queue check into PendingActions.
+func (s *DaemonService) SetPendingTasks(fn func(uuid.UUID) bool) {
+	s.hasPending = fn
 }
 
 // Sentinel errors for pairing / authentication flows.
@@ -315,9 +323,12 @@ func (s *DaemonService) UpdateDaemonVersion(ctx context.Context, id uuid.UUID, v
 }
 
 // PendingActions returns the list of server-to-daemon commands that should be
-// delivered in the next heartbeat ack. MVP returns an empty slice; task
-// wakeup actions will be populated when task dispatch is implemented.
+// delivered in the next heartbeat ack. When the daemon has queued tasks, it
+// returns a task_available action (the daemon then claims the task via HTTP).
 func (s *DaemonService) PendingActions(ctx context.Context, id uuid.UUID) []v1.PendingAction {
+	if s.hasPending != nil && s.hasPending(id) {
+		return []v1.PendingAction{{Type: v1.ActionTaskAvailable}}
+	}
 	return nil
 }
 

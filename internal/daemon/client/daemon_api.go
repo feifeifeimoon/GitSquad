@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
+	"github.com/google/uuid"
 )
 
 // Auth authenticates the daemon with the server.
@@ -41,6 +42,28 @@ func (c *Client) Register(ctx context.Context, runtimes []v1.Runtime) error {
 	body := v1.RegisterRequest{Runtimes: runtimes}
 	if err := c.Do(ctx, "PUT", "/api/v1/daemon/runtimes", body, nil); err != nil {
 		return fmt.Errorf("register runtimes: %w", err)
+	}
+	return nil
+}
+
+// ClaimTask requests a pending task for this daemon. It returns a nil task
+// (and nil error) when the queue is empty.
+func (c *Client) ClaimTask(ctx context.Context) (*v1.Task, error) {
+	var task v1.Task
+	if err := c.Do(ctx, "POST", "/api/v1/daemon/tasks/claim", nil, &task); err != nil {
+		return nil, fmt.Errorf("claim task: %w", err)
+	}
+	if task.ID == uuid.Nil {
+		return nil, nil
+	}
+	return &task, nil
+}
+
+// ReportTaskStatus reports a task lifecycle event (started / succeeded /
+// failed, optionally with a progress event or artifact summary).
+func (c *Client) ReportTaskStatus(ctx context.Context, taskID string, report v1.TaskReport) error {
+	if err := c.Do(ctx, "POST", "/api/v1/daemon/tasks/"+taskID+"/status", report, nil); err != nil {
+		return fmt.Errorf("report task status: %w", err)
 	}
 	return nil
 }

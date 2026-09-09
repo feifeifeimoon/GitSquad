@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import {
-  IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi,
+  IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi, agentApi,
 } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,16 @@ export default function IssueDetailPage() {
   const [content, setContent] = useState("");
   const [posting, setPosting] = useState(false);
   const [editorKey, setEditorKey] = useState(0);
+  const [agentNames, setAgentNames] = useState<string[]>([]);
+
+  useEffect(() => {
+    agentApi
+      .list(slug)
+      .then((agents) =>
+        setAgentNames(agents.filter((a) => a.enabled).map((a) => a.name)),
+      )
+      .catch(() => {});
+  }, [slug]);
 
   const load = () => {
     issueApi
@@ -175,6 +185,7 @@ export default function IssueDetailPage() {
               key={editorKey}
               onChange={setContent}
               placeholder="Add a comment… (@mention an agent)"
+              mentionItems={agentNames}
               className="min-h-[100px] px-3 py-2"
             />
             <div className="flex items-center justify-end border-t border-hairline px-3 py-2">
