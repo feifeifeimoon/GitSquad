@@ -52,3 +52,66 @@ jobs:
 
       - name: Build
         run: bun run build
+
+  e2e:
+    name: E2E (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: gitsquad
+          POSTGRES_USER: gitsquad
+          POSTGRES_PASSWORD: gitsquad
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U gitsquad -d gitsquad"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      GITSQUAD_DATABASE_URL: postgres://gitsquad:gitsquad@localhost:5432/gitsquad?sslmode=disable
+      GITSQUAD_E2E: "true"
+      GITSQUAD_GOOGLE_CLIENT_ID: e2e-client-id
+      GITSQUAD_GOOGLE_CLIENT_SECRET: e2e-client-secret
+      GITSQUAD_JWT_SECRET: e2e-jwt-secret
+      E2E_API_URL: http://localhost:8080
+      E2E_FRONTEND_URL: http://localhost:3000
+      NEXT_PUBLIC_API_URL: http://localhost:8080
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Run E2E suite
+        run: bash scripts/e2e.sh
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 14
+

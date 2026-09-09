@@ -1,0 +1,19 @@
+{
+  "name": "gitsquad-e2e",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser end-to-end tests for GitSquad (Playwright + Postgres).",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^22.0.0",
+    "@types/pg": "^8.11.0",
+    "pg": "^8.16.0",
+    "typescript": "^5.7.0"
+  }
+}

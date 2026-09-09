@@ -62,6 +62,13 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			auth.GET("/google/callback", authHandler.CallbackGoogle)
 		}
 
+		// Test-only token minting for browser E2E. Registered only when the
+		// server is explicitly started with GITSQUAD_E2E=true; production
+		// builds never expose it.
+		if cfg.E2E {
+			api.POST("/e2e/token", authHandler.E2ELogin)
+		}
+
 		// Daemon auth (public — pairing initiation + polling).
 		daemonAuth := api.Group("/daemon/auth")
 		{

@@ -96,3 +96,27 @@ func (s *AuthService) HandleCallback(ctx context.Context, provider string, code 
 
 	return &AuthResult{User: user, Token: token}, nil
 }
+
+// E2ELogin creates (or reuses) a deterministic test user and returns a signed
+// JWT for it. It exists only to give browser E2E tests a stable way to log in
+// without a real Google OAuth round-trip, and is only reachable when the
+// server is started with GITSQUAD_E2E=true (the route is not registered
+// otherwise).
+func (s *AuthService) E2ELogin(ctx context.Context, name string) (*AuthResult, error) {
+	const (
+		provider       = "e2e"
+		providerUserID = "gitsquad-e2e-user"
+	)
+
+	user, err := s.userSvc.UpsertByIdentity(ctx, provider, providerUserID, name, "", "", "")
+	if err != nil {
+		return nil, fmt.Errorf("upsert e2e user: %w", err)
+	}
+
+	token, err := auth.GenerateToken(user.ID.String(), s.jwtSecret)
+	if err != nil {
+		return nil, fmt.Errorf("generate token: %w", err)
+	}
+
+	return &AuthResult{User: user, Token: token}, nil
+}

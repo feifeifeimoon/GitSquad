@@ -8,6 +8,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/crypto"
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gin-gonic/gin"
 )
 
@@ -82,4 +83,23 @@ func (h *AuthHandler) CallbackGoogle(c *gin.Context) {
 func (h *AuthHandler) redirectError(c *gin.Context, errType string) {
 	c.Redirect(http.StatusFound,
 		h.cfg.FrontendURL+"/login?error="+errType)
+}
+
+// E2ELogin issues a JWT for the deterministic E2E test user. The route is only
+// registered when GITSQUAD_E2E=true (see routes.go), so it never exists in
+// production. It lets browser E2E tests authenticate without Google OAuth.
+func (h *AuthHandler) E2ELogin(c *gin.Context) {
+	name := c.DefaultQuery("name", "E2E User")
+
+	result, err := h.authSvc.E2ELogin(c.Request.Context(), name)
+	if err != nil {
+		slog.Error("e2e login", "error", err)
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("e2e login failed"))
+		return
+	}
+
+	c.JSON(http.StatusOK, v1.SuccessResponse(struct {
+		Token string   `json:"token"`
+		User  *v1.User `json:"user"`
+	}{Token: result.Token, User: result.User}, 0))
 }

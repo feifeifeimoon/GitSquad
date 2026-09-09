@@ -1,0 +1,16 @@
+# Minimal Postgres for local E2E runs. CI uses its own service container
+# (see .github/workflows/ci.yml), so this is only for `make e2e-db`.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: gitsquad
+      POSTGRES_USER: gitsquad
+      POSTGRES_PASSWORD: gitsquad
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gitsquad -d gitsquad"]
+      interval: 5s
+      timeout: 5s
+      retries: 20

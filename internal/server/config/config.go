@@ -12,6 +12,10 @@ type Config struct {
 	DatabaseURL string
 	Environment string
 
+	// E2E enables test-only endpoints (e.g. token minting). Must stay false
+	// in production; it is only turned on by the e2e test harness.
+	E2E bool
+
 	// Google OAuth
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -37,6 +41,7 @@ func Load() (Config, error) {
 		HTTPAddr:    getEnv("GITSQUAD_HTTP_ADDR", ":8080"),
 		DatabaseURL: os.Getenv("GITSQUAD_DATABASE_URL"),
 		Environment: getEnv("GITSQUAD_ENV", "development"),
+		E2E:         getBoolEnv("GITSQUAD_E2E"),
 
 		GoogleClientID:     os.Getenv("GITSQUAD_GOOGLE_CLIENT_ID"),
 		GoogleClientSecret: os.Getenv("GITSQUAD_GOOGLE_CLIENT_SECRET"),
@@ -76,4 +81,8 @@ func getEnv(key string, fallback string) string {
 		return fallback
 	}
 	return value
+}
+
+func getBoolEnv(key string) bool {
+	return os.Getenv(key) == "true"
 }

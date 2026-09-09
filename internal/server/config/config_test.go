@@ -23,6 +23,25 @@ func TestLoadUsesDefaults(t *testing.T) {
 	if cfg.DatabaseURL != "postgres://test" {
 		t.Fatalf("DatabaseURL = %q, want postgres://test", cfg.DatabaseURL)
 	}
+	if cfg.E2E {
+		t.Fatalf("E2E = true, want false by default")
+	}
+}
+
+func TestLoadReadsE2EFlag(t *testing.T) {
+	t.Setenv("GITSQUAD_DATABASE_URL", "postgres://test")
+	t.Setenv("GITSQUAD_GOOGLE_CLIENT_ID", "test-client-id")
+	t.Setenv("GITSQUAD_GOOGLE_CLIENT_SECRET", "test-client-secret")
+	t.Setenv("GITSQUAD_E2E", "true")
+
+	cfg, err := Load()
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+
+	if !cfg.E2E {
+		t.Fatalf("E2E = false, want true")
+	}
 }
 
 func TestLoadReadsEnvironment(t *testing.T) {
