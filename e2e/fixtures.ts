@@ -3,7 +3,9 @@
 // Browser tests should not click through GitHub App installation or Google
 // OAuth (both are external and nondeterministic). Instead this client:
 //   * mints a JWT via the env-gated /api/v1/e2e/token endpoint, and
-//   * seeds a workspace directly in Postgres, bypassing GitHub.
+//   * seeds workspaces/daemons directly in Postgres, bypassing GitHub, and
+//   * creates issues/skills/agents through the real API so the UI under test
+//     still exercises the production read/write paths.
 //
 // It talks to the backend with raw fetch and to the database with pg, so it
 // has zero build-time coupling to the web app (mirrors the multica approach).
@@ -25,6 +27,24 @@ interface TokenResponse {
 export interface TestWorkspace {
   id: string;
   slug: string;
+  name: string;
+}
+
+export interface TestIssue {
+  id: string;
+  issue_key: string;
+  title: string;
+  status: string;
+}
+
+export interface TestSkill {
+  id: string;
+  name: string;
+  description: string;
+}
+
+export interface TestDaemon {
+  id: string;
   name: string;
 }
 
@@ -111,9 +131,80 @@ export class TestApiClient {
   }
 
   /**
+   * Seed an "online" daemon with one runtime per `kind` so the agents page
+   * shows it in the daemon/provider selectors. Returns the daemon id.
+   */
+  async seedDaemon(opts: {
+    name?: string;
+    status?: string;
+    kinds?: string[];
+  } = {}): Promise<TestDaemon> {
+    const name = opts.name ?? `E2E Daemon ${Date.now().toString(36)}`;
+    const status = opts.status ?? "online";
+    const kinds = opts.kinds ?? ["claude"];
+
+    const client = new pg.Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      const daemon = await client.query(
+        `INSERT INTO daemons (user_id, name, os, arch, daemon_version, status, registered_at)
+         VALUES ($1, $2, 'darwin', 'arm64', '0.1.0', $3, now())
+         RETURNING id`,
+        [this.getUserId(), name, status],
+      );
+      const daemonId: string = daemon.rows[0].id;
+
+      for (const kind of kinds) {
+        await client.query(
+          `INSERT INTO runtimes (daemon_id, kind, name, executable_path, version, status, checked_at, max_concurrency)
+           VALUES ($1, $2, $2, '/usr/local/bin/' || $2, '1.0.0', 'available', now(), 1)`,
+          [daemonId, kind],
+        );
+      }
+      return { id: daemonId, name };
+    } finally {
+      await client.end();
+    }
+  }
+
+  /** Create an issue via the real API. */
+  async createIssue(
+    workspaceId: string,
+    title: string,
+    opts: { description?: string; status?: string } = {},
+  ): Promise<TestIssue> {
+    return this.authedFetch(`/api/v1/workspaces/${workspaceId}/issues`, {
+      method: "POST",
+      body: JSON.stringify({ title, ...opts }),
+    });
+  }
+
+  /** Create a skill via the real API. */
+  async createSkill(
+    workspaceId: string,
+    body: { name: string; description?: string; content?: string },
+  ): Promise<TestSkill> {
+    return this.authedFetch(`/api/v1/workspaces/${workspaceId}/skills`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  /** Create an agent via the real API (requires a seeded daemon). */
+  async createAgent(
+    workspaceId: string,
+    body: { name: string; daemon_id: string; provider: string; description?: string },
+  ): Promise<{ id: string; name: string }> {
+    return this.authedFetch(`/api/v1/workspaces/${workspaceId}/agents`, {
+      method: "POST",
+      body: JSON.stringify(body),
+    });
+  }
+
+  /**
    * Remove all data seeded for the E2E user, in FK-dependency order.
-   * Workspaces cascade to issues/agents/skills; repos and installations have
-   * plain FKs, so they must be deleted explicitly.
+   * Workspaces cascade to issues/agents/skills/runtimes; repos, installations,
+   * runtimes and daemons have plain FKs, so they must be deleted explicitly.
    */
   async cleanup(): Promise<void> {
     const client = new pg.Client({ connectionString: DATABASE_URL });
@@ -130,8 +221,30 @@ export class TestApiClient {
         "DELETE FROM github_installations WHERE user_id = $1",
         [userId],
       );
+      await client.query(
+        `DELETE FROM runtimes
+         WHERE daemon_id IN (SELECT id FROM daemons WHERE user_id = $1)`,
+        [userId],
+      );
+      await client.query("DELETE FROM daemons WHERE user_id = $1", [userId]);
     } finally {
       await client.end();
     }
+  }
+
+  private async authedFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const res = await fetch(`${API_BASE}${path}`, {
+      ...init,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${this.getToken()}`,
+        ...init.headers,
+      },
+    });
+    if (!res.ok) {
+      throw new Error(`${init.method ?? "GET"} ${path} failed: ${res.status}`);
+    }
+    const body = (await res.json()) as { data?: T };
+    return body.data as T;
   }
 }
