@@ -48,10 +48,12 @@ test.describe("Agents", () => {
     const agentName = `ui-agent-${suffix}`;
     await page.getByPlaceholder("coder").fill(agentName);
 
-    // Pick the seeded online daemon, then its provider.
-    await page.getByRole("combobox", { name: "Select daemon" }).click();
+    // Pick the seeded online daemon, then its provider. Radix Select triggers
+    // expose role=combobox but their accessible name is unreliable in this
+    // version, so target by position (daemon first, provider second).
+    await page.getByRole("combobox").first().click();
     await page.getByRole("option", { name: daemon.name }).click();
-    await page.getByRole("combobox", { name: "Select provider" }).click();
+    await page.getByRole("combobox").nth(1).click();
     await page.getByRole("option", { name: "claude" }).click();
 
     await page.getByRole("button", { name: "Create agent" }).click();
