@@ -11,10 +11,16 @@ export default defineConfig({
   // database; locally Playwright may fan out once isolation is by naming.
   workers: process.env.CI ? 1 : undefined,
   forbidOnly: !!process.env.CI,
-  reporter: [
-    ["list"],
-    ["html", { open: "never", outputFolder: "playwright-report" }],
-  ],
+  reporter: process.env.CI
+    ? [
+        ["github"],
+        ["list"],
+        ["html", { open: "never", outputFolder: "playwright-report" }],
+      ]
+    : [
+        ["list"],
+        ["html", { open: "never", outputFolder: "playwright-report" }],
+      ],
   use: {
     baseURL: FRONTEND_URL,
     headless: true,
