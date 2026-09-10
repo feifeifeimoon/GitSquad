@@ -1,4 +1,4 @@
-> 进度基线(2026-09-07 同步):已完成 1.1/1.3–1.6、2.2–2.4、3.1–3.2/3.4、4.1–4.6、5(agent/runtime/skill 子系统,按 2026-09-02 设计落地)、7.1–7.3/7.7;未开始 6/8/9/10/11 章;部分完成 2.5/3.3(degraded 缺口)、7.4/7.5(依赖第 9 章)、7.6(仅下线检测)。另:daemon runtime 探测重写(openspec change `daemon-runtime-detection`)已完整落地。
+> 进度基线(2026-09-08 同步):已完成 1.1/1.3–1.6、2.2–2.4、3.1–3.2/3.4、4.1–4.6、5(agent/runtime/skill 子系统)、6(Runtime 执行内核:claude 适配器 + execenv + Runner + git)、7.1–7.3/7.7;未开始 8/9/10/11 章;部分完成 2.5/3.3(degraded 缺口)、7.4/7.5(已实现认领 + 工作目录隔离,但任务持久化依赖第 9 章)、7.6(仅下线检测)。另:daemon runtime 探测重写(`daemon-runtime-detection`)与前端 issue 编辑器 @mention 自动补全均已落地。
 
 ## 1. 技术栈敲定与项目骨架
 
@@ -51,23 +51,24 @@
 
 ## 6. Agent Runtime(共享内核)
 
-- [ ] 6.1 实现 Runtime 认证/连接模块(daemon token / cloud task token,向 SaaS 证明身份,领取任务)
-- [ ] 6.2 实现 clone repo 模块(使用任务携带的 installation 凭证 clone 到工作区)
-- [ ] 6.3 实现上下文组装模块(读 Issue 黑板评论流 + 相关 repo 代码)
-- [ ] 6.4 定义 coder_backend adapter 接口,实现至少一个 adapter(claude-code 或 codex CLI 驱动)
-- [ ] 6.5 实现产物收集(代码 diff / 测试结果 / 日志)
-- [ ] 6.6 实现回写模块(通过 GitHub App 凭证提 PR + PR body 引用 Issue;写 Issue 评论/状态)
-- [ ] 6.7 实现 Runtime 与 SaaS 的进度报告(开始/进行中/成功/失败)
+> 注(2026-09-08):本章已落地(设计:`docs/superpowers/specs/2026-09-07-runtime-execution-design.md` v2,计划:`docs/superpowers/plans/2026-09-08-runtime-execution.md`)。流式 `provider.Backend`(claude 适配器)+ execenv(per-task brief/skill 注入)+ Runner(git + 编排)+ daemon 认领/执行/上报 + SaaS 建 PR/写 Issue 已跑通代码路径。codex(app-server)/agy 适配器、语义不活动超时、session 恢复、多任务并发后置。
+
+- [x] 6.1 实现 Runtime 认证/连接模块(daemon token 认证已有;新增 `POST /api/v1/daemon/tasks/claim` 认领)
+- [x] 6.2 实现 clone repo 模块(`internal/daemon/runner/git.go`,per-workspace 持久 clone + per-task 分支)
+- [x] 6.3 实现上下文组装模块(`internal/daemon/execenv/`,brief 注入 CLAUDE.md + issue_context + skill 原生注入)
+- [x] 6.4 定义 provider 适配器接口 + claude 适配器(`internal/daemon/provider/`,stream-json;codex/agy 后置)
+- [x] 6.5 实现产物收集(diff + 日志;test 结果结构化解析后置)
+- [x] 6.6 实现回写模块(Runner push 分支 + SaaS `CreatePullRequest` + Issue 评论/状态)
+- [x] 6.7 实现进度报告(started/running/succeeded/failed via `POST /api/v1/daemon/tasks/:id/status`)
 
 ## 7. LocalShell daemon
 
 - [x] 7.1 实现 `gitsquad daemon login` User 级 pairing 登录与 daemon token 本地保存
 - [x] 7.2 实现 `gitsquad daemon status` runtime check 与 capabilities 上报
 - [x] 7.3 实现 daemon↔SaaS 长连接(WebSocket/SSE 拉模式)与心跳/重连
-- [ ] 7.4 实现 LocalShell 的 `next_task()` 接口(从长连接队列拉取任务)
-  - 注:`task_wake` / `task_available` 帧类型与 `PendingActions` 通道已定义,但服务端从不发送、daemon 侧为 TODO,依赖第 9 章任务派发
-- [ ] 7.5 实现多 Workspace 任务的工作目录隔离
-  - 注:未实现,依赖 7.4 任务通道
+- [x] 7.4 实现 LocalShell 的认领接口(daemon 收到 `task_wake`/`task_available` → HTTP claim → Runner 执行)
+  - 注:已实现(内存队列版);任务持久化与完整状态机归第 9 章
+- [x] 7.5 实现多 Workspace 任务的工作目录隔离(`{workRoot}/workspaces/{workspace_id}/` + per-task 分支)
 - [ ] 7.6 实现 daemon 下线检测与任务超时标记 `failed` + Issue 回流通知(MVP 不自动迁移)
   - 进度:下线检测 ✅(WS 陈旧连接驱逐 → `MarkOffline`);任务超时标记 `failed` + Issue 回流 ❌(任务系统未建)
 - [ ] 7.7 打包 daemon 单 binary(`gitsquad daemon`)与安装/更新脚本
@@ -119,3 +120,5 @@
 - 工程化:Makefile、goreleaser 发布配置、Dockerfile、.github 工作流
 - Issue 黑板全链路:7 态状态机(backlog 默认)、GIT-42 式编号、评论三类型(user/agent/system)不可编辑、@mention 解析(代码块跳过 + 系统提示 + 派发钩子)、七列看板 + 详情页(设计文档:docs/superpowers/specs/2026-08-24-issue-blackboard-design.md)
 - (2026-09-07)daemon runtime 探测重写:声明式注册表 + login-shell 解析 + 版本门槛 + 三态诊断 + 周期重探,作为独立 openspec change(`daemon-runtime-detection`)完整落地
+- (2026-09-08)第 6 章 Runtime 执行内核:流式 `provider.Backend`(claude)+ execenv + Runner + git + daemon/SaaS 接线(设计 `docs/superpowers/specs/2026-09-07-runtime-execution-design.md`,计划 `docs/superpowers/plans/2026-09-08-runtime-execution.md`)
+- (2026-09-08)前端 issue 编辑器 @mention agent 自动补全(`web/components/markdown-editor.tsx` + `[slug]/page.tsx` 与 `[issueKey]/page.tsx` 接线)

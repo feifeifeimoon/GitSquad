@@ -37,7 +37,7 @@
 - [x] 6.1 `execpath` 单测:env 覆盖命中 / hard-miss、LookPath 命中、shell 兜底命中、extra locations 命中、优先级顺序
 - [x] 6.2 `shellpath` 单测:白名单过滤、脚本输出解析、`isSafeCommandName`、超时降级
 - [x] 6.3 `version` 单测:semver 提取(含 Windows `chcp` 噪音)、门槛判定
-- [ ] 6.4 `ReplaceRuntimes` 单测:status/diagnostics 持久化 —— 未落地,`internal/server/service/` 下仅有 agent/issue/mentions 测试
+- [x] 6.4 `ReplaceRuntimes` 单测:status/diagnostics 持久化(`internal/server/service/daemon_test.go`:纯函数测 `runtimeStatus`/`runtimeDiagnostics` + DB 集成测 `TestDaemonServiceReplaceRuntimes`,后者需 `GITSQUAD_TEST_DATABASE_URL`)
 - [x] 6.5 删除 `runtime_claude.go`/`runtime_codex.go` 后确认 `runtime_test.go`/`detect_test.go` 更新通过
 
 > 说明:`agy` 的 `--version` 输出格式与最低版本门槛待确认(见 design.md Open Questions),第一版不设门槛。

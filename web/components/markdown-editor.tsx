@@ -20,6 +20,7 @@ import {
   Quote,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { mentionQueryAt } from "@/lib/mention";
 
 function BubbleButton({
   active,
@@ -89,12 +90,11 @@ export function MarkdownEditor({
       return;
     }
     const before = editor.state.doc.textBetween(0, from, "\n", " ");
-    const m = /(?:^|\s)@([\w-]*)$/.exec(before);
-    if (!m) {
+    const query = mentionQueryAt(before);
+    if (query === null) {
       setMention(null);
       return;
     }
-    const query = m[1];
     const atPos = from - query.length - 1;
     const coords = editor.view.coordsAtPos(atPos);
     setMention({ query, from: atPos, to: from, x: coords.left, y: coords.bottom });
