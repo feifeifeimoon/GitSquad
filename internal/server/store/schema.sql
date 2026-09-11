@@ -203,8 +203,10 @@ CREATE INDEX IF NOT EXISTS idx_tasks_pending
     ON tasks(assigned_daemon_id, priority DESC, created_at ASC)
     WHERE status IN ('queued','dispatched');
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_issue
-    ON tasks(issue_id)
+-- At most one pending task per (issue, agent): an issue may have several
+-- agents working in parallel, but the same agent must not be queued twice.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_agent
+    ON tasks(issue_id, agent_id)
     WHERE status IN ('queued','dispatched');
 
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id, created_at);

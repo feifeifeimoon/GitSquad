@@ -95,6 +95,11 @@ func (s *TaskService) Dispatch(ctx context.Context, workspaceID, issueID uuid.UU
 		Model:            agent.Model,
 		Context:          raw,
 	})
+	// A pending task for this (issue, agent) already exists — coalesce instead
+	// of failing the comment that triggered it.
+	if err != nil && util.IsUniqueViolation(err) {
+		return nil
+	}
 	return err
 }
 
@@ -110,6 +115,19 @@ func (s *TaskService) Claim(ctx context.Context, daemonID uuid.UUID) (*v1.Task, 
 		return nil, fmt.Errorf("claim task: %w", err)
 	}
 
+	full, err := s.buildClaim(ctx, task)
+	if err != nil {
+		// ClaimNextTask already flipped the row to dispatched. Without a token
+		// the daemon cannot run the task, so hand it back to the queue instead
+		// of stranding it in dispatched forever.
+		_, _ = s.store.RevertTaskToQueued(ctx, task.ID)
+		return nil, err
+	}
+	return full, nil
+}
+
+// buildClaim assembles the full task payload, minting a fresh installation token.
+func (s *TaskService) buildClaim(ctx context.Context, task db.Task) (*v1.Task, error) {
 	ws, err := s.store.GetWorkspaceWithRepo(ctx, task.WorkspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("get workspace: %w", err)
@@ -187,10 +205,13 @@ func (s *TaskService) FailDaemonTasks(ctx context.Context, daemonID uuid.UUID) e
 // ── state machine handlers ─────────────────────────────────────────────
 
 func (s *TaskService) handleStarted(ctx context.Context, task db.Task) error {
-	if task.Status == "dispatched" {
-		if _, err := s.store.MarkTaskRunning(ctx, task.ID); err != nil {
-			return err
+	// CAS dispatched → running. A replayed "started" report finds no row and
+	// must not post a second "started" comment.
+	if _, err := s.store.MarkTaskRunning(ctx, task.ID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
 		}
+		return err
 	}
 	full, err := taskContext(task)
 	if err != nil {
@@ -230,6 +251,15 @@ func (s *TaskService) handleProgress(ctx context.Context, task db.Task, p *v1.Ta
 }
 
 func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report v1.TaskReport) error {
+	// CAS the terminal transition first: a replayed "completed" report finds no
+	// row and must not open a second PR or post a second comment.
+	if _, err := s.store.MarkTaskCompleted(ctx, task.ID); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+
 	full, err := taskContext(task)
 	if err != nil {
 		return err
@@ -245,6 +275,10 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		body := fmt.Sprintf("Closes %s\n\nAutomated changes by %s.", full.Issue.Key, full.Agent.Name)
 		prNum, err := s.github.CreatePullRequest(ctx, ws.InstallationID, ws.RepoOwner, ws.RepoName, report.Summary.Branch, full.Repo.DefaultBranch, title, body)
 		if err != nil {
+			// The task is already terminal; surface the write-back failure
+			// rather than losing it silently.
+			_ = s.appendComment(ctx, task.IssueID, "system", "system",
+				fmt.Sprintf("%s 完成任务,但建 PR 失败: %v", full.Agent.Name, err))
 			return err
 		}
 		result["pr_number"] = prNum
@@ -267,25 +301,27 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 	}
 
 	raw, _ := json.Marshal(result)
-	_, err = s.store.MarkTaskCompleted(ctx, db.MarkTaskCompletedParams{ID: task.ID, Result: raw})
-	return err
+	return s.store.SetTaskResult(ctx, db.SetTaskResultParams{ID: task.ID, Result: raw})
 }
 
 func (s *TaskService) handleFailed(ctx context.Context, task db.Task, report v1.TaskReport) error {
+	// CAS first so a replayed failure does not duplicate the comment.
+	if _, err := s.store.MarkTaskFailed(ctx, db.MarkTaskFailedParams{
+		ID:            task.ID,
+		Error:         report.Error,
+		FailureReason: util.Ptr("agent_error"),
+	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
 	full, err := taskContext(task)
 	if err != nil {
 		return err
 	}
-	if err := s.appendComment(ctx, task.IssueID, "system", "system",
-		fmt.Sprintf("%s 任务失败: %s", full.Agent.Name, report.Error)); err != nil {
-		return err
-	}
-	_, err = s.store.MarkTaskFailed(ctx, db.MarkTaskFailedParams{
-		ID:            task.ID,
-		Error:         report.Error,
-		FailureReason: util.Ptr("agent_error"),
-	})
-	return err
+	return s.appendComment(ctx, task.IssueID, "system", "system",
+		fmt.Sprintf("%s 任务失败: %s", full.Agent.Name, report.Error))
 }
 
 // ── helpers ─────────────────────────────────────────────────────────────

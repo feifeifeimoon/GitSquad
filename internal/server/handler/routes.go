@@ -51,7 +51,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		c.String(http.StatusOK, "ok")
 	})
 
-	r.GET("/ws/daemon", NewDaemonWS(daemonSvc))
+	r.GET("/ws/daemon", NewDaemonWS(daemonSvc, taskSvc))
 
 	api := r.Group("/api/v1")
 	{

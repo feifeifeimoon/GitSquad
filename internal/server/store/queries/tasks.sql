@@ -18,13 +18,23 @@ WHERE tasks.id = (
 RETURNING *;
 
 -- name: MarkTaskRunning :one
-UPDATE tasks SET status = 'running', started_at = now(), updated_at = now() WHERE id = $1 RETURNING *;
+UPDATE tasks SET status = 'running', started_at = now(), updated_at = now()
+WHERE id = $1 AND status = 'dispatched' RETURNING *;
 
 -- name: MarkTaskCompleted :one
-UPDATE tasks SET status = 'completed', result = $2, completed_at = now(), updated_at = now() WHERE id = $1 RETURNING *;
+UPDATE tasks SET status = 'completed', completed_at = now(), updated_at = now()
+WHERE id = $1 AND status IN ('dispatched','running') RETURNING *;
+
+-- name: SetTaskResult :exec
+UPDATE tasks SET result = $2, updated_at = now() WHERE id = $1;
 
 -- name: MarkTaskFailed :one
-UPDATE tasks SET status = 'failed', error = $2, failure_reason = $3, completed_at = now(), updated_at = now() WHERE id = $1 RETURNING *;
+UPDATE tasks SET status = 'failed', error = $2, failure_reason = $3, completed_at = now(), updated_at = now()
+WHERE id = $1 AND status IN ('dispatched','running') RETURNING *;
+
+-- name: RevertTaskToQueued :one
+UPDATE tasks SET status = 'queued', dispatched_at = NULL, updated_at = now()
+WHERE id = $1 AND status = 'dispatched' RETURNING *;
 
 -- name: HasPendingForDaemon :one
 SELECT EXISTS(SELECT 1 FROM tasks WHERE assigned_daemon_id = $1 AND status = 'queued') AS has_pending;

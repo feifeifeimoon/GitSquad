@@ -266,16 +266,12 @@ func (q *Queries) ListTaskMessages(ctx context.Context, arg ListTaskMessagesPara
 }
 
 const markTaskCompleted = `-- name: MarkTaskCompleted :one
-UPDATE tasks SET status = 'completed', result = $2, completed_at = now(), updated_at = now() WHERE id = $1 RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+UPDATE tasks SET status = 'completed', completed_at = now(), updated_at = now()
+WHERE id = $1 AND status IN ('dispatched','running') RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
-type MarkTaskCompletedParams struct {
-	ID     uuid.UUID `json:"id"`
-	Result []byte    `json:"result"`
-}
-
-func (q *Queries) MarkTaskCompleted(ctx context.Context, arg MarkTaskCompletedParams) (Task, error) {
-	row := q.db.QueryRow(ctx, markTaskCompleted, arg.ID, arg.Result)
+func (q *Queries) MarkTaskCompleted(ctx context.Context, id uuid.UUID) (Task, error) {
+	row := q.db.QueryRow(ctx, markTaskCompleted, id)
 	var i Task
 	err := row.Scan(
 		&i.ID,
@@ -301,7 +297,8 @@ func (q *Queries) MarkTaskCompleted(ctx context.Context, arg MarkTaskCompletedPa
 }
 
 const markTaskFailed = `-- name: MarkTaskFailed :one
-UPDATE tasks SET status = 'failed', error = $2, failure_reason = $3, completed_at = now(), updated_at = now() WHERE id = $1 RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+UPDATE tasks SET status = 'failed', error = $2, failure_reason = $3, completed_at = now(), updated_at = now()
+WHERE id = $1 AND status IN ('dispatched','running') RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 type MarkTaskFailedParams struct {
@@ -337,7 +334,8 @@ func (q *Queries) MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) 
 }
 
 const markTaskRunning = `-- name: MarkTaskRunning :one
-UPDATE tasks SET status = 'running', started_at = now(), updated_at = now() WHERE id = $1 RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+UPDATE tasks SET status = 'running', started_at = now(), updated_at = now()
+WHERE id = $1 AND status = 'dispatched' RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 func (q *Queries) MarkTaskRunning(ctx context.Context, id uuid.UUID) (Task, error) {
@@ -375,4 +373,49 @@ func (q *Queries) NextTaskMessageSeq(ctx context.Context, taskID uuid.UUID) (int
 	var seq int32
 	err := row.Scan(&seq)
 	return seq, err
+}
+
+const revertTaskToQueued = `-- name: RevertTaskToQueued :one
+UPDATE tasks SET status = 'queued', dispatched_at = NULL, updated_at = now()
+WHERE id = $1 AND status = 'dispatched' RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+`
+
+func (q *Queries) RevertTaskToQueued(ctx context.Context, id uuid.UUID) (Task, error) {
+	row := q.db.QueryRow(ctx, revertTaskToQueued, id)
+	var i Task
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.AgentID,
+		&i.Status,
+		&i.AssignedDaemonID,
+		&i.Provider,
+		&i.Model,
+		&i.Priority,
+		&i.Context,
+		&i.Result,
+		&i.Error,
+		&i.FailureReason,
+		&i.DispatchedAt,
+		&i.StartedAt,
+		&i.CompletedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const setTaskResult = `-- name: SetTaskResult :exec
+UPDATE tasks SET result = $2, updated_at = now() WHERE id = $1
+`
+
+type SetTaskResultParams struct {
+	ID     uuid.UUID `json:"id"`
+	Result []byte    `json:"result"`
+}
+
+func (q *Queries) SetTaskResult(ctx context.Context, arg SetTaskResultParams) error {
+	_, err := q.db.Exec(ctx, setTaskResult, arg.ID, arg.Result)
+	return err
 }

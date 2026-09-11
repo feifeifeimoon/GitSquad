@@ -13,7 +13,7 @@ import (
 )
 
 // NewDaemonWS wires up the WS hub, dispatcher, message handlers, and stale detection.
-func NewDaemonWS(daemonSvc *service.DaemonService) gin.HandlerFunc {
+func NewDaemonWS(daemonSvc *service.DaemonService, taskSvc *service.TaskService) gin.HandlerFunc {
 	// Hub with built-in stale detection: connections untouched for 60s (2 heartbeat
 	// cycles) are unregistered, which triggers OnDisconnect → MarkOffline.
 	hub := ws.NewHub(60 * time.Second)
@@ -21,10 +21,13 @@ func NewDaemonWS(daemonSvc *service.DaemonService) gin.HandlerFunc {
 	disp := ws.NewDispatcher()
 
 	hub.OnDisconnect = func(daemonID string) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		uid, _ := uuid.Parse(daemonID)
 		_ = daemonSvc.MarkOffline(ctx, uid)
+		// In-flight tasks can no longer report back; fail them and tell the
+		// issues instead of leaving them stuck in dispatched/running.
+		_ = taskSvc.FailDaemonTasks(ctx, uid)
 	}
 
 	// HeartbeatScheduler batches last_seen_at DB writes every 60s.

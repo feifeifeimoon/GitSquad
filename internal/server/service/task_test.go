@@ -3,16 +3,18 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"testing"
 
-	"github.com/feifeifeimoon/GitSquad/internal/util"
 	"github.com/feifeifeimoon/GitSquad/internal/server/database"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 func TestTaskContextRoundTrip(t *testing.T) {
@@ -131,9 +133,12 @@ func TestTaskLifecycleQueries(t *testing.T) {
 		t.Fatal("second ClaimNextTask should return no rows")
 	}
 
-	// 3. MarkTaskRunning.
+	// 3. MarkTaskRunning. A replay must be a no-op (compare-and-set gate).
 	if _, err := s.MarkTaskRunning(ctx, task.ID); err != nil {
 		t.Fatalf("MarkTaskRunning: %v", err)
+	}
+	if _, err := s.MarkTaskRunning(ctx, task.ID); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("second MarkTaskRunning err = %v, want pgx.ErrNoRows", err)
 	}
 
 	// 4. InsertTaskMessage + ListTaskMessages.
@@ -147,11 +152,16 @@ func TestTaskLifecycleQueries(t *testing.T) {
 		t.Fatalf("ListTaskMessages: %v (n=%d)", err, len(msgs))
 	}
 
-	// 5. MarkTaskFailed.
+	// 5. MarkTaskFailed, then a replayed terminal report must find no row.
 	if _, err := s.MarkTaskFailed(ctx, db.MarkTaskFailedParams{
 		ID: task.ID, Error: "boom", FailureReason: util.Ptr("agent_error"),
 	}); err != nil {
 		t.Fatalf("MarkTaskFailed: %v", err)
+	}
+	if _, err := s.MarkTaskFailed(ctx, db.MarkTaskFailedParams{
+		ID: task.ID, Error: "again", FailureReason: util.Ptr("agent_error"),
+	}); !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatalf("second MarkTaskFailed err = %v, want pgx.ErrNoRows", err)
 	}
 
 	// 6. FailDaemonTasks marks in-flight tasks failed (runtime_offline).
@@ -166,5 +176,19 @@ func TestTaskLifecycleQueries(t *testing.T) {
 	}
 	if failed[0].ID != task2.ID || *failed[0].FailureReason != "runtime_offline" {
 		t.Fatalf("failed task = %+v", failed[0])
+	}
+
+	// 7. RevertTaskToQueued hands a claimed-but-unrunnable task back.
+	task3, _ := s.CreateTask(ctx, db.CreateTaskParams{
+		WorkspaceID: workspace.ID, IssueID: issue.ID, AgentID: agent.ID,
+		AssignedDaemonID: &daemon.ID, Provider: "claude", Context: []byte(`{}`),
+	})
+	claimed3, err := s.ClaimNextTask(ctx, &daemon.ID)
+	if err != nil || claimed3.ID != task3.ID || claimed3.Status != "dispatched" {
+		t.Fatalf("claim task3 = %+v (err=%v)", claimed3, err)
+	}
+	reverted, err := s.RevertTaskToQueued(ctx, task3.ID)
+	if err != nil || reverted.Status != "queued" || reverted.DispatchedAt != nil {
+		t.Fatalf("RevertTaskToQueued = %+v (err=%v)", reverted, err)
 	}
 }

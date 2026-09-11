@@ -223,6 +223,11 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`},
 		{name: "034_task_messages_idx", sql: `CREATE INDEX IF NOT EXISTS idx_task_messages_task_seq ON task_messages(task_id, seq)`},
+		// An issue may have several agents working in parallel, so the pending
+		// guard must be per (issue, agent) rather than per issue.
+		{name: "035_pending_task_per_agent", sql: `DROP INDEX IF EXISTS idx_one_pending_task_per_issue`},
+		{name: "036_pending_task_per_agent_idx", sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_agent
+			ON tasks(issue_id, agent_id) WHERE status IN ('queued','dispatched')`},
 	}
 
 	for _, m := range migrations {

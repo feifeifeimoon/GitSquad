@@ -202,6 +202,29 @@ export class TestApiClient {
   }
 
   /**
+   * Count tasks in a workspace, optionally filtered by status. Used to assert
+   * that an @mention queued work without needing a real daemon.
+   */
+  async taskCount(workspaceId: string, status?: string): Promise<number> {
+    const client = new pg.Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      const res = status
+        ? await client.query(
+            "SELECT count(*)::int AS n FROM tasks WHERE workspace_id = $1 AND status = $2",
+            [workspaceId, status],
+          )
+        : await client.query(
+            "SELECT count(*)::int AS n FROM tasks WHERE workspace_id = $1",
+            [workspaceId],
+          );
+      return res.rows[0].n as number;
+    } finally {
+      await client.end();
+    }
+  }
+
+  /**
    * Remove all data seeded for the E2E user, in FK-dependency order.
    * Workspaces cascade to issues/agents/skills/runtimes; repos, installations,
    * runtimes and daemons have plain FKs, so they must be deleted explicitly.
