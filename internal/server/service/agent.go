@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var (
@@ -36,11 +36,6 @@ func normalizeAgentName(name string) (string, error) {
 		return "", ErrInvalidAgentName
 	}
 	return n, nil
-}
-
-func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 type AgentService struct {
@@ -105,7 +100,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, workspaceID, userID uuid
 		CreatedBy:    &userID,
 	})
 	if err != nil {
-		if isUniqueViolation(err) {
+		if util.IsUniqueViolation(err) {
 			return nil, ErrAgentNameTaken
 		}
 		return nil, fmt.Errorf("create agent: %w", err)
@@ -191,7 +186,7 @@ func (s *AgentService) UpdateAgent(ctx context.Context, workspaceID, agentID uui
 		}
 	}
 	if _, err := s.store.UpdateAgent(ctx, params); err != nil {
-		if isUniqueViolation(err) {
+		if util.IsUniqueViolation(err) {
 			return nil, ErrAgentNameTaken
 		}
 		return nil, fmt.Errorf("update agent: %w", err)
@@ -286,15 +281,8 @@ func buildAgentView(
 			Provider:     runtimeProvider,
 			DaemonID:     runtimeDaemonID,
 			Status:       runtimeStatus,
-			DaemonName:   strPtr(runtimeDaemonName),
-			DaemonStatus: strPtr(runtimeDaemonStatus),
+			DaemonName:   util.Value(runtimeDaemonName),
+			DaemonStatus: util.Value(runtimeDaemonStatus),
 		},
 	}
-}
-
-func strPtr(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

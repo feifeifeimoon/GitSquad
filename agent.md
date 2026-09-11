@@ -65,6 +65,7 @@
 │   │   ├── helpers.go         # Small shared helpers
 │   │   └── login.go           # Login flow (pairing + token)
 │   ├── crypto/                # Shared crypto utilities (SHA-256 hashing)
+│   ├── util/                  # Shared helpers (nullable-pointer bridging, pg error classification)
 │   └── version/               # Build version info (ldflags-injected)
 ├── pkg/
 │   └── types/

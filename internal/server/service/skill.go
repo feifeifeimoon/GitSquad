@@ -6,6 +6,7 @@ import (
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 )
@@ -26,7 +27,7 @@ func (s *SkillService) CreateSkill(ctx context.Context, workspaceID, userID uuid
 		CreatedBy:   &userID,
 	})
 	if err != nil {
-		if isUniqueViolation(err) {
+		if util.IsUniqueViolation(err) {
 			return nil, ErrSkillNameTaken
 		}
 		return nil, fmt.Errorf("create skill: %w", err)
@@ -73,7 +74,7 @@ func (s *SkillService) UpdateSkill(ctx context.Context, workspaceID, skillID uui
 	}
 	sk, err := s.store.UpdateSkill(ctx, params)
 	if err != nil {
-		if isUniqueViolation(err) {
+		if util.IsUniqueViolation(err) {
 			return nil, ErrSkillNameTaken
 		}
 		return nil, fmt.Errorf("update skill: %w", err)

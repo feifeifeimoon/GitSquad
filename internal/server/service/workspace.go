@@ -11,9 +11,9 @@ import (
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 var (
@@ -110,8 +110,7 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID
 	if err != nil {
 		// Unique-index backstop for concurrent creates and for reusing an
 		// archived workspace's slug (the pre-check above skips archived rows).
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		if util.IsUniqueViolation(err) {
 			return nil, ErrWorkspaceSlugTaken
 		}
 		return nil, fmt.Errorf("create workspace: %w", err)

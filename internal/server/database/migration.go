@@ -183,6 +183,46 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			ADD COLUMN IF NOT EXISTS avatar_url TEXT NOT NULL DEFAULT ''`},
 		{name: "027_agent_run_count", sql: `ALTER TABLE agents
 			ADD COLUMN IF NOT EXISTS run_count INT NOT NULL DEFAULT 0`},
+		{name: "028_create_tasks", sql: `CREATE TABLE IF NOT EXISTS tasks (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+			agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+			status TEXT NOT NULL DEFAULT 'queued'
+				CHECK (status IN ('queued','dispatched','running','completed','failed','cancelled')),
+			assigned_daemon_id UUID REFERENCES daemons(id),
+			provider TEXT NOT NULL DEFAULT '',
+			model TEXT NOT NULL DEFAULT '',
+			priority INT NOT NULL DEFAULT 0,
+			context JSONB NOT NULL DEFAULT '{}',
+			result JSONB,
+			error TEXT NOT NULL DEFAULT '',
+			failure_reason TEXT,
+			dispatched_at TIMESTAMPTZ,
+			started_at TIMESTAMPTZ,
+			completed_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`},
+		{name: "029_tasks_pending_idx", sql: `CREATE INDEX IF NOT EXISTS idx_tasks_pending
+			ON tasks(assigned_daemon_id, priority DESC, created_at ASC)
+			WHERE status IN ('queued','dispatched')`},
+		{name: "030_one_pending_task_per_issue", sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_issue
+			ON tasks(issue_id) WHERE status IN ('queued','dispatched')`},
+		{name: "031_tasks_workspace_idx", sql: `CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id, created_at)`},
+		{name: "032_tasks_issue_idx", sql: `CREATE INDEX IF NOT EXISTS idx_tasks_issue ON tasks(issue_id)`},
+		{name: "033_create_task_messages", sql: `CREATE TABLE IF NOT EXISTS task_messages (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+			seq INT NOT NULL,
+			type TEXT NOT NULL,
+			tool TEXT,
+			content TEXT,
+			input JSONB,
+			output TEXT,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		)`},
+		{name: "034_task_messages_idx", sql: `CREATE INDEX IF NOT EXISTS idx_task_messages_task_seq ON task_messages(task_id, seq)`},
 	}
 
 	for _, m := range migrations {

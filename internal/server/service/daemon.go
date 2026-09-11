@@ -9,6 +9,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/crypto"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 )
@@ -17,7 +18,7 @@ type DaemonService struct {
 	store *store.Store
 	// hasPending reports whether a daemon has queued tasks; wired to the
 	// TaskService after construction. Nil means "never".
-	hasPending func(uuid.UUID) bool
+	hasPending func(context.Context, uuid.UUID) bool
 }
 
 func NewDaemonService(s *store.Store) *DaemonService {
@@ -25,7 +26,7 @@ func NewDaemonService(s *store.Store) *DaemonService {
 }
 
 // SetPendingTasks wires the task-queue check into PendingActions.
-func (s *DaemonService) SetPendingTasks(fn func(uuid.UUID) bool) {
+func (s *DaemonService) SetPendingTasks(fn func(context.Context, uuid.UUID) bool) {
 	s.hasPending = fn
 }
 
@@ -326,7 +327,7 @@ func (s *DaemonService) UpdateDaemonVersion(ctx context.Context, id uuid.UUID, v
 // delivered in the next heartbeat ack. When the daemon has queued tasks, it
 // returns a task_available action (the daemon then claims the task via HTTP).
 func (s *DaemonService) PendingActions(ctx context.Context, id uuid.UUID) []v1.PendingAction {
-	if s.hasPending != nil && s.hasPending(id) {
+	if s.hasPending != nil && s.hasPending(ctx, id) {
 		return []v1.PendingAction{{Type: v1.ActionTaskAvailable}}
 	}
 	return nil
@@ -365,7 +366,7 @@ func (s *DaemonService) ReplaceRuntimes(ctx context.Context, daemonID uuid.UUID,
 				ExecutablePath: rt.ExecutablePath,
 				Version:        rt.Version,
 				Status:         runtimeStatus(rt.Status),
-				Diagnostics:    runtimeDiagnostics(rt.Diagnostics),
+				Diagnostics:    util.OrNil(rt.Diagnostics),
 				MaxConcurrency: int32(rt.MaxConcurrency),
 			}); err != nil {
 				return err
@@ -386,14 +387,6 @@ func runtimeStatus(status string) string {
 		return "available"
 	}
 	return status
-}
-
-// runtimeDiagnostics converts a diagnostics string to the nullable DB column.
-func runtimeDiagnostics(d string) *string {
-	if d == "" {
-		return nil
-	}
-	return &d
 }
 
 // ── DB → API conversions ──────────────────────────────────────────────

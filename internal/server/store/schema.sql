@@ -176,3 +176,50 @@ CREATE TABLE agent_skills (
 CREATE INDEX IF NOT EXISTS idx_agent_runtimes_workspace ON agent_runtimes(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_agents_workspace ON agents(workspace_id);
 CREATE INDEX IF NOT EXISTS idx_skills_workspace ON skills(workspace_id);
+
+CREATE TABLE tasks (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    status TEXT NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued','dispatched','running','completed','failed','cancelled')),
+    assigned_daemon_id UUID REFERENCES daemons(id),
+    provider TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    priority INT NOT NULL DEFAULT 0,
+    context JSONB NOT NULL DEFAULT '{}',
+    result JSONB,
+    error TEXT NOT NULL DEFAULT '',
+    failure_reason TEXT,
+    dispatched_at TIMESTAMPTZ,
+    started_at TIMESTAMPTZ,
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_pending
+    ON tasks(assigned_daemon_id, priority DESC, created_at ASC)
+    WHERE status IN ('queued','dispatched');
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_issue
+    ON tasks(issue_id)
+    WHERE status IN ('queued','dispatched');
+
+CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tasks_issue ON tasks(issue_id);
+
+CREATE TABLE task_messages (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    seq INT NOT NULL,
+    type TEXT NOT NULL,
+    tool TEXT,
+    content TEXT,
+    input JSONB,
+    output TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_messages_task_seq ON task_messages(task_id, seq);

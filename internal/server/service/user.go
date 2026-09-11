@@ -5,6 +5,7 @@ import (
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 )
@@ -25,7 +26,7 @@ func (s *UserService) FindByID(ctx context.Context, id uuid.UUID) (*v1.User, err
 	return &v1.User{
 		ID:        u.ID,
 		Login:     u.Login,
-		AvatarURL: strVal(u.AvatarUrl),
+		AvatarURL: util.Value(u.AvatarUrl),
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}, nil
@@ -52,8 +53,8 @@ func (s *UserService) FindByIdentity(ctx context.Context, provider, providerUser
 		Provider:       row.Provider,
 		ProviderUserID: row.ProviderUserID,
 		ProviderLogin:  row.ProviderLogin,
-		Email:          strVal(row.Email),
-		AccessToken:    strVal(row.AccessToken),
+		Email:          util.Value(row.Email),
+		AccessToken:    util.Value(row.AccessToken),
 		CreatedAt:      row.CreatedAt,
 		UpdatedAt:      row.UpdatedAt,
 	}, nil
@@ -70,7 +71,7 @@ func (s *UserService) CreateUser(ctx context.Context, login, avatarURL string) (
 	return &v1.User{
 		ID:        u.ID,
 		Login:     u.Login,
-		AvatarURL: strVal(u.AvatarUrl),
+		AvatarURL: util.Value(u.AvatarUrl),
 		CreatedAt: u.CreatedAt,
 		UpdatedAt: u.UpdatedAt,
 	}, nil
@@ -124,11 +125,4 @@ func (s *UserService) UpsertByIdentity(ctx context.Context, provider, providerUs
 		return nil, err
 	}
 	return u, nil
-}
-
-func strVal(s *string) string {
-	if s == nil {
-		return ""
-	}
-	return *s
 }

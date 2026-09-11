@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
 	"github.com/google/uuid"
@@ -175,10 +176,6 @@ func getRowToResponse(row db.GetIssueRow) IssueResponse {
 	}
 }
 
-// uuidPtr converts a uuid.UUID into the *uuid.UUID the sqlc-generated
-// models use for nullable uuid columns.
-func uuidPtr(id uuid.UUID) *uuid.UUID { return &id }
-
 // CreateIssue creates an issue with a per-workspace sequential number,
 // scans the description for @mentions, and appends system hints for
 // mentions that match no agent. Runs in one transaction.
@@ -215,7 +212,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 			Title:          title,
 			Description:    description,
 			Status:         status,
-			CreatorUserID:  uuidPtr(userID),
+			CreatorUserID:  util.Ptr(userID),
 			AssignedAgents: matched,
 		})
 		if err != nil {
@@ -397,7 +394,7 @@ func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, use
 		comment, err := q.CreateComment(ctx, db.CreateCommentParams{
 			IssueID:    issueID,
 			AuthorType: "user",
-			AuthorID:   uuidPtr(userID),
+				AuthorID:   util.Ptr(userID),
 			AuthorName: userLogin,
 			Type:       "comment",
 			Content:    content,

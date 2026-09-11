@@ -25,16 +25,6 @@ func TestRuntimeStatus(t *testing.T) {
 	}
 }
 
-func TestRuntimeDiagnostics(t *testing.T) {
-	if got := runtimeDiagnostics(""); got != nil {
-		t.Errorf("runtimeDiagnostics(\"\") = %v, want nil", got)
-	}
-	got := runtimeDiagnostics("below min version")
-	if got == nil || *got != "below min version" {
-		t.Errorf("runtimeDiagnostics() = %v, want ptr to value", got)
-	}
-}
-
 // TestDaemonServiceReplaceRuntimes verifies that status/diagnostics reported
 // by the daemon are persisted (not hardcoded to available/nil). Skipped
 // unless GITSQUAD_TEST_DATABASE_URL is set.

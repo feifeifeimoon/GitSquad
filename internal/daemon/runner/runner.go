@@ -149,7 +149,7 @@ func triggerPrompt(task v1.Task) string {
 }
 
 func progressFromMessage(m provider.Message) *v1.TaskProgress {
-	return &v1.TaskProgress{Type: string(m.Type), Content: m.Content, Tool: m.Tool}
+	return &v1.TaskProgress{Type: string(m.Type), Content: m.Content, Tool: m.Tool, Input: m.Input, Output: m.Output}
 }
 
 func diffStat(diff string) string {

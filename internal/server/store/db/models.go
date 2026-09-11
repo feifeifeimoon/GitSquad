@@ -150,6 +150,39 @@ type Skill struct {
 	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
+type Task struct {
+	ID               uuid.UUID  `json:"id"`
+	WorkspaceID      uuid.UUID  `json:"workspace_id"`
+	IssueID          uuid.UUID  `json:"issue_id"`
+	AgentID          uuid.UUID  `json:"agent_id"`
+	Status           string     `json:"status"`
+	AssignedDaemonID *uuid.UUID `json:"assigned_daemon_id"`
+	Provider         string     `json:"provider"`
+	Model            string     `json:"model"`
+	Priority         int32      `json:"priority"`
+	Context          []byte     `json:"context"`
+	Result           []byte     `json:"result"`
+	Error            string     `json:"error"`
+	FailureReason    *string    `json:"failure_reason"`
+	DispatchedAt     *time.Time `json:"dispatched_at"`
+	StartedAt        *time.Time `json:"started_at"`
+	CompletedAt      *time.Time `json:"completed_at"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+}
+
+type TaskMessage struct {
+	ID        uuid.UUID `json:"id"`
+	TaskID    uuid.UUID `json:"task_id"`
+	Seq       int32     `json:"seq"`
+	Type      string    `json:"type"`
+	Tool      *string   `json:"tool"`
+	Content   *string   `json:"content"`
+	Input     []byte    `json:"input"`
+	Output    *string   `json:"output"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type User struct {
 	ID        uuid.UUID `json:"id"`
 	Login     string    `json:"login"`

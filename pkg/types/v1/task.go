@@ -95,9 +95,11 @@ type TaskReport struct {
 // TaskProgress is one streamed agent event forwarded to the server during
 // execution. It mirrors the provider Message event model on the wire.
 type TaskProgress struct {
-	Type    string `json:"type"` // text | thinking | tool_use | tool_result | status | error
-	Content string `json:"content,omitempty"`
-	Tool    string `json:"tool,omitempty"`
+	Type    string         `json:"type"` // text | thinking | tool_use | tool_result | status | error
+	Content string         `json:"content,omitempty"`
+	Tool    string         `json:"tool,omitempty"`
+	Input   map[string]any `json:"input,omitempty"` // tool_use 的入参(如命令)
+	Output  string         `json:"output,omitempty"` // tool_result 的输出
 }
 
 // TaskSummary summarizes the artifacts on task completion.
