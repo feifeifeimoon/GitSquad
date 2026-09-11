@@ -280,11 +280,16 @@ func (d *Daemon) drainTasks(ctx context.Context) {
 
 // runTask resolves the provider backend and runs one task via the Runner.
 func (d *Daemon) runTask(ctx context.Context, task v1.Task) error {
+	reporter := runner.NewHTTPReporter(d.client)
+
 	backend, err := d.backendFor(task.Agent.Provider)
 	if err != nil {
+		// The task is already claimed, so it can never be re-claimed. Report the
+		// failure instead of leaving it stranded in dispatched with no trace.
+		_ = reporter.Report(ctx, task.ID, v1.TaskReport{Status: v1.TaskReportFailed, Error: err.Error()})
 		return err
 	}
-	r := runner.New(runner.NewGitCLI(), backend, runner.NewHTTPReporter(d.client), d.cfg.WorkDir)
+	r := runner.New(runner.NewGitCLI(), backend, reporter, d.cfg.WorkDir)
 
 	taskCtx, cancel := context.WithCancel(ctx)
 	d.setActive(task.ID.String(), cancel)

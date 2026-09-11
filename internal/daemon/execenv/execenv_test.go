@@ -67,6 +67,27 @@ func TestPrepare(t *testing.T) {
 	}
 }
 
+func TestPrepareAgyUsesAgentsMd(t *testing.T) {
+	dir := t.TempDir()
+	p := testParams()
+	p.Provider = "agy"
+	p.Agent.Provider = "agy"
+	if _, err := Prepare(dir, p); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	// Antigravity reads AGENTS.md, not CLAUDE.md.
+	if _, err := os.Stat(filepath.Join(dir, "AGENTS.md")); err != nil {
+		t.Errorf("AGENTS.md missing for agy: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(dir, "CLAUDE.md")); err == nil {
+		t.Error("CLAUDE.md should not be written for agy")
+	}
+	// Antigravity discovers workspace skills under .agents/skills.
+	if _, err := os.Stat(filepath.Join(dir, ".agents", "skills", "go-review", "SKILL.md")); err != nil {
+		t.Errorf("agy skill path missing: %v", err)
+	}
+}
+
 func TestPrepareIdempotent(t *testing.T) {
 	dir := t.TempDir()
 	if _, err := Prepare(dir, testParams()); err != nil {

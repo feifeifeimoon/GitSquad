@@ -9,7 +9,7 @@ import (
 // normally the detected path from daemon runtime detection (RuntimeSpec.Kind
 // → ExecutablePath).
 //
-// Supported kinds: "claude". "codex" is pending (see the chapter 6 plan P1.5).
+// Supported kinds: "claude", "agy". "codex" is pending (chapter 6 plan P1.5).
 func New(kind, executablePath string, logger *slog.Logger) (Backend, error) {
 	if logger == nil {
 		logger = slog.Default()
@@ -18,7 +18,9 @@ func New(kind, executablePath string, logger *slog.Logger) (Backend, error) {
 	switch kind {
 	case "claude":
 		return newClaudeBackend(cfg), nil
+	case "agy":
+		return newAgyBackend(cfg), nil
 	default:
-		return nil, fmt.Errorf("unknown provider: %q (supported: claude)", kind)
+		return nil, fmt.Errorf("unknown provider: %q (supported: claude, agy)", kind)
 	}
 }

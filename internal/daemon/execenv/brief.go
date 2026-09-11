@@ -16,11 +16,12 @@ const (
 )
 
 // runtimeConfigPath returns the provider-native runtime config file name.
+// claude reads CLAUDE.md; codex and agy both read AGENTS.md.
 func runtimeConfigPath(provider string) string {
-	if provider == "codex" {
-		return "AGENTS.md"
+	if provider == "claude" {
+		return "CLAUDE.md"
 	}
-	return "CLAUDE.md"
+	return "AGENTS.md"
 }
 
 // renderBrief renders the managed brief markdown: agent identity + task

@@ -54,13 +54,16 @@ func renderIssueContext(issue v1.TaskIssueContext) string {
 }
 
 // writeSkill writes a single skill into its provider-native location.
-// Claude Code discovers `.claude/skills/{name}/SKILL.md` relative to cwd.
+// Claude Code discovers `.claude/skills/{name}/SKILL.md` and Antigravity
+// discovers `.agents/skills/{name}/SKILL.md`, both relative to cwd.
 // Codex skills live in a per-task CODEX_HOME and are deferred (chapter 6 P1.5).
 func writeSkill(workDir, provider string, s v1.TaskSkill) error {
 	var dir string
 	switch provider {
 	case "claude":
 		dir = filepath.Join(workDir, ".claude", "skills", s.Name)
+	case "agy":
+		dir = filepath.Join(workDir, ".agents", "skills", s.Name)
 	case "codex":
 		return nil // deferred: per-task CODEX_HOME/skills
 	default:

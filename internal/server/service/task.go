@@ -97,10 +97,17 @@ func (s *TaskService) Dispatch(ctx context.Context, workspaceID, issueID uuid.UU
 	})
 	// A pending task for this (issue, agent) already exists — coalesce instead
 	// of failing the comment that triggered it.
-	if err != nil && util.IsUniqueViolation(err) {
-		return nil
+	if err != nil {
+		if util.IsUniqueViolation(err) {
+			return nil
+		}
+		return err
 	}
-	return err
+
+	// Immediate feedback: without it an @mention produces no visible change
+	// until a daemon claims and starts the task.
+	return s.appendComment(ctx, issueID, "system", "system",
+		fmt.Sprintf("已为 @%s 排队一个任务。", agentName))
 }
 
 // Claim atomically claims the oldest queued task for daemonID, mints a fresh

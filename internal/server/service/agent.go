@@ -19,7 +19,7 @@ var (
 	ErrAgentNotFound    = errors.New("agent not found")
 	ErrAgentNameTaken   = errors.New("agent name already exists in workspace")
 	ErrInvalidAgentName = errors.New("agent name must match ^[a-z0-9][a-z0-9_-]{0,63}$")
-	ErrInvalidProvider  = errors.New("provider must be claude or codex")
+	ErrInvalidProvider  = errors.New("provider must be claude, codex, or agy")
 	ErrRuntimeNotFound  = errors.New("runtime not found")
 	ErrDaemonMismatch   = errors.New("daemon does not belong to this workspace owner")
 	ErrSkillNotFound    = errors.New("skill not found")
@@ -28,7 +28,10 @@ var (
 
 var agentNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 
-var validProviders = map[string]bool{"claude": true, "codex": true}
+// validProviders mirrors the daemon's runtime registry (see
+// internal/daemon/runtime_specs.go): a provider the daemon can detect must also
+// be acceptable here, otherwise the UI offers a choice the API rejects.
+var validProviders = map[string]bool{"claude": true, "codex": true, "agy": true}
 
 func normalizeAgentName(name string) (string, error) {
 	n := strings.ToLower(strings.TrimSpace(name))
