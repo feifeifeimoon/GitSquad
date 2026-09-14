@@ -58,6 +58,7 @@
 │   │   ├── provider/          # Provider adapters (Claude CLI, registry of backends)
 │   │   ├── runner/            # Task runner: git checkout/push, process execution, result reporting
 │   │   ├── daemon.go          # Core Daemon struct (Run, eventLoop, Status, refresh ticker)
+│   │   ├── console.go         # Keep Windows from popping a console window per child process
 │   │   ├── detect.go          # Runtime detection entry (assemble machine info + runtimes)
 │   │   ├── runtime.go         # Runtime interface + registry
 │   │   ├── runtime_specs.go   # Declarative runtime registry (claude/codex/agy + min versions)

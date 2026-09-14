@@ -58,6 +58,10 @@ func New() *Daemon {
 // persists runtime state, launches the heartbeat goroutine, and enters
 // the main connection loop. It blocks until ctx is cancelled.
 func (d *Daemon) Run(ctx context.Context) error {
+	// Must precede every child spawn below — a child started first allocates
+	// its own visible console window.
+	EnsureHiddenConsole()
+
 	if d.cfg.Token == "" || d.cfg.ID == "" {
 		return fmt.Errorf("not logged in. Run 'gitsquad daemon login' first")
 	}
