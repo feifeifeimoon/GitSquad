@@ -17,6 +17,7 @@ import {
 import { Markdown } from "@/components/markdown";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { StatusIconLabel } from "@/components/status-icon";
+import { useWorkspaceEvents } from "@/lib/realtime";
 
 export default function IssueDetailPage() {
   const { slug, issueKey } = useParams<{ slug: string; issueKey: string }>();
@@ -45,6 +46,13 @@ export default function IssueDetailPage() {
       .finally(() => setLoading(false));
   };
   useEffect(load, [slug, issueKey, router]);
+
+  // Agent activity arrives as backend-written comments while this page is open;
+  // refetch when the server reports a change so it appears without a reload.
+  useWorkspaceEvents(slug, (event) => {
+    if (event.issue_id && issue && event.issue_id !== issue.id) return;
+    load();
+  });
 
   const changeStatus = async (status: IssueStatus) => {
     if (!issue || status === issue.status) return;

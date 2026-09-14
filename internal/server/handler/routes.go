@@ -8,6 +8,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/memory"
+	"github.com/feifeifeimoon/GitSquad/internal/server/ws"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -47,11 +48,18 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	taskHandler := NewTaskHandler(taskSvc)
 	daemonSvc.SetPendingTasks(taskSvc.HasPending)
 
+	// Realtime: browsers subscribe to workspace events over /ws/app, and the
+	// services publish comment/issue changes to the hub as they happen.
+	appHub := ws.NewAppHub()
+	issueSvc.SetPublisher(appHub)
+	taskSvc.SetPublisher(appHub)
+
 	r.GET("/healthz", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
 
 	r.GET("/ws/daemon", NewDaemonWS(daemonSvc, taskSvc))
+	r.GET("/ws/app", gin.WrapF(ws.ServeApp(appHub, NewAppAuth(cfg, userSvc, workspaceSvc))))
 
 	api := r.Group("/api/v1")
 	{

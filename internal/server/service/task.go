@@ -26,12 +26,24 @@ type TaskDispatcher interface {
 // TaskService persists tasks to the `tasks` table and drives the task
 // lifecycle state machine (queued → dispatched → running → completed/failed).
 type TaskService struct {
-	store  *store.Store
-	github *GitHubAppService
+	store     *store.Store
+	github    *GitHubAppService
+	publisher EventPublisher
 }
 
 func NewTaskService(s *store.Store, github *GitHubAppService) *TaskService {
 	return &TaskService{store: s, github: github}
+}
+
+// SetPublisher wires the realtime publisher in; nil disables realtime.
+func (s *TaskService) SetPublisher(p EventPublisher) { s.publisher = p }
+
+// publish sends a workspace event to connected browsers (no-op when unwired).
+func (s *TaskService) publish(eventType string, workspaceID, issueID uuid.UUID) {
+	if s.publisher == nil {
+		return
+	}
+	s.publisher.Publish(v1.AppEvent{Type: eventType, WorkspaceID: workspaceID, IssueID: issueID})
 }
 
 // Dispatch resolves the agent + workspace + repo, assembles a context snapshot,
@@ -106,7 +118,7 @@ func (s *TaskService) Dispatch(ctx context.Context, workspaceID, issueID uuid.UU
 
 	// Immediate feedback: without it an @mention produces no visible change
 	// until a daemon claims and starts the task.
-	return s.appendComment(ctx, issueID, "system", "system",
+	return s.appendComment(ctx, workspaceID, issueID, "system", "system",
 		fmt.Sprintf("已为 @%s 排队一个任务。", agentName))
 }
 
@@ -203,7 +215,7 @@ func (s *TaskService) FailDaemonTasks(ctx context.Context, daemonID uuid.UUID) e
 		if err != nil {
 			continue
 		}
-		_ = s.appendComment(ctx, task.IssueID, "system", "system",
+		_ = s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
 			fmt.Sprintf("%s 任务因 daemon 下线而失败。", full.Agent.Name))
 	}
 	return nil
@@ -224,16 +236,19 @@ func (s *TaskService) handleStarted(ctx context.Context, task db.Task) error {
 	if err != nil {
 		return err
 	}
-	if err := s.appendComment(ctx, task.IssueID, "agent", full.Agent.Name,
+	if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
 		fmt.Sprintf("%s 开始工作。", full.Agent.Name)); err != nil {
 		return err
 	}
-	_, err = s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
+	if _, err := s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
 		ID:          task.IssueID,
 		WorkspaceID: task.WorkspaceID,
 		Status:      "in_progress",
-	})
-	return err
+	}); err != nil {
+		return err
+	}
+	s.publish(v1.AppEventIssueUpdated, task.WorkspaceID, task.IssueID)
+	return nil
 }
 
 func (s *TaskService) handleProgress(ctx context.Context, task db.Task, p *v1.TaskProgress) error {
@@ -284,12 +299,12 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		if err != nil {
 			// The task is already terminal; surface the write-back failure
 			// rather than losing it silently.
-			_ = s.appendComment(ctx, task.IssueID, "system", "system",
+			_ = s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
 				fmt.Sprintf("%s 完成任务,但建 PR 失败: %v", full.Agent.Name, err))
 			return err
 		}
 		result["pr_number"] = prNum
-		if err := s.appendComment(ctx, task.IssueID, "agent", full.Agent.Name,
+		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
 			fmt.Sprintf("%s 完成改动,已提 PR #%d。", full.Agent.Name, prNum)); err != nil {
 			return err
 		}
@@ -300,8 +315,9 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		}); err != nil {
 			return err
 		}
+		s.publish(v1.AppEventIssueUpdated, task.WorkspaceID, task.IssueID)
 	} else {
-		if err := s.appendComment(ctx, task.IssueID, "system", "system",
+		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
 			fmt.Sprintf("%s 完成任务,但未产生代码改动。", full.Agent.Name)); err != nil {
 			return err
 		}
@@ -327,7 +343,7 @@ func (s *TaskService) handleFailed(ctx context.Context, task db.Task, report v1.
 	if err != nil {
 		return err
 	}
-	return s.appendComment(ctx, task.IssueID, "system", "system",
+	return s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
 		fmt.Sprintf("%s 任务失败: %s", full.Agent.Name, report.Error))
 }
 
@@ -342,7 +358,8 @@ func taskContext(task db.Task) (v1.Task, error) {
 	return full, nil
 }
 
-func (s *TaskService) appendComment(ctx context.Context, issueID uuid.UUID, authorType, authorName, content string) error {
+// appendComment writes an issue comment and notifies connected browsers.
+func (s *TaskService) appendComment(ctx context.Context, workspaceID, issueID uuid.UUID, authorType, authorName, content string) error {
 	_, err := s.store.CreateComment(ctx, db.CreateCommentParams{
 		IssueID:    issueID,
 		AuthorType: authorType,
@@ -350,7 +367,11 @@ func (s *TaskService) appendComment(ctx context.Context, issueID uuid.UUID, auth
 		Type:       "comment",
 		Content:    content,
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	s.publish(v1.AppEventCommentCreated, workspaceID, issueID)
+	return nil
 }
 
 func buildTaskIssue(issue db.GetIssueRow, comments []db.IssueComment) v1.TaskIssueContext {

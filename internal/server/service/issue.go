@@ -10,9 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/feifeifeimoon/GitSquad/internal/util"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/util"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 )
 
@@ -76,6 +77,7 @@ type IssueDetailResponse struct {
 type IssueService struct {
 	store      *store.Store
 	dispatcher TaskDispatcher // optional; enqueues tasks for matched @mentions
+	publisher  EventPublisher // optional; pushes realtime events to browsers
 }
 
 func NewIssueService(s *store.Store, dispatcher ...TaskDispatcher) *IssueService {
@@ -84,6 +86,17 @@ func NewIssueService(s *store.Store, dispatcher ...TaskDispatcher) *IssueService
 		svc.dispatcher = dispatcher[0]
 	}
 	return svc
+}
+
+// SetPublisher wires the realtime publisher in; nil disables realtime.
+func (s *IssueService) SetPublisher(p EventPublisher) { s.publisher = p }
+
+// publish notifies connected browsers of a workspace-scoped change.
+func (s *IssueService) publish(eventType string, workspaceID, issueID uuid.UUID) {
+	if s.publisher == nil {
+		return
+	}
+	s.publisher.Publish(v1.AppEvent{Type: eventType, WorkspaceID: workspaceID, IssueID: issueID})
 }
 
 // listAgentNames returns the enabled agent names configured in a workspace,
@@ -250,6 +263,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 	for _, name := range matched {
 		s.dispatchForMention(ctx, workspaceID, resp.ID, name)
 	}
+	s.publish(v1.AppEventIssueCreated, workspaceID, resp.ID)
 	return resp, nil
 }
 
@@ -360,6 +374,7 @@ func (s *IssueService) UpdateIssue(ctx context.Context, workspaceID, issueID uui
 	if err != nil {
 		return nil, err
 	}
+	s.publish(v1.AppEventIssueUpdated, workspaceID, issueID)
 	return resp, nil
 }
 
@@ -430,5 +445,6 @@ func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, use
 	for _, name := range matched {
 		s.dispatchForMention(ctx, workspaceID, issueID, name)
 	}
+	s.publish(v1.AppEventCommentCreated, workspaceID, issueID)
 	return resp, nil
 }

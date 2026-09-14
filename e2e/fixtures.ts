@@ -201,6 +201,14 @@ export class TestApiClient {
     });
   }
 
+  /** Post an issue comment through the real API (used to trigger realtime pushes). */
+  async addComment(workspaceId: string, issueRef: string, content: string): Promise<void> {
+    await this.authedFetch(
+      `/api/v1/workspaces/${workspaceId}/issues/${issueRef}/comments`,
+      { method: "POST", body: JSON.stringify({ content }) },
+    );
+  }
+
   /**
    * Count tasks in a workspace, optionally filtered by status. Used to assert
    * that an @mention queued work without needing a real daemon.

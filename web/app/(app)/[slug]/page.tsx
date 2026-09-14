@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { StatusIconLabel } from "@/components/status-icon";
+import { useWorkspaceEvents } from "@/lib/realtime";
 import { IssueCard } from "@/components/issues/board-card";
 import { BoardColumn } from "@/components/issues/board-column";
 import { IssuesToolbar } from "@/components/issues/issues-toolbar";
@@ -125,6 +126,10 @@ export default function WorkspaceBoardPage({
       )
       .catch(() => {});
   }, [slug]);
+
+  // Realtime: agent activity changes issue status and comment counts, so keep
+  // the board current without requiring a reload.
+  useWorkspaceEvents(slug, () => load());
 
   useEffect(() => {
     api
