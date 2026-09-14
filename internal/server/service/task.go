@@ -5,10 +5,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/feifeifeimoon/GitSquad/internal/util"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -287,41 +288,60 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		return err
 	}
 
+	summary := report.Summary
+	output, branch := "", ""
+	if summary != nil {
+		output = strings.TrimSpace(summary.Output)
+		branch = summary.Branch
+	}
+
+	// The agent's own output is the deliverable: it is what an analysis, design
+	// or review task exists to produce, and for code tasks it is the summary.
+	if output != "" {
+		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name, output); err != nil {
+			return err
+		}
+	}
+
 	result := map[string]any{}
-	if report.Summary != nil && report.Summary.Branch != "" {
+	if branch != "" {
 		ws, err := s.store.GetWorkspaceWithRepo(ctx, task.WorkspaceID)
 		if err != nil {
 			return err
 		}
 		title := full.Issue.Key + ": changes by " + full.Agent.Name
 		body := fmt.Sprintf("Closes %s\n\nAutomated changes by %s.", full.Issue.Key, full.Agent.Name)
-		prNum, err := s.github.CreatePullRequest(ctx, ws.InstallationID, ws.RepoOwner, ws.RepoName, report.Summary.Branch, full.Repo.DefaultBranch, title, body)
+		prNum, err := s.github.CreatePullRequest(ctx, ws.InstallationID, ws.RepoOwner, ws.RepoName, branch, full.Repo.DefaultBranch, title, body)
 		if err != nil {
 			// The task is already terminal; surface the write-back failure
 			// rather than losing it silently.
 			_ = s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
-				fmt.Sprintf("%s 完成任务,但建 PR 失败: %v", full.Agent.Name, err))
+				fmt.Sprintf("代码改动已推送,但建 PR 失败: %v", err))
 			return err
 		}
 		result["pr_number"] = prNum
 		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
-			fmt.Sprintf("%s 完成改动,已提 PR #%d。", full.Agent.Name, prNum)); err != nil {
+			fmt.Sprintf("已提 PR #%d。", prNum)); err != nil {
 			return err
 		}
-		if _, err := s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
-			ID:          task.IssueID,
-			WorkspaceID: task.WorkspaceID,
-			Status:      "in_review",
-		}); err != nil {
-			return err
-		}
-		s.publish(v1.AppEventIssueUpdated, task.WorkspaceID, task.IssueID)
-	} else {
+	} else if output == "" {
+		// Neither text nor code: worth surfacing rather than staying silent.
 		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
-			fmt.Sprintf("%s 完成任务,但未产生代码改动。", full.Agent.Name)); err != nil {
+			fmt.Sprintf("%s 完成了任务,但没有任何输出。", full.Agent.Name)); err != nil {
 			return err
 		}
 	}
+
+	// The agent is done; a human should look at whatever it produced — a pull
+	// request or an analysis. This transition is not specific to code changes.
+	if _, err := s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
+		ID:          task.IssueID,
+		WorkspaceID: task.WorkspaceID,
+		Status:      "in_review",
+	}); err != nil {
+		return err
+	}
+	s.publish(v1.AppEventIssueUpdated, task.WorkspaceID, task.IssueID)
 
 	raw, _ := json.Marshal(result)
 	return s.store.SetTaskResult(ctx, db.SetTaskResultParams{ID: task.ID, Result: raw})

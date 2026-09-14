@@ -20,7 +20,10 @@ type fakeGit struct {
 func (f *fakeGit) CloneOrFetch(_ context.Context, _ string, _ string) error {
 	return f.cloneErr
 }
-func (f *fakeGit) CreateBranch(_ context.Context, _ string, _ string, branch string) error {
+func (f *fakeGit) ResetToDefault(_ context.Context, _ string, _ string) error {
+	return nil
+}
+func (f *fakeGit) CreateBranch(_ context.Context, _ string, branch string) error {
 	f.branch = branch
 	return f.branchErr
 }
@@ -133,7 +136,7 @@ func TestRunnerRunProviderFailed(t *testing.T) {
 
 func TestRunnerRunNoChanges(t *testing.T) {
 	git := &fakeGit{diff: ""}
-	backend := &fakeBackend{res: provider.Result{Status: "completed"}}
+	backend := &fakeBackend{res: provider.Result{Status: "completed", Output: "here is my analysis"}}
 	rep := &fakeReporter{}
 	r := New(git, backend, rep, t.TempDir())
 
@@ -143,9 +146,16 @@ func TestRunnerRunNoChanges(t *testing.T) {
 	if git.committed || git.pushed {
 		t.Errorf("should not commit/push when diff is empty")
 	}
+	if git.branch != "" {
+		t.Errorf("branch should not be created for a read-only task, got %q", git.branch)
+	}
 	last := rep.reports[len(rep.reports)-1]
 	if last.Status != v1.TaskReportSucceeded {
 		t.Errorf("last report status = %s, want succeeded", last.Status)
+	}
+	// The agent's text is the deliverable even without a code change.
+	if last.Summary == nil || last.Summary.Output != "here is my analysis" {
+		t.Errorf("summary output = %+v, want the agent output", last.Summary)
 	}
 }
 

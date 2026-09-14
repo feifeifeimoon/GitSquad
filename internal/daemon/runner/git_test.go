@@ -52,15 +52,23 @@ func TestGitCLIFullFlow(t *testing.T) {
 
 	g := NewGitCLI()
 
-	// Clone.
+	// Clone, then reset to a clean default branch (what a task start does).
 	dst := filepath.Join(t.TempDir(), "work")
 	if err := g.CloneOrFetch(ctx, dst, remote); err != nil {
 		t.Fatalf("CloneOrFetch: %v", err)
 	}
+	if err := g.ResetToDefault(ctx, dst, defBranch); err != nil {
+		t.Fatalf("ResetToDefault: %v", err)
+	}
+
+	// Platform context files must stay out of the agent's diff and commit.
+	if err := os.WriteFile(filepath.Join(dst, "AGENTS.md"), []byte("brief\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 
 	// Create a task branch.
 	branch := "gitsquad/GTS-42/task-1"
-	if err := g.CreateBranch(ctx, dst, defBranch, branch); err != nil {
+	if err := g.CreateBranch(ctx, dst, branch); err != nil {
 		t.Fatalf("CreateBranch: %v", err)
 	}
 
@@ -79,6 +87,9 @@ func TestGitCLIFullFlow(t *testing.T) {
 	}
 	if !strings.Contains(diff, "hello world") {
 		t.Errorf("diff should contain the change: %s", diff)
+	}
+	if strings.Contains(diff, "AGENTS.md") {
+		t.Errorf("the platform brief leaked into the agent's diff: %s", diff)
 	}
 
 	// Push.

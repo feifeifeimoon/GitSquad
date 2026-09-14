@@ -102,8 +102,14 @@ type TaskProgress struct {
 	Output  string         `json:"output,omitempty"` // tool_result 的输出
 }
 
-// TaskSummary summarizes the artifacts on task completion.
+// TaskSummary carries what a finished task produced.
+//
+// Output is the agent's own final text and is the primary deliverable: for
+// analysis / design / review work it IS the result, and for code work it is the
+// agent's summary. Every other field describes the code change, which is
+// optional — a task that changes no code is a normal outcome, not a failure.
 type TaskSummary struct {
+	Output      string `json:"output,omitempty"`
 	Branch      string `json:"branch,omitempty"`
 	CommitSHA   string `json:"commit_sha,omitempty"`
 	DiffStat    string `json:"diff_stat,omitempty"`

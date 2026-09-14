@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -15,8 +16,12 @@ type GitOps interface {
 	// CloneOrFetch clones remoteURL into dst, or fetches origin if dst is
 	// already a checkout.
 	CloneOrFetch(ctx context.Context, dst, remoteURL string) error
-	// CreateBranch resets dst to origin/defaultBranch and creates branch.
-	CreateBranch(ctx context.Context, dst, defaultBranch, branch string) error
+	// ResetToDefault puts a reused checkout back on the default branch at
+	// origin's tip, discarding whatever a previous task left behind.
+	ResetToDefault(ctx context.Context, dst, defaultBranch string) error
+	// CreateBranch creates branch from the current HEAD. It is only called once
+	// the task has changes worth pushing.
+	CreateBranch(ctx context.Context, dst, branch string) error
 	Commit(ctx context.Context, dst, message string) error
 	Push(ctx context.Context, dst, branch string) error
 	// Diff returns the unified diff of base...HEAD.
@@ -56,17 +61,49 @@ func (g *GitCLI) CloneOrFetch(ctx context.Context, dst, remoteURL string) error 
 		_, err := g.Exec(ctx, dst, "fetch", "--prune", "origin")
 		return err
 	}
-	_, err := g.Exec(ctx, ".", "clone", remoteURL, dst)
-	return err
+	if _, err := g.Exec(ctx, ".", "clone", remoteURL, dst); err != nil {
+		return err
+	}
+	return writeGitExcludes(dst)
 }
 
-func (g *GitCLI) CreateBranch(ctx context.Context, dst, defaultBranch, branch string) error {
+// platformExcludes are paths the daemon writes into the workdir for the agent.
+// Excluding them via .git/info/exclude keeps them out of the agent's diff and
+// commit — and because `git clean -fd` spares ignored files, a reused checkout
+// keeps them until the next Prepare rewrites them.
+var platformExcludes = []string{"CLAUDE.md", "AGENTS.md", ".gitsquad/", ".claude/", ".agents/"}
+
+func writeGitExcludes(dst string) error {
+	path := filepath.Join(dst, ".git", "info", "exclude")
+	existing, err := os.ReadFile(path)
+	if err != nil && !os.IsNotExist(err) {
+		return err
+	}
+
+	var b strings.Builder
+	b.Write(existing)
+	for _, p := range platformExcludes {
+		if !strings.Contains(string(existing), p) {
+			b.WriteString("\n" + p)
+		}
+	}
+	return os.WriteFile(path, []byte(b.String()), 0o644)
+}
+
+// ResetToDefault returns a reused checkout to a clean default branch. It is
+// what makes an analysis/design task leave no branch (and no leftovers) behind.
+func (g *GitCLI) ResetToDefault(ctx context.Context, dst, defaultBranch string) error {
 	if _, err := g.Exec(ctx, dst, "checkout", defaultBranch); err != nil {
 		return err
 	}
 	if _, err := g.Exec(ctx, dst, "reset", "--hard", "origin/"+defaultBranch); err != nil {
 		return err
 	}
+	_, err := g.Exec(ctx, dst, "clean", "-fd")
+	return err
+}
+
+func (g *GitCLI) CreateBranch(ctx context.Context, dst, branch string) error {
 	_, err := g.Exec(ctx, dst, "checkout", "-b", branch)
 	return err
 }

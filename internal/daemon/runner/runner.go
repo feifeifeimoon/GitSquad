@@ -49,8 +49,10 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	if err := r.git.CloneOrFetch(ctx, wsDir, remoteURL); err != nil {
 		return r.fail(ctx, task, fmt.Errorf("checkout: %w", err))
 	}
-	if err := r.git.CreateBranch(ctx, wsDir, task.Repo.DefaultBranch, branch); err != nil {
-		return r.fail(ctx, task, fmt.Errorf("create branch: %w", err))
+	// No branch yet: a task that only reads the repo (analysis, design, review)
+	// must not leave one behind. The branch is created at commit time below.
+	if err := r.git.ResetToDefault(ctx, wsDir, task.Repo.DefaultBranch); err != nil {
+		return r.fail(ctx, task, fmt.Errorf("reset checkout: %w", err))
 	}
 
 	if _, err := execenv.Prepare(wsDir, execenv.PrepareParams{
@@ -94,14 +96,18 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		return r.fail(ctx, task, fmt.Errorf("diff: %w", err))
 	}
 
-	// No code change → succeed without a PR.
+	// No code change is a normal outcome (analysis / design / review work), not
+	// a failure — the agent's output is the deliverable either way.
 	if strings.TrimSpace(diff) == "" {
 		return r.reporter.Report(ctx, task.ID, v1.TaskReport{
 			Status:  v1.TaskReportSucceeded,
-			Summary: &v1.TaskSummary{},
+			Summary: &v1.TaskSummary{Output: res.Output},
 		})
 	}
 
+	if err := r.git.CreateBranch(ctx, wsDir, branch); err != nil {
+		return r.fail(ctx, task, fmt.Errorf("create branch: %w", err))
+	}
 	if err := r.git.Commit(ctx, wsDir, commitMessage(task)); err != nil {
 		return r.fail(ctx, task, fmt.Errorf("commit: %w", err))
 	}
@@ -112,6 +118,7 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	return r.reporter.Report(ctx, task.ID, v1.TaskReport{
 		Status: v1.TaskReportSucceeded,
 		Summary: &v1.TaskSummary{
+			Output:   res.Output,
 			Branch:   branch,
 			DiffStat: diffStat(diff),
 		},

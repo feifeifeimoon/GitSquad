@@ -30,7 +30,7 @@ func runtimeConfigPath(provider string) string {
 func renderBrief(p PrepareParams) string {
 	var b strings.Builder
 	b.WriteString("# GitSquad Agent Runtime\n\n")
-	b.WriteString("You are a coding agent in the GitSquad platform. Work in this directory, then commit and push your changes — the platform opens the PR and posts your result back to the issue.\n\n")
+	b.WriteString("You are an agent in the GitSquad platform. Work in this directory. Your final output is posted to the issue as a comment, so end with a clear, self-contained conclusion.\n\n")
 
 	b.WriteString("## Agent Identity\n\n")
 	fmt.Fprintf(&b, "**You are: %s**\n\n", p.Agent.Name)
@@ -51,13 +51,16 @@ func renderBrief(p PrepareParams) string {
 	}
 	b.WriteString("\n")
 
+	// Deliberately outcome-neutral: analysis, design and review tasks are as
+	// valid as implementation ones, so nothing here may assume a code change.
 	b.WriteString("## Working Instructions\n\n")
-	b.WriteString("1. Make your changes in this directory (a branch has already been created for you).\n")
-	b.WriteString("2. Run the tests and make sure they pass.\n")
+	b.WriteString("1. Do the work described in the issue above.\n")
+	b.WriteString("2. Finish with your conclusion in your final output — it is posted to the issue as a comment. State what you found or did, and anything the user needs to decide.\n")
+	b.WriteString("3. If — and only if — the task requires code changes: make them in this directory, run the tests, then `git commit`")
 	if p.Issue.Key != "" {
-		fmt.Fprintf(&b, "3. `git commit` your changes, referencing %s in the commit message.\n", p.Issue.Key)
+		fmt.Fprintf(&b, " referencing %s", p.Issue.Key)
 	}
-	b.WriteString("4. When done, summarize in your final output: what you changed, where, and the test results.\n")
+	b.WriteString(" and `git push` your branch. The platform opens the pull request for you, so you do not need to.\n")
 
 	return b.String()
 }
