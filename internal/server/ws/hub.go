@@ -8,6 +8,7 @@ import (
 	"time"
 
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
+	"github.com/google/uuid"
 )
 
 // Frame is a type alias for the canonical Frame in pkg/types/v1.
@@ -125,6 +126,20 @@ func (h *Hub) IsOnline(daemonID string) bool {
 	conn, ok := h.conns[daemonID]
 	h.mu.RUnlock()
 	return ok && conn.Authenticated
+}
+
+// Wake nudges a connected daemon to claim pending work.
+//
+// It implements service.DaemonWaker. A wake carries no task payload — the
+// daemon claims the queue over HTTP, which is where the installation token
+// travels. Sending is best-effort: an offline daemon (or a full send buffer)
+// drops the frame, and the heartbeat pull covers that case.
+func (h *Hub) Wake(daemonID uuid.UUID) {
+	payload, err := json.Marshal(v1.WSTaskWakePayload{})
+	if err != nil {
+		return
+	}
+	_ = h.Send(daemonID.String(), Frame{Type: TypeTaskWake, Payload: payload})
 }
 
 // Has returns true if a connection is registered (authenticated or not).

@@ -30,6 +30,7 @@ type TaskService struct {
 	store     *store.Store
 	github    *GitHubAppService
 	publisher EventPublisher
+	waker     DaemonWaker
 }
 
 func NewTaskService(s *store.Store, github *GitHubAppService) *TaskService {
@@ -38,6 +39,16 @@ func NewTaskService(s *store.Store, github *GitHubAppService) *TaskService {
 
 // SetPublisher wires the realtime publisher in; nil disables realtime.
 func (s *TaskService) SetPublisher(p EventPublisher) { s.publisher = p }
+
+// SetWaker wires the daemon wake-up channel in; nil falls back to the daemon's
+// heartbeat pull.
+func (s *TaskService) SetWaker(w DaemonWaker) { s.waker = w }
+
+func (s *TaskService) wake(daemonID uuid.UUID) {
+	if s.waker != nil {
+		s.waker.Wake(daemonID)
+	}
+}
 
 // publish sends a workspace event to connected browsers (no-op when unwired).
 func (s *TaskService) publish(eventType string, workspaceID, issueID uuid.UUID) {
@@ -109,13 +120,19 @@ func (s *TaskService) Dispatch(ctx context.Context, workspaceID, issueID uuid.UU
 		Context:          raw,
 	})
 	// A pending task for this (issue, agent) already exists — coalesce instead
-	// of failing the comment that triggered it.
+	// of failing the comment that triggered it, but still wake the daemon in
+	// case it never saw the earlier wake.
 	if err != nil {
 		if util.IsUniqueViolation(err) {
+			s.wake(*agent.RuntimeDaemonID)
 			return nil
 		}
 		return err
 	}
+
+	// Tell the daemon to claim now rather than on its next heartbeat (up to 30s
+	// later). The heartbeat pull remains the fallback if this is dropped.
+	s.wake(*agent.RuntimeDaemonID)
 
 	// Immediate feedback: without it an @mention produces no visible change
 	// until a daemon claims and starts the task.

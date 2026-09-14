@@ -12,12 +12,10 @@ import (
 	"github.com/google/uuid"
 )
 
-// NewDaemonWS wires up the WS hub, dispatcher, message handlers, and stale detection.
-func NewDaemonWS(daemonSvc *service.DaemonService, taskSvc *service.TaskService) gin.HandlerFunc {
-	// Hub with built-in stale detection: connections untouched for 60s (2 heartbeat
-	// cycles) are unregistered, which triggers OnDisconnect → MarkOffline.
-	hub := ws.NewHub(60 * time.Second)
-
+// NewDaemonWS wires the daemon WebSocket: auth, heartbeats, wake-up delivery,
+// and stale detection. The hub is owned by the caller so that the task
+// dispatcher can nudge daemons on the same pool.
+func NewDaemonWS(hub *ws.Hub, daemonSvc *service.DaemonService, taskSvc *service.TaskService) gin.HandlerFunc {
 	disp := ws.NewDispatcher()
 
 	hub.OnDisconnect = func(daemonID string) {
@@ -33,7 +31,7 @@ func NewDaemonWS(daemonSvc *service.DaemonService, taskSvc *service.TaskService)
 	// HeartbeatScheduler batches last_seen_at DB writes every 60s.
 	scheduler := NewHeartbeatScheduler(context.Background(), daemonSvc)
 
-	disp.On(ws.TypeAuth, authHandler(daemonSvc))
+	disp.On(ws.TypeAuth, authHandler(daemonSvc, taskSvc))
 	disp.On(ws.TypeHeartbeat, heartbeatHandler(daemonSvc, scheduler))
 	disp.On(ws.TypeStatusUpdate, statusUpdateHandler(daemonSvc))
 	disp.On(ws.TypeTaskWakeAck, noopHandler)
@@ -42,7 +40,7 @@ func NewDaemonWS(daemonSvc *service.DaemonService, taskSvc *service.TaskService)
 	return gin.WrapF(ws.Upgrade(hub, disp))
 }
 
-func authHandler(daemonSvc *service.DaemonService) ws.Handler {
+func authHandler(daemonSvc *service.DaemonService, taskSvc *service.TaskService) ws.Handler {
 	return func(conn *ws.Conn, hub *ws.Hub, frame ws.Frame) *ws.Frame {
 		var payload v1.WSAuthPayload
 		if err := json.Unmarshal(frame.Payload, &payload); err != nil {
@@ -70,6 +68,13 @@ func authHandler(daemonSvc *service.DaemonService) ws.Handler {
 		}
 
 		hub.Register(daemon.ID.String(), conn)
+
+		// Work may have been queued while this daemon was offline (or while it
+		// was reconnecting). Wake it now instead of making it wait for the next
+		// heartbeat pull.
+		if taskSvc.HasPending(ctx, daemon.ID) {
+			hub.Wake(daemon.ID)
+		}
 
 		ackPayload, _ := json.Marshal(v1.WSAuthAckPayload{
 			ServerTime:          time.Now().Format(time.RFC3339),

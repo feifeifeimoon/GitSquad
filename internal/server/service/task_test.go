@@ -234,6 +234,41 @@ func TestTaskLifecycleQueries(t *testing.T) {
 	}
 }
 
+// TestTaskServiceDispatchWakesDaemon verifies that queuing work nudges the
+// target daemon immediately instead of leaving it to find the task on its next
+// heartbeat (up to 30s later).
+func TestTaskServiceDispatchWakesDaemon(t *testing.T) {
+	s, pool := openTestStore(t)
+	ctx := context.Background()
+	f := seedTaskFixture(t, ctx, s, pool)
+
+	waker := &fakeWaker{}
+	svc := NewTaskService(s, nil)
+	svc.SetWaker(waker)
+
+	if err := svc.Dispatch(ctx, f.workspace.ID, f.issue.ID, "coder"); err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+	if len(waker.woken) != 1 || waker.woken[0] != f.daemon.ID {
+		t.Fatalf("waker calls = %v, want [%s]", waker.woken, f.daemon.ID)
+	}
+	if pending, err := s.HasPendingForDaemon(ctx, &f.daemon.ID); err != nil || !pending {
+		t.Fatalf("HasPendingForDaemon = %v (err=%v), want true", pending, err)
+	}
+
+	// A second mention of the same agent coalesces, and still wakes the daemon.
+	if err := svc.Dispatch(ctx, f.workspace.ID, f.issue.ID, "coder"); err != nil {
+		t.Fatalf("second Dispatch: %v", err)
+	}
+	if len(waker.woken) != 2 {
+		t.Fatalf("waker calls = %d, want 2 (coalesced dispatch still wakes)", len(waker.woken))
+	}
+}
+
+type fakeWaker struct{ woken []uuid.UUID }
+
+func (f *fakeWaker) Wake(id uuid.UUID) { f.woken = append(f.woken, id) }
+
 // TestTaskServicePostsAgentOutput pins the artifact contract: a finished task's
 // agent output becomes an issue comment — the deliverable for analysis / design
 // work — and the issue waits for a human even though no code changed.

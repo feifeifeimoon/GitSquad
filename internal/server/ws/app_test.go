@@ -1,11 +1,45 @@
 package ws
 
 import (
+	"encoding/json"
 	"testing"
 
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 )
+
+func TestHubWakeSendsTaskWake(t *testing.T) {
+	hub := NewHub(0) // no stale detection
+	defer hub.Close()
+
+	daemonID := uuid.New()
+	conn := &Conn{send: make(chan []byte, 4)}
+	hub.Register(daemonID.String(), conn)
+
+	hub.Wake(daemonID)
+
+	select {
+	case data := <-conn.send:
+		var f Frame
+		if err := json.Unmarshal(data, &f); err != nil {
+			t.Fatalf("unmarshal frame: %v", err)
+		}
+		if f.Type != TypeTaskWake {
+			t.Fatalf("frame type = %q, want %q", f.Type, TypeTaskWake)
+		}
+		// The daemon unmarshals the payload before signalling; an empty payload
+		// would be rejected, so it must be valid JSON.
+		var p v1.WSTaskWakePayload
+		if err := json.Unmarshal(f.Payload, &p); err != nil {
+			t.Fatalf("payload is not a valid task_wake payload: %v", err)
+		}
+	default:
+		t.Fatal("Wake delivered nothing to a connected daemon")
+	}
+
+	// Waking a daemon with no connection is a no-op, not a panic.
+	hub.Wake(uuid.New())
+}
 
 func TestAppHubPublishesToSubscribers(t *testing.T) {
 	hub := NewAppHub()

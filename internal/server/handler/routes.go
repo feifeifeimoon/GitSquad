@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/config"
 	"github.com/feifeifeimoon/GitSquad/internal/server/middleware"
@@ -54,11 +55,18 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	issueSvc.SetPublisher(appHub)
 	taskSvc.SetPublisher(appHub)
 
+	// Daemon channel: stale connections (untouched for 2 heartbeat cycles) are
+	// evicted, which flips the daemon offline and fails its in-flight tasks.
+	// The task dispatcher shares this hub so it can wake a daemon the moment a
+	// task is queued.
+	daemonHub := ws.NewHub(60 * time.Second)
+	taskSvc.SetWaker(daemonHub)
+
 	r.GET("/healthz", func(c *gin.Context) {
 		c.String(http.StatusOK, "ok")
 	})
 
-	r.GET("/ws/daemon", NewDaemonWS(daemonSvc, taskSvc))
+	r.GET("/ws/daemon", NewDaemonWS(daemonHub, daemonSvc, taskSvc))
 	r.GET("/ws/app", gin.WrapF(ws.ServeApp(appHub, NewAppAuth(cfg, userSvc, workspaceSvc))))
 
 	api := r.Group("/api/v1")
