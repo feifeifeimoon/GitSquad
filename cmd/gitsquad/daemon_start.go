@@ -37,9 +37,20 @@ func runDaemonStart(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("cannot find executable: %w", err)
 	}
 
-	// Spawn the child: "gitsquad daemon run".
+	// Spawn the child: "gitsquad daemon run". The daemon is detached from any
+	// terminal, so its logs need a sink or they land in the null device.
+	logPath := daemon.LogFilePath()
+	logFile, err := daemon.OpenLogFile(logPath, daemon.LogMaxBytes)
+	if err != nil {
+		return fmt.Errorf("open daemon log %s: %w", logPath, err)
+	}
+	// The child gets its own handle; this one is only for the spawn.
+	defer logFile.Close()
+
 	child := exec.Command(exe, "daemon", "run")
 	child.SysProcAttr = daemonSysProcAttr()
+	child.Stdout = logFile
+	child.Stderr = logFile
 	if err := child.Start(); err != nil {
 		return fmt.Errorf("failed to start daemon: %w", err)
 	}
@@ -49,10 +60,11 @@ func runDaemonStart(cmd *cobra.Command, args []string) error {
 	// Poll health endpoint until the daemon is ready.
 	state, err := waitForDaemon(15 * time.Second)
 	if err != nil {
-		return fmt.Errorf("daemon did not become ready: %w", err)
+		return fmt.Errorf("daemon did not become ready (logs: %s): %w", logPath, err)
 	}
 
 	fmt.Printf("Daemon started (pid: %d, port: %d)\n", state.PID, state.Port)
+	fmt.Printf("Logs: %s\n", logPath)
 	return nil
 }
 
