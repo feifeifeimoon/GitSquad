@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/crypto"
@@ -32,11 +33,17 @@ func (s *DaemonService) SetPendingTasks(fn func(context.Context, uuid.UUID) bool
 
 // Sentinel errors for pairing / authentication flows.
 var (
-	ErrPairingNotFound = errors.New("pairing not found or already used")
-	ErrPairingExpired  = errors.New("pairing expired")
-	ErrTokenInvalid    = errors.New("invalid or revoked token")
-	ErrDaemonNotFound  = errors.New("daemon not found")
+	ErrPairingNotFound   = errors.New("pairing not found or already used")
+	ErrPairingExpired    = errors.New("pairing expired")
+	ErrTokenInvalid      = errors.New("invalid or revoked token")
+	ErrDaemonNotFound    = errors.New("daemon not found")
+	ErrInvalidDaemonName = errors.New("daemon name is required")
+	ErrDaemonNameTaken   = errors.New("another daemon already uses that name")
 )
+
+// maxDaemonNameLen bounds the user-editable name so it cannot be used to store
+// a blob. Machine names reported at pairing are far shorter than this.
+const maxDaemonNameLen = 64
 
 // PairingInitResult is returned when a daemon initiates browser-based pairing.
 type PairingInitResult struct {
@@ -300,6 +307,61 @@ func (s *DaemonService) FindByUserAndName(ctx context.Context, userID uuid.UUID,
 
 func (s *DaemonService) DeleteDaemon(ctx context.Context, id uuid.UUID) error {
 	return s.store.DeleteDaemon(ctx, id)
+}
+
+// RenameDaemon sets the user-editable display name. Names are unique per user
+// because pairing reuses an existing daemon row by name, so a collision would
+// silently merge two machines.
+func (s *DaemonService) RenameDaemon(ctx context.Context, userID, daemonID uuid.UUID, name string) (*v1.Daemon, error) {
+	name = strings.TrimSpace(name)
+	if name == "" || len(name) > maxDaemonNameLen {
+		return nil, ErrInvalidDaemonName
+	}
+
+	current, err := s.store.FindDaemonByID(ctx, daemonID)
+	if err != nil || current.UserID != userID {
+		return nil, ErrDaemonNotFound
+	}
+	if current.Name == name {
+		d := toDaemon(&current)
+		return d, nil
+	}
+
+	// FindDaemonByUserAndName errors with ErrNoRows when the name is free.
+	if existing, err := s.store.FindDaemonByUserAndName(ctx, db.FindDaemonByUserAndNameParams{
+		UserID: userID, Name: name,
+	}); err == nil && existing.ID != daemonID {
+		return nil, ErrDaemonNameTaken
+	}
+
+	updated, err := s.store.UpdateDaemonName(ctx, db.UpdateDaemonNameParams{ID: daemonID, Name: name})
+	if err != nil {
+		return nil, fmt.Errorf("rename daemon: %w", err)
+	}
+	return toDaemon(&updated), nil
+}
+
+// ListRuntimes returns the runtimes a daemon reported, newest check per
+// (kind, name).
+func (s *DaemonService) ListRuntimes(ctx context.Context, daemonID uuid.UUID) ([]v1.Runtime, error) {
+	rows, err := s.store.ListRuntimesByDaemon(ctx, daemonID)
+	if err != nil {
+		return nil, fmt.Errorf("list runtimes: %w", err)
+	}
+	out := make([]v1.Runtime, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, v1.Runtime{
+			ID:             r.ID,
+			DaemonID:       r.DaemonID,
+			Kind:           r.Kind,
+			ExecutablePath: r.ExecutablePath,
+			Version:        r.Version,
+			MaxConcurrency: int(r.MaxConcurrency),
+			Status:         r.Status,
+			Diagnostics:    util.Value(r.Diagnostics),
+		})
+	}
+	return out, nil
 }
 
 func (s *DaemonService) MarkOnline(ctx context.Context, id uuid.UUID) error {

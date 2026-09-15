@@ -21,6 +21,7 @@ export const paths = {
   newWorkspace: () => "/workspaces/new",
   newWorkspaceConfigure: () => "/workspaces/new/configure",
   daemons: () => "/daemons",
+  daemon: (id: string) => `/daemons/${encode(id)}`,
   settings: () => "/settings",
   workspace: (slug: string) => ({
     board: () => `/${encode(slug)}`,

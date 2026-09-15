@@ -42,6 +42,9 @@ SELECT * FROM daemons WHERE user_id = $1 AND name = $2;
 -- name: UpdateDaemonInfo :exec
 UPDATE daemons SET name = $2, os = $3, arch = $4, daemon_version = $5 WHERE id = $1;
 
+-- name: UpdateDaemonName :one
+UPDATE daemons SET name = $2 WHERE id = $1 RETURNING *;
+
 -- name: DaemonOnline :exec
 UPDATE daemons SET last_seen_at = now(), status = 'online', connected_at = COALESCE(connected_at, now()) WHERE id = $1;
 
@@ -66,6 +69,9 @@ FROM daemons d
 LEFT JOIN runtimes r ON r.daemon_id = d.id
 WHERE d.user_id = $1
 ORDER BY d.registered_at DESC, r.kind, r.name;
+
+-- name: ListRuntimesByDaemon :many
+SELECT * FROM runtimes WHERE daemon_id = $1 ORDER BY kind, name;
 
 -- runtimes
 -- name: ClearRuntimes :exec

@@ -18,26 +18,43 @@ type AgentRuntime struct {
 	Status       string     `json:"status"`
 	DaemonName   string     `json:"daemon_name,omitempty"`
 	DaemonStatus string     `json:"daemon_status,omitempty"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
+	// LastSeenAt is the backing daemon's last heartbeat. It lets a client tell
+	// a live daemon from a stale "online" row that survived a server restart.
+	LastSeenAt *time.Time `json:"last_seen_at,omitempty"`
+	CreatedAt  time.Time  `json:"created_at"`
+	UpdatedAt  time.Time  `json:"updated_at"`
 }
 
 // Agent is a configured worker persona bound to a runtime.
 type Agent struct {
-	ID           uuid.UUID     `json:"id"`
-	WorkspaceID  uuid.UUID     `json:"workspace_id"`
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Instructions string        `json:"instructions"`
-	Model        string        `json:"model"`
-	RuntimeID    uuid.UUID     `json:"runtime_id"`
-	Enabled      bool          `json:"enabled"`
-	AvatarURL    string        `json:"avatar_url,omitempty"`
-	RunCount     int           `json:"run_count"`
-	Skills       []Skill       `json:"skills,omitempty"`
-	Runtime      *AgentRuntime `json:"runtime,omitempty"`
-	CreatedAt    time.Time     `json:"created_at"`
-	UpdatedAt    time.Time     `json:"updated_at"`
+	ID           uuid.UUID `json:"id"`
+	WorkspaceID  uuid.UUID `json:"workspace_id"`
+	Name         string    `json:"name"`
+	Description  string    `json:"description"`
+	Instructions string    `json:"instructions"`
+	Model        string    `json:"model"`
+	RuntimeID    uuid.UUID `json:"runtime_id"`
+	Enabled      bool      `json:"enabled"`
+	AvatarURL    string    `json:"avatar_url,omitempty"`
+	RunCount     int       `json:"run_count"`
+	// Live workload, derived from the task queue rather than stored on the
+	// agent. RunningCount covers dispatched + running tasks; TotalRuns counts
+	// the terminal ones, which is what "N runs" in the UI means.
+	RunningCount int               `json:"running_count"`
+	QueuedCount  int               `json:"queued_count"`
+	TotalRuns    int               `json:"total_runs"`
+	CurrentTask  *AgentCurrentTask `json:"current_task,omitempty"`
+	Skills       []Skill           `json:"skills,omitempty"`
+	Runtime      *AgentRuntime     `json:"runtime,omitempty"`
+	CreatedAt    time.Time         `json:"created_at"`
+	UpdatedAt    time.Time         `json:"updated_at"`
+}
+
+// AgentCurrentTask names the issue an agent is working on right now. Nil when
+// the agent has nothing in flight.
+type AgentCurrentTask struct {
+	IssueKey   string `json:"issue_key"`
+	IssueTitle string `json:"issue_title"`
 }
 
 type CreateAgentRequest struct {

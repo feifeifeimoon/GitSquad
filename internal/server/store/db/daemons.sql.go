@@ -440,6 +440,41 @@ func (q *Queries) ListDaemonsByUser(ctx context.Context, userID uuid.UUID) ([]Li
 	return items, nil
 }
 
+const listRuntimesByDaemon = `-- name: ListRuntimesByDaemon :many
+SELECT id, daemon_id, kind, name, executable_path, version, status, checked_at, diagnostics, max_concurrency FROM runtimes WHERE daemon_id = $1 ORDER BY kind, name
+`
+
+func (q *Queries) ListRuntimesByDaemon(ctx context.Context, daemonID uuid.UUID) ([]Runtime, error) {
+	rows, err := q.db.Query(ctx, listRuntimesByDaemon, daemonID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Runtime
+	for rows.Next() {
+		var i Runtime
+		if err := rows.Scan(
+			&i.ID,
+			&i.DaemonID,
+			&i.Kind,
+			&i.Name,
+			&i.ExecutablePath,
+			&i.Version,
+			&i.Status,
+			&i.CheckedAt,
+			&i.Diagnostics,
+			&i.MaxConcurrency,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setTokenHash = `-- name: SetTokenHash :exec
 UPDATE daemon_tokens SET token_hash = $2, token_prefix = $3 WHERE id = $1
 `
@@ -485,6 +520,34 @@ func (q *Queries) UpdateDaemonInfo(ctx context.Context, arg UpdateDaemonInfoPara
 		arg.DaemonVersion,
 	)
 	return err
+}
+
+const updateDaemonName = `-- name: UpdateDaemonName :one
+UPDATE daemons SET name = $2 WHERE id = $1 RETURNING id, user_id, token_id, name, os, arch, daemon_version, status, last_seen_at, connected_at, registered_at
+`
+
+type UpdateDaemonNameParams struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+func (q *Queries) UpdateDaemonName(ctx context.Context, arg UpdateDaemonNameParams) (Daemon, error) {
+	row := q.db.QueryRow(ctx, updateDaemonName, arg.ID, arg.Name)
+	var i Daemon
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.TokenID,
+		&i.Name,
+		&i.Os,
+		&i.Arch,
+		&i.DaemonVersion,
+		&i.Status,
+		&i.LastSeenAt,
+		&i.ConnectedAt,
+		&i.RegisteredAt,
+	)
+	return i, err
 }
 
 const updateDaemonVersion = `-- name: UpdateDaemonVersion :exec

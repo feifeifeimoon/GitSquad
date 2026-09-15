@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import {
   ArrowDown,
   ArrowUp,
@@ -17,7 +18,10 @@ import {
   List,
   Search,
 } from "lucide-react";
-import { api } from "@/lib/api";
+import { daemonApi, type Daemon, type DaemonRuntime } from "@/lib/api";
+import { daemonStatus } from "@/lib/agent-status";
+import { DaemonStatusBadge } from "@/components/status-dot";
+import { paths } from "@/lib/paths";
 import { timeAgo } from "@/lib/time";
 import { ProviderIcon } from "@/components/provider-icon";
 import { Button } from "@/components/ui/button";
@@ -30,27 +34,6 @@ import {
   EmptyTitle,
   EmptyDescription,
 } from "@/components/ui/empty";
-
-interface Runtime {
-  kind: string;
-  executable_path?: string;
-  version?: string;
-  max_concurrency: number;
-  status?: string;
-  diagnostics?: string;
-}
-
-interface Daemon {
-  id: string;
-  name: string;
-  status: string;
-  os: string;
-  arch: string;
-  daemon_version: string;
-  last_seen_at: string | null;
-  registered_at: string;
-  runtimes: Runtime[];
-}
 
 type ViewMode = "cards" | "list";
 type SortKey = "name" | "last_seen";
@@ -76,8 +59,8 @@ export default function DaemonsPage() {
 
   useEffect(() => {
     const fetchDaemons = () => {
-      api
-        .get<Daemon[]>("/api/v1/daemons")
+      daemonApi
+        .list()
         .then((data) => setDaemons(data || []))
         .catch(() => {})
         .finally(() => setLoading(false));
@@ -93,7 +76,7 @@ export default function DaemonsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      await api.delete(`/api/v1/daemons/${id}`);
+      await daemonApi.remove(id);
       setDaemons((prev) => prev.filter((d) => d.id !== id));
       toast.success("Daemon removed");
     } catch {
@@ -283,20 +266,7 @@ function ViewSwitcher({
   );
 }
 
-function DaemonStatusPill({ status }: { status: string }) {
-  const online = status === "online";
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-        online ? "bg-success/10 text-success" : "bg-muted text-mute"
-      }`}
-    >
-      {status}
-    </span>
-  );
-}
-
-function RuntimeChips({ runtimes }: { runtimes: Runtime[] }) {
+function RuntimeChips({ runtimes }: { runtimes: DaemonRuntime[] }) {
   const list = Array.isArray(runtimes) ? runtimes : [];
   if (list.length === 0) {
     return <span className="text-xs text-mute">No capabilities reported.</span>;
@@ -376,13 +346,22 @@ function DaemonCard({
         <div className="flex min-w-0 items-center gap-2">
           <span
             className={`size-2.5 shrink-0 rounded-full ${
-              daemon.status === "online" ? "bg-success" : "bg-hairline-strong"
+              daemonStatus(daemon) === "online"
+                ? "bg-success"
+                : daemonStatus(daemon) === "unstable"
+                  ? "bg-warning-deep"
+                  : "bg-hairline-strong"
             }`}
           />
-          <p className="truncate text-sm font-medium text-ink">{daemon.name}</p>
+          <Link
+            href={paths.daemon(daemon.id)}
+            className="truncate text-sm font-medium text-ink hover:underline"
+          >
+            {daemon.name}
+          </Link>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <DaemonStatusPill status={daemon.status} />
+          <DaemonStatusBadge status={daemonStatus(daemon)} />
           <RemoveDaemon
             deleting={deleting}
             onConfirm={onConfirmDelete}
@@ -495,16 +474,23 @@ function DaemonTable({
                   <div className="flex items-center gap-2">
                     <span
                       className={`size-2 shrink-0 rounded-full ${
-                        d.status === "online"
+                        daemonStatus(d) === "online"
                           ? "bg-success"
-                          : "bg-hairline-strong"
+                          : daemonStatus(d) === "unstable"
+                            ? "bg-warning-deep"
+                            : "bg-hairline-strong"
                       }`}
                     />
-                    <span className="truncate font-medium text-ink">{d.name}</span>
+                    <Link
+                      href={paths.daemon(d.id)}
+                      className="truncate font-medium text-ink hover:underline"
+                    >
+                      {d.name}
+                    </Link>
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <DaemonStatusPill status={d.status} />
+                  <DaemonStatusBadge status={daemonStatus(d)} />
                 </td>
                 <td className="px-4 py-3">
                   <span className="font-mono text-xs text-body">

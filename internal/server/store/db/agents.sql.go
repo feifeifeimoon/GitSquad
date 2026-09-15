@@ -76,10 +76,30 @@ func (q *Queries) DeleteAgent(ctx context.Context, arg DeleteAgentParams) error 
 
 const getAgent = `-- name: GetAgent :one
 SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.run_count, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
-       ar.status AS runtime_status, d.name AS runtime_daemon_name, d.status AS runtime_daemon_status
+       ar.status AS runtime_status, d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
+       d.last_seen_at AS runtime_daemon_last_seen_at,
+       workload.running_count, workload.queued_count, workload.total_runs,
+       coalesce(cur.issue_prefix, '') AS issue_prefix,
+       coalesce(cur.issue_number, 0)::int AS issue_number,
+       coalesce(cur.issue_title, '') AS issue_title
 FROM agents a
 JOIN agent_runtimes ar ON ar.id = a.runtime_id
 LEFT JOIN daemons d ON d.id = ar.daemon_id
+LEFT JOIN LATERAL (
+    SELECT (count(*) FILTER (WHERE t.status IN ('dispatched','running')))::int AS running_count,
+           (count(*) FILTER (WHERE t.status = 'queued'))::int AS queued_count,
+           (count(*) FILTER (WHERE t.status IN ('completed','failed')))::int AS total_runs
+    FROM tasks t WHERE t.agent_id = a.id
+) workload ON true
+LEFT JOIN LATERAL (
+    SELECT w.issue_prefix, i.number AS issue_number, i.title AS issue_title
+    FROM tasks t
+    JOIN issues i ON i.id = t.issue_id
+    JOIN workspaces w ON w.id = t.workspace_id
+    WHERE t.agent_id = a.id AND t.status IN ('dispatched','running')
+    ORDER BY t.started_at DESC NULLS LAST, t.created_at DESC
+    LIMIT 1
+) cur ON true
 WHERE a.id = $1 AND a.workspace_id = $2
 `
 
@@ -89,25 +109,32 @@ type GetAgentParams struct {
 }
 
 type GetAgentRow struct {
-	ID                  uuid.UUID  `json:"id"`
-	WorkspaceID         uuid.UUID  `json:"workspace_id"`
-	Name                string     `json:"name"`
-	Description         string     `json:"description"`
-	Instructions        string     `json:"instructions"`
-	Model               string     `json:"model"`
-	RuntimeID           uuid.UUID  `json:"runtime_id"`
-	Enabled             bool       `json:"enabled"`
-	AvatarUrl           string     `json:"avatar_url"`
-	RunCount            int32      `json:"run_count"`
-	CreatedBy           *uuid.UUID `json:"created_by"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	RuntimeProvider     string     `json:"runtime_provider"`
-	RuntimeName         string     `json:"runtime_name"`
-	RuntimeDaemonID     *uuid.UUID `json:"runtime_daemon_id"`
-	RuntimeStatus       string     `json:"runtime_status"`
-	RuntimeDaemonName   *string    `json:"runtime_daemon_name"`
-	RuntimeDaemonStatus *string    `json:"runtime_daemon_status"`
+	ID                      uuid.UUID  `json:"id"`
+	WorkspaceID             uuid.UUID  `json:"workspace_id"`
+	Name                    string     `json:"name"`
+	Description             string     `json:"description"`
+	Instructions            string     `json:"instructions"`
+	Model                   string     `json:"model"`
+	RuntimeID               uuid.UUID  `json:"runtime_id"`
+	Enabled                 bool       `json:"enabled"`
+	AvatarUrl               string     `json:"avatar_url"`
+	RunCount                int32      `json:"run_count"`
+	CreatedBy               *uuid.UUID `json:"created_by"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
+	RuntimeProvider         string     `json:"runtime_provider"`
+	RuntimeName             string     `json:"runtime_name"`
+	RuntimeDaemonID         *uuid.UUID `json:"runtime_daemon_id"`
+	RuntimeStatus           string     `json:"runtime_status"`
+	RuntimeDaemonName       *string    `json:"runtime_daemon_name"`
+	RuntimeDaemonStatus     *string    `json:"runtime_daemon_status"`
+	RuntimeDaemonLastSeenAt *time.Time `json:"runtime_daemon_last_seen_at"`
+	RunningCount            int32      `json:"running_count"`
+	QueuedCount             int32      `json:"queued_count"`
+	TotalRuns               int32      `json:"total_runs"`
+	IssuePrefix             string     `json:"issue_prefix"`
+	IssueNumber             int32      `json:"issue_number"`
+	IssueTitle              string     `json:"issue_title"`
 }
 
 func (q *Queries) GetAgent(ctx context.Context, arg GetAgentParams) (GetAgentRow, error) {
@@ -133,6 +160,13 @@ func (q *Queries) GetAgent(ctx context.Context, arg GetAgentParams) (GetAgentRow
 		&i.RuntimeStatus,
 		&i.RuntimeDaemonName,
 		&i.RuntimeDaemonStatus,
+		&i.RuntimeDaemonLastSeenAt,
+		&i.RunningCount,
+		&i.QueuedCount,
+		&i.TotalRuns,
+		&i.IssuePrefix,
+		&i.IssueNumber,
+		&i.IssueTitle,
 	)
 	return i, err
 }
@@ -161,38 +195,192 @@ func (q *Queries) ListAgentNamesByWorkspace(ctx context.Context, workspaceID uui
 	return items, nil
 }
 
+const listAgentsByDaemon = `-- name: ListAgentsByDaemon :many
+SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.run_count, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
+       ar.status AS runtime_status, d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
+       d.last_seen_at AS runtime_daemon_last_seen_at,
+       w.name AS workspace_name, w.slug AS workspace_slug,
+       workload.running_count, workload.queued_count, workload.total_runs,
+       coalesce(cur.issue_prefix, '') AS issue_prefix,
+       coalesce(cur.issue_number, 0)::int AS issue_number,
+       coalesce(cur.issue_title, '') AS issue_title
+FROM agents a
+JOIN agent_runtimes ar ON ar.id = a.runtime_id
+JOIN workspaces w ON w.id = a.workspace_id
+LEFT JOIN daemons d ON d.id = ar.daemon_id
+LEFT JOIN LATERAL (
+    SELECT (count(*) FILTER (WHERE t.status IN ('dispatched','running')))::int AS running_count,
+           (count(*) FILTER (WHERE t.status = 'queued'))::int AS queued_count,
+           (count(*) FILTER (WHERE t.status IN ('completed','failed')))::int AS total_runs
+    FROM tasks t WHERE t.agent_id = a.id
+) workload ON true
+LEFT JOIN LATERAL (
+    SELECT w2.issue_prefix, i.number AS issue_number, i.title AS issue_title
+    FROM tasks t
+    JOIN issues i ON i.id = t.issue_id
+    JOIN workspaces w2 ON w2.id = t.workspace_id
+    WHERE t.agent_id = a.id AND t.status IN ('dispatched','running')
+    ORDER BY t.started_at DESC NULLS LAST, t.created_at DESC
+    LIMIT 1
+) cur ON true
+WHERE ar.daemon_id = $1 AND w.user_id = $2
+ORDER BY a.name ASC
+`
+
+type ListAgentsByDaemonParams struct {
+	DaemonID *uuid.UUID `json:"daemon_id"`
+	UserID   uuid.UUID  `json:"user_id"`
+}
+
+type ListAgentsByDaemonRow struct {
+	ID                      uuid.UUID  `json:"id"`
+	WorkspaceID             uuid.UUID  `json:"workspace_id"`
+	Name                    string     `json:"name"`
+	Description             string     `json:"description"`
+	Instructions            string     `json:"instructions"`
+	Model                   string     `json:"model"`
+	RuntimeID               uuid.UUID  `json:"runtime_id"`
+	Enabled                 bool       `json:"enabled"`
+	AvatarUrl               string     `json:"avatar_url"`
+	RunCount                int32      `json:"run_count"`
+	CreatedBy               *uuid.UUID `json:"created_by"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
+	RuntimeProvider         string     `json:"runtime_provider"`
+	RuntimeName             string     `json:"runtime_name"`
+	RuntimeDaemonID         *uuid.UUID `json:"runtime_daemon_id"`
+	RuntimeStatus           string     `json:"runtime_status"`
+	RuntimeDaemonName       *string    `json:"runtime_daemon_name"`
+	RuntimeDaemonStatus     *string    `json:"runtime_daemon_status"`
+	RuntimeDaemonLastSeenAt *time.Time `json:"runtime_daemon_last_seen_at"`
+	WorkspaceName           string     `json:"workspace_name"`
+	WorkspaceSlug           string     `json:"workspace_slug"`
+	RunningCount            int32      `json:"running_count"`
+	QueuedCount             int32      `json:"queued_count"`
+	TotalRuns               int32      `json:"total_runs"`
+	IssuePrefix             string     `json:"issue_prefix"`
+	IssueNumber             int32      `json:"issue_number"`
+	IssueTitle              string     `json:"issue_title"`
+}
+
+// aliased w2 because the outer query already joins workspaces as w
+func (q *Queries) ListAgentsByDaemon(ctx context.Context, arg ListAgentsByDaemonParams) ([]ListAgentsByDaemonRow, error) {
+	rows, err := q.db.Query(ctx, listAgentsByDaemon, arg.DaemonID, arg.UserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAgentsByDaemonRow
+	for rows.Next() {
+		var i ListAgentsByDaemonRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Name,
+			&i.Description,
+			&i.Instructions,
+			&i.Model,
+			&i.RuntimeID,
+			&i.Enabled,
+			&i.AvatarUrl,
+			&i.RunCount,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RuntimeProvider,
+			&i.RuntimeName,
+			&i.RuntimeDaemonID,
+			&i.RuntimeStatus,
+			&i.RuntimeDaemonName,
+			&i.RuntimeDaemonStatus,
+			&i.RuntimeDaemonLastSeenAt,
+			&i.WorkspaceName,
+			&i.WorkspaceSlug,
+			&i.RunningCount,
+			&i.QueuedCount,
+			&i.TotalRuns,
+			&i.IssuePrefix,
+			&i.IssueNumber,
+			&i.IssueTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listAgentsByWorkspace = `-- name: ListAgentsByWorkspace :many
 SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.run_count, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
-       ar.status AS runtime_status, d.name AS runtime_daemon_name, d.status AS runtime_daemon_status
+       ar.status AS runtime_status, d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
+       d.last_seen_at AS runtime_daemon_last_seen_at,
+       workload.running_count, workload.queued_count, workload.total_runs,
+       coalesce(cur.issue_prefix, '') AS issue_prefix,
+       coalesce(cur.issue_number, 0)::int AS issue_number,
+       coalesce(cur.issue_title, '') AS issue_title
 FROM agents a
 JOIN agent_runtimes ar ON ar.id = a.runtime_id
 LEFT JOIN daemons d ON d.id = ar.daemon_id
+LEFT JOIN LATERAL (
+    SELECT (count(*) FILTER (WHERE t.status IN ('dispatched','running')))::int AS running_count,
+           (count(*) FILTER (WHERE t.status = 'queued'))::int AS queued_count,
+           (count(*) FILTER (WHERE t.status IN ('completed','failed')))::int AS total_runs
+    FROM tasks t WHERE t.agent_id = a.id
+) workload ON true
+LEFT JOIN LATERAL (
+    SELECT w.issue_prefix, i.number AS issue_number, i.title AS issue_title
+    FROM tasks t
+    JOIN issues i ON i.id = t.issue_id
+    JOIN workspaces w ON w.id = t.workspace_id
+    WHERE t.agent_id = a.id AND t.status IN ('dispatched','running')
+    ORDER BY t.started_at DESC NULLS LAST, t.created_at DESC
+    LIMIT 1
+) cur ON true
 WHERE a.workspace_id = $1
 ORDER BY a.created_at ASC
 `
 
 type ListAgentsByWorkspaceRow struct {
-	ID                  uuid.UUID  `json:"id"`
-	WorkspaceID         uuid.UUID  `json:"workspace_id"`
-	Name                string     `json:"name"`
-	Description         string     `json:"description"`
-	Instructions        string     `json:"instructions"`
-	Model               string     `json:"model"`
-	RuntimeID           uuid.UUID  `json:"runtime_id"`
-	Enabled             bool       `json:"enabled"`
-	AvatarUrl           string     `json:"avatar_url"`
-	RunCount            int32      `json:"run_count"`
-	CreatedBy           *uuid.UUID `json:"created_by"`
-	CreatedAt           time.Time  `json:"created_at"`
-	UpdatedAt           time.Time  `json:"updated_at"`
-	RuntimeProvider     string     `json:"runtime_provider"`
-	RuntimeName         string     `json:"runtime_name"`
-	RuntimeDaemonID     *uuid.UUID `json:"runtime_daemon_id"`
-	RuntimeStatus       string     `json:"runtime_status"`
-	RuntimeDaemonName   *string    `json:"runtime_daemon_name"`
-	RuntimeDaemonStatus *string    `json:"runtime_daemon_status"`
+	ID                      uuid.UUID  `json:"id"`
+	WorkspaceID             uuid.UUID  `json:"workspace_id"`
+	Name                    string     `json:"name"`
+	Description             string     `json:"description"`
+	Instructions            string     `json:"instructions"`
+	Model                   string     `json:"model"`
+	RuntimeID               uuid.UUID  `json:"runtime_id"`
+	Enabled                 bool       `json:"enabled"`
+	AvatarUrl               string     `json:"avatar_url"`
+	RunCount                int32      `json:"run_count"`
+	CreatedBy               *uuid.UUID `json:"created_by"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
+	RuntimeProvider         string     `json:"runtime_provider"`
+	RuntimeName             string     `json:"runtime_name"`
+	RuntimeDaemonID         *uuid.UUID `json:"runtime_daemon_id"`
+	RuntimeStatus           string     `json:"runtime_status"`
+	RuntimeDaemonName       *string    `json:"runtime_daemon_name"`
+	RuntimeDaemonStatus     *string    `json:"runtime_daemon_status"`
+	RuntimeDaemonLastSeenAt *time.Time `json:"runtime_daemon_last_seen_at"`
+	RunningCount            int32      `json:"running_count"`
+	QueuedCount             int32      `json:"queued_count"`
+	TotalRuns               int32      `json:"total_runs"`
+	IssuePrefix             string     `json:"issue_prefix"`
+	IssueNumber             int32      `json:"issue_number"`
+	IssueTitle              string     `json:"issue_title"`
 }
 
+// Workload counts and the in-flight issue ride along on every agent read so the
+// list can show a live status without a per-agent round trip. A claimed task
+// sits in 'dispatched' until the daemon reports "started", but it is already
+// running on that machine, so it counts as running.
+//
+// workload always returns exactly one row (bare aggregates), but cur yields no
+// row at all while the agent is idle. So cur's columns are coalesced where they
+// are *referenced*, not inside the lateral: a coalesce in the lateral's select
+// list cannot apply to a row that never existed.
 func (q *Queries) ListAgentsByWorkspace(ctx context.Context, workspaceID uuid.UUID) ([]ListAgentsByWorkspaceRow, error) {
 	rows, err := q.db.Query(ctx, listAgentsByWorkspace, workspaceID)
 	if err != nil {
@@ -222,6 +410,13 @@ func (q *Queries) ListAgentsByWorkspace(ctx context.Context, workspaceID uuid.UU
 			&i.RuntimeStatus,
 			&i.RuntimeDaemonName,
 			&i.RuntimeDaemonStatus,
+			&i.RuntimeDaemonLastSeenAt,
+			&i.RunningCount,
+			&i.QueuedCount,
+			&i.TotalRuns,
+			&i.IssuePrefix,
+			&i.IssueNumber,
+			&i.IssueTitle,
 		); err != nil {
 			return nil, err
 		}

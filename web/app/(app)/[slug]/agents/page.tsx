@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Plus, Trash2, Pencil } from "lucide-react";
 import { api, agentApi, skillApi, type Agent, type Skill } from "@/lib/api";
+import {
+  agentStatus,
+  workloadDetail,
+  AGENT_STATUS_LABEL,
+  type AgentStatus,
+} from "@/lib/agent-status";
 import { paths } from "@/lib/paths";
 import { ProviderIcon } from "@/components/provider-icon";
+import { AgentStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +42,18 @@ const inputCls =
   "w-full rounded-sm border border-hairline bg-canvas px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-primary";
 const textareaCls = `${inputCls} min-h-24 resize-y`;
 
+// Status is derived (see lib/agent-status.ts), so the list has to re-read the
+// daemon heartbeat and the task queue instead of holding a stale snapshot.
+const REFRESH_MS = 15_000;
+
+const STATUS_FILTERS: Array<{ key: AgentStatus | "all"; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "running", label: AGENT_STATUS_LABEL.running },
+  { key: "queued", label: AGENT_STATUS_LABEL.queued },
+  { key: "idle", label: AGENT_STATUS_LABEL.idle },
+  { key: "offline", label: AGENT_STATUS_LABEL.offline },
+];
+
 export default function WorkspaceAgentsPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
@@ -47,6 +66,7 @@ export default function WorkspaceAgentsPage() {
   const [editing, setEditing] = useState<Agent | null>(null);
   const [saving, setSaving] = useState(false);
   const [confirmId, setConfirmId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<AgentStatus | "all">("all");
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -61,17 +81,23 @@ export default function WorkspaceAgentsPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const load = () =>
-    agentApi
-      .list(slug)
-      .then(setAgents)
-      .catch(() => router.push(paths.workspaces()))
-      .finally(() => setLoading(false));
-
   useEffect(() => {
+    let first = true;
+    const load = () =>
+      agentApi
+        .list(slug)
+        .then(setAgents)
+        .catch(() => {
+          if (first) router.push(paths.workspaces());
+        })
+        .finally(() => {
+          first = false;
+          setLoading(false);
+        });
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+    const interval = setInterval(load, REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [slug, router]);
 
   useEffect(() => {
     skillApi.list(slug).then(setSkills).catch(() => {});
@@ -159,7 +185,8 @@ export default function WorkspaceAgentsPage() {
       if (editing) await agentApi.update(slug, editing.id, body);
       else await agentApi.create(slug, body);
       setOpen(false);
-      load();
+      const list = await agentApi.list(slug);
+      setAgents(list);
       toast.success(editing ? "Agent updated" : "Agent created");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save agent");
@@ -171,13 +198,30 @@ export default function WorkspaceAgentsPage() {
   const remove = async (id: string) => {
     try {
       await agentApi.remove(slug, id);
-      load();
+      setAgents((prev) => prev.filter((a) => a.id !== id));
       toast.success("Agent deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete agent");
     }
     setConfirmId(null);
   };
+
+  const counts = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const a of agents) {
+      const s = agentStatus(a);
+      acc[s] = (acc[s] ?? 0) + 1;
+    }
+    return acc;
+  }, [agents]);
+
+  const visible = useMemo(
+    () =>
+      statusFilter === "all"
+        ? agents
+        : agents.filter((a) => agentStatus(a) === statusFilter),
+    [agents, statusFilter],
+  );
 
   const selectedDaemon = daemons.find((d) => d.id === daemonId);
   const toggleSkill = (id: string) =>
@@ -197,9 +241,9 @@ export default function WorkspaceAgentsPage() {
 
       <div className="flex-1 px-8 pb-8 pt-6">
         {loading ? (
-          <div className="space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <Skeleton key={i} className="h-16 w-full rounded-md" />
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-md" />
             ))}
           </div>
         ) : agents.length === 0 ? (
@@ -214,82 +258,67 @@ export default function WorkspaceAgentsPage() {
             </EmptyDescription>
           </Empty>
         ) : (
-          <div className="space-y-3">
-            {agents.map((a) => (
-              <div
-                key={a.id}
-                className="flex items-center gap-4 rounded-md border border-hairline bg-canvas p-4 shadow-level-2"
-              >
-                <WorkspaceAvatar
-                  name={a.name}
-                  avatarUrl={a.avatar_url}
-                  className="size-10"
-                />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="truncate text-sm font-semibold text-ink">@{a.name}</p>
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        a.enabled
-                          ? "bg-success/10 text-success"
-                          : "bg-muted text-mute"
-                      }`}
-                    >
-                      {a.enabled ? "enabled" : "disabled"}
-                    </span>
-                  </div>
-                  {a.description && (
-                    <p className="mt-0.5 truncate text-xs text-body">{a.description}</p>
-                  )}
-                  <div className="mt-1 flex items-center gap-2 text-xs text-mute">
-                    <span className="flex items-center gap-1.5">
-                      <ProviderIcon
-                        provider={a.runtime?.provider ?? ""}
-                        className="size-3.5"
-                      />
-                      {a.runtime?.provider}
-                      {a.runtime?.daemon_name ? ` · ${a.runtime.daemon_name}` : ""}
-                      <span
-                        className={`size-1.5 rounded-full ${
-                          a.runtime?.status === "online"
-                            ? "bg-success"
-                            : "bg-hairline-strong"
-                        }`}
-                      />
-                    </span>
-                    <span>·</span>
-                    <span>{a.run_count ?? 0} runs</span>
-                  </div>
-                </div>
-                <button
-                  onClick={() => openEdit(a)}
-                  className="text-hairline-strong transition-colors hover:text-ink"
-                  title="Edit agent"
-                >
-                  <Pencil className="size-4" />
-                </button>
-                {confirmId === a.id ? (
-                  <span className="flex items-center gap-2 text-xs">
-                    <span className="text-destructive">Delete?</span>
-                    <button onClick={() => remove(a.id)} className="font-medium text-destructive hover:underline">
-                      Yes
-                    </button>
-                    <button onClick={() => setConfirmId(null)} className="text-mute hover:text-body">
-                      No
-                    </button>
-                  </span>
-                ) : (
+          <>
+            <div className="mb-3 flex flex-wrap items-center gap-1.5">
+              {STATUS_FILTERS.map((f) => {
+                const count =
+                  f.key === "all" ? agents.length : (counts[f.key] ?? 0);
+                const active = statusFilter === f.key;
+                return (
                   <button
-                    onClick={() => setConfirmId(a.id)}
-                    className="text-hairline-strong transition-colors hover:text-destructive"
-                    title="Delete agent"
+                    key={f.key}
+                    onClick={() => setStatusFilter(f.key)}
+                    disabled={count === 0 && f.key !== "all"}
+                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
+                      active
+                        ? "bg-ink text-canvas"
+                        : "bg-muted text-body hover:text-ink"
+                    }`}
                   >
-                    <Trash2 className="size-4" />
+                    {f.label}
+                    <span className={active ? "ml-1.5" : "ml-1.5 text-mute"}>
+                      {count}
+                    </span>
                   </button>
-                )}
-              </div>
-            ))}
-          </div>
+                );
+              })}
+            </div>
+
+            <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-hairline bg-canvas-soft">
+                    <th className={th}>Agent</th>
+                    <th className={th}>Status</th>
+                    <th className={th}>Runtime</th>
+                    <th className={`${th} hidden lg:table-cell`}>Model</th>
+                    <th className={`${th} hidden text-right sm:table-cell`}>
+                      Runs
+                    </th>
+                    <th className={`${th} text-right`}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visible.map((a) => (
+                    <AgentRow
+                      key={a.id}
+                      agent={a}
+                      confirming={confirmId === a.id}
+                      onEdit={() => openEdit(a)}
+                      onRequestDelete={() => setConfirmId(a.id)}
+                      onCancelDelete={() => setConfirmId(null)}
+                      onConfirmDelete={() => remove(a.id)}
+                    />
+                  ))}
+                </tbody>
+              </table>
+              {visible.length === 0 && (
+                <p className="px-4 py-8 text-center text-xs text-mute">
+                  No agents are {AGENT_STATUS_LABEL[statusFilter as AgentStatus].toLowerCase()}.
+                </p>
+              )}
+            </div>
+          </>
         )}
       </div>
 
@@ -462,5 +491,119 @@ export default function WorkspaceAgentsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+const th =
+  "px-4 py-2 text-left font-mono text-xs font-medium uppercase tracking-wide text-mute";
+
+function AgentRow({
+  agent,
+  confirming,
+  onEdit,
+  onRequestDelete,
+  onCancelDelete,
+  onConfirmDelete,
+}: {
+  agent: Agent;
+  confirming: boolean;
+  onEdit: () => void;
+  onRequestDelete: () => void;
+  onCancelDelete: () => void;
+  onConfirmDelete: () => void;
+}) {
+  const status = agentStatus(agent);
+  const detail = workloadDetail(agent);
+  return (
+    <tr className="border-b border-hairline last:border-b-0 transition-colors hover:bg-muted/40">
+      <td className="px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <WorkspaceAvatar
+            name={agent.name}
+            avatarUrl={agent.avatar_url}
+            className="size-8"
+          />
+          <div className="min-w-0">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-medium text-ink">@{agent.name}</span>
+              {!agent.enabled && (
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-mute">
+                  disabled
+                </span>
+              )}
+            </div>
+            {agent.description && (
+              <p className="truncate text-xs text-mute">{agent.description}</p>
+            )}
+          </div>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        <AgentStatusBadge status={status} />
+        {/* The current issue is a second line so the row stays narrow while
+            still naming what the agent is actually working on. */}
+        {detail && (
+          <p className="mt-0.5 truncate text-xs text-mute" title={detail}>
+            {detail}
+          </p>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <span className="flex min-w-0 items-center gap-1.5 text-xs text-body">
+          <ProviderIcon
+            provider={agent.runtime?.provider ?? ""}
+            className="size-3.5 shrink-0"
+          />
+          <span className="truncate">{agent.runtime?.provider || "—"}</span>
+        </span>
+        <p className="truncate text-xs text-mute">
+          {agent.runtime?.daemon_name || "no daemon"}
+        </p>
+      </td>
+      <td className="hidden px-4 py-3 lg:table-cell">
+        <span className="font-mono text-xs text-body">
+          {agent.model || "default"}
+        </span>
+      </td>
+      <td className="hidden px-4 py-3 text-right font-mono text-xs tabular-nums text-body sm:table-cell">
+        {agent.total_runs}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex items-center justify-end gap-3">
+          <button
+            onClick={onEdit}
+            className="text-hairline-strong transition-colors hover:text-ink"
+            title="Edit agent"
+          >
+            <Pencil className="size-4" />
+          </button>
+          {confirming ? (
+            <span className="flex items-center gap-2 whitespace-nowrap text-xs">
+              <span className="text-destructive">Delete?</span>
+              <button
+                onClick={onConfirmDelete}
+                className="font-medium text-destructive hover:underline"
+              >
+                Yes
+              </button>
+              <button
+                onClick={onCancelDelete}
+                className="text-mute hover:text-body"
+              >
+                No
+              </button>
+            </span>
+          ) : (
+            <button
+              onClick={onRequestDelete}
+              className="text-hairline-strong transition-colors hover:text-destructive"
+              title="Delete agent"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          )}
+        </div>
+      </td>
+    </tr>
   );
 }

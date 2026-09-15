@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/feifeifeimoon/GitSquad/internal/util"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
+	"github.com/feifeifeimoon/GitSquad/internal/util"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 )
@@ -123,7 +123,18 @@ func (s *AgentService) ListAgents(ctx context.Context, workspaceID uuid.UUID) ([
 	}
 	out := make([]v1.Agent, 0, len(rows))
 	for _, r := range rows {
-		out = append(out, buildAgentView(r.ID, r.WorkspaceID, r.RuntimeID, r.Name, r.Description, r.Instructions, r.Model, r.RuntimeProvider, r.RuntimeName, r.AvatarUrl, r.Enabled, r.RunCount, r.RuntimeDaemonID, r.RuntimeStatus, r.RuntimeDaemonName, r.RuntimeDaemonStatus, r.CreatedAt, r.UpdatedAt))
+		out = append(out, buildAgentView(agentRow{
+			id: r.ID, workspaceID: r.WorkspaceID, runtimeID: r.RuntimeID,
+			name: r.Name, description: r.Description, instructions: r.Instructions,
+			model: r.Model, runtimeProvider: r.RuntimeProvider, runtimeName: r.RuntimeName,
+			avatarURL: r.AvatarUrl, enabled: r.Enabled, runCount: r.RunCount,
+			runtimeDaemonID: r.RuntimeDaemonID, runtimeStatus: r.RuntimeStatus,
+			runtimeDaemonName: r.RuntimeDaemonName, runtimeDaemonStatus: r.RuntimeDaemonStatus,
+			runtimeDaemonLastSeenAt: r.RuntimeDaemonLastSeenAt,
+			runningCount:            r.RunningCount, queuedCount: r.QueuedCount, totalRuns: r.TotalRuns,
+			issuePrefix: r.IssuePrefix, issueNumber: r.IssueNumber, issueTitle: r.IssueTitle,
+			createdAt: r.CreatedAt, updatedAt: r.UpdatedAt,
+		}))
 	}
 	return out, nil
 }
@@ -133,12 +144,52 @@ func (s *AgentService) GetAgent(ctx context.Context, workspaceID, agentID uuid.U
 	if err != nil {
 		return nil, ErrAgentNotFound
 	}
-	agent := buildAgentView(r.ID, r.WorkspaceID, r.RuntimeID, r.Name, r.Description, r.Instructions, r.Model, r.RuntimeProvider, r.RuntimeName, r.AvatarUrl, r.Enabled, r.RunCount, r.RuntimeDaemonID, r.RuntimeStatus, r.RuntimeDaemonName, r.RuntimeDaemonStatus, r.CreatedAt, r.UpdatedAt)
+	agent := buildAgentView(agentRow{
+		id: r.ID, workspaceID: r.WorkspaceID, runtimeID: r.RuntimeID,
+		name: r.Name, description: r.Description, instructions: r.Instructions,
+		model: r.Model, runtimeProvider: r.RuntimeProvider, runtimeName: r.RuntimeName,
+		avatarURL: r.AvatarUrl, enabled: r.Enabled, runCount: r.RunCount,
+		runtimeDaemonID: r.RuntimeDaemonID, runtimeStatus: r.RuntimeStatus,
+		runtimeDaemonName: r.RuntimeDaemonName, runtimeDaemonStatus: r.RuntimeDaemonStatus,
+		runtimeDaemonLastSeenAt: r.RuntimeDaemonLastSeenAt,
+		runningCount:            r.RunningCount, queuedCount: r.QueuedCount, totalRuns: r.TotalRuns,
+		issuePrefix: r.IssuePrefix, issueNumber: r.IssueNumber, issueTitle: r.IssueTitle,
+		createdAt: r.CreatedAt, updatedAt: r.UpdatedAt,
+	})
 	skills, err := s.store.ListSkillsForAgent(ctx, agentID)
 	if err == nil {
 		agent.Skills = toSkills(skills)
 	}
 	return &agent, nil
+}
+
+// ListAgentsByDaemon returns every agent bound to one of daemonID's runtimes,
+// across all of the owner's workspaces. It backs the daemon detail page, where
+// the grouping is per runtime rather than per workspace.
+func (s *AgentService) ListAgentsByDaemon(ctx context.Context, daemonID, userID uuid.UUID) ([]v1.DaemonAgent, error) {
+	rows, err := s.store.ListAgentsByDaemon(ctx, db.ListAgentsByDaemonParams{DaemonID: &daemonID, UserID: userID})
+	if err != nil {
+		return nil, fmt.Errorf("list agents by daemon: %w", err)
+	}
+	out := make([]v1.DaemonAgent, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, v1.DaemonAgent{
+			ID:            r.ID,
+			WorkspaceID:   r.WorkspaceID,
+			WorkspaceSlug: r.WorkspaceSlug,
+			WorkspaceName: r.WorkspaceName,
+			Name:          r.Name,
+			AvatarURL:     r.AvatarUrl,
+			Provider:      r.RuntimeProvider,
+			Model:         r.Model,
+			Enabled:       r.Enabled,
+			RunningCount:  int(r.RunningCount),
+			QueuedCount:   int(r.QueuedCount),
+			TotalRuns:     int(r.TotalRuns),
+			CurrentTask:   currentTask(r.IssuePrefix, r.IssueNumber, r.IssueTitle),
+		})
+	}
+	return out, nil
 }
 
 func (s *AgentService) UpdateAgent(ctx context.Context, workspaceID, agentID uuid.UUID, req v1.UpdateAgentRequest) (*v1.Agent, error) {
@@ -253,39 +304,67 @@ func (s *AgentService) setSkills(ctx context.Context, agentID uuid.UUID, skillID
 	})
 }
 
-// buildAgentView assembles the v1.Agent view from the joined query columns
-// shared by ListAgentsByWorkspaceRow and GetAgentRow.
-func buildAgentView(
-	id, workspaceID, runtimeID uuid.UUID,
-	name, description, instructions, model, runtimeProvider, runtimeName, avatarURL string,
-	enabled bool,
-	runCount int32,
-	runtimeDaemonID *uuid.UUID,
-	runtimeStatus string,
-	runtimeDaemonName, runtimeDaemonStatus *string,
-	createdAt, updatedAt time.Time,
-) v1.Agent {
+// agentRow is the column set every agent query selects. The three queries
+// (by workspace, by id, by daemon) return the same joined shape, so the view
+// builder takes this instead of twenty positional arguments.
+type agentRow struct {
+	id, workspaceID, runtimeID             uuid.UUID
+	name, description, instructions        string
+	model, runtimeProvider, runtimeName    string
+	avatarURL                              string
+	enabled                                bool
+	runCount                               int32
+	runtimeDaemonID                        *uuid.UUID
+	runtimeStatus                          string
+	runtimeDaemonName, runtimeDaemonStatus *string
+	runtimeDaemonLastSeenAt                *time.Time
+	runningCount, queuedCount, totalRuns   int32
+	issuePrefix                            string
+	issueNumber                            int32
+	issueTitle                             string
+	createdAt, updatedAt                   time.Time
+}
+
+// buildAgentView assembles the v1.Agent view from a joined query row.
+func buildAgentView(r agentRow) v1.Agent {
 	return v1.Agent{
-		ID:           id,
-		WorkspaceID:  workspaceID,
-		Name:         name,
-		Description:  description,
-		Instructions: instructions,
-		Model:        model,
-		RuntimeID:    runtimeID,
-		Enabled:      enabled,
-		AvatarURL:    avatarURL,
-		RunCount:     int(runCount),
-		CreatedAt:    createdAt,
-		UpdatedAt:    updatedAt,
+		ID:           r.id,
+		WorkspaceID:  r.workspaceID,
+		Name:         r.name,
+		Description:  r.description,
+		Instructions: r.instructions,
+		Model:        r.model,
+		RuntimeID:    r.runtimeID,
+		Enabled:      r.enabled,
+		AvatarURL:    r.avatarURL,
+		RunCount:     int(r.runCount),
+		RunningCount: int(r.runningCount),
+		QueuedCount:  int(r.queuedCount),
+		TotalRuns:    int(r.totalRuns),
+		CurrentTask:  currentTask(r.issuePrefix, r.issueNumber, r.issueTitle),
+		CreatedAt:    r.createdAt,
+		UpdatedAt:    r.updatedAt,
 		Runtime: &v1.AgentRuntime{
-			ID:           runtimeID,
-			Name:         runtimeName,
-			Provider:     runtimeProvider,
-			DaemonID:     runtimeDaemonID,
-			Status:       runtimeStatus,
-			DaemonName:   util.Value(runtimeDaemonName),
-			DaemonStatus: util.Value(runtimeDaemonStatus),
+			ID:           r.runtimeID,
+			Name:         r.runtimeName,
+			Provider:     r.runtimeProvider,
+			DaemonID:     r.runtimeDaemonID,
+			Status:       r.runtimeStatus,
+			DaemonName:   util.Value(r.runtimeDaemonName),
+			DaemonStatus: util.Value(r.runtimeDaemonStatus),
+			LastSeenAt:   r.runtimeDaemonLastSeenAt,
 		},
+	}
+}
+
+// currentTask builds the in-flight task reference, or nil when the query's
+// current-task lateral matched nothing (which it signals with empty columns).
+func currentTask(prefix string, number int32, title string) *v1.AgentCurrentTask {
+	if prefix == "" && title == "" {
+		return nil
+	}
+	return &v1.AgentCurrentTask{
+		IssueKey:   fmt.Sprintf("%s-%d", prefix, number),
+		IssueTitle: title,
 	}
 }

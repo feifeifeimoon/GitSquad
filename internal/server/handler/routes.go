@@ -33,7 +33,6 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 
 	authHandler := NewAuthHandler(cfg, authSvc)
 	userHandler := NewUserHandler()
-	daemonHandler := NewDaemonHandler(cfg, daemonSvc)
 
 	githubSvc := service.NewGitHubAppService(s, cfg, memory.NewPendingInstallationStore())
 	taskSvc := service.NewTaskService(s, githubSvc)
@@ -47,6 +46,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	agentHandler := NewAgentHandler(agentSvc, workspaceSvc)
 	skillHandler := NewSkillHandler(skillSvc, workspaceSvc)
 	taskHandler := NewTaskHandler(taskSvc)
+	daemonHandler := NewDaemonHandler(cfg, daemonSvc, agentSvc)
 	daemonSvc.SetPendingTasks(taskSvc.HasPending)
 
 	// Realtime: browsers subscribe to workspace events over /ws/app, and the
@@ -96,8 +96,8 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		daemonConfirm := api.Group("/daemon/auth")
 		daemonConfirm.Use(middleware.RequireAuth(cfg, userSvc))
 		{
-		daemonConfirm.POST("/:code/confirm", daemonHandler.ConfirmPairing)
-	}
+			daemonConfirm.POST("/:code/confirm", daemonHandler.ConfirmPairing)
+		}
 
 		// GitHub App prepare-install + installation list (requires user login).
 		github := api.Group("/github")
@@ -113,7 +113,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		// a cross-site redirect from github.com with no session.
 		api.GET("/github/callback", githubHandler.Callback)
 
-	// Protected daemon endpoints (daemon token auth).
+		// Protected daemon endpoints (daemon token auth).
 		// Daemon identity is resolved from the token — no :id in the URL.
 		daemon := api.Group("/daemon")
 		daemon.Use(middleware.RequireDaemonAuth(cfg, daemonSvc))
@@ -137,7 +137,9 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 		{
 			protected.GET("/me", userHandler.Me)
 			protected.GET("/daemons", daemonHandler.ListDaemons)
-		protected.DELETE("/daemons/:id", daemonHandler.DeleteDaemon)
+			protected.GET("/daemons/:id", daemonHandler.GetDaemon)
+			protected.PATCH("/daemons/:id", daemonHandler.UpdateDaemon)
+			protected.DELETE("/daemons/:id", daemonHandler.DeleteDaemon)
 
 			// Workspace management
 			protected.POST("/workspaces", workspaceHandler.Create)
@@ -169,7 +171,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.PATCH("/workspaces/:id/skills/:skillId", skillHandler.Update)
 			protected.DELETE("/workspaces/:id/skills/:skillId", skillHandler.Delete)
 		}
-}
+	}
 
 	// Webhook endpoint — public, HMAC-verified, no user auth required.
 	r.POST("/api/v1/github/webhook", githubHandler.Webhook)

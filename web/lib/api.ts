@@ -169,6 +169,8 @@ export interface AgentRuntime {
   status: "online" | "offline";
   daemon_name?: string;
   daemon_status?: string;
+  /** Backing daemon's last heartbeat — see lib/agent-status.ts. */
+  last_seen_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -183,6 +185,11 @@ export interface Skill {
   updated_at: string;
 }
 
+export interface AgentCurrentTask {
+  issue_key: string;
+  issue_title: string;
+}
+
 export interface Agent {
   id: string;
   workspace_id: string;
@@ -193,12 +200,80 @@ export interface Agent {
   runtime_id: string;
   enabled: boolean;
   avatar_url?: string;
+  /** Always 0 — the column is never incremented. Use total_runs instead. */
   run_count: number;
+  running_count: number;
+  queued_count: number;
+  total_runs: number;
+  current_task?: AgentCurrentTask | null;
   skills?: Skill[];
   runtime?: AgentRuntime;
   created_at: string;
   updated_at: string;
 }
+
+// ── Daemons ───────────────────────────────────────────────────────────
+
+/** A capability the daemon detected on its machine, with the concrete CLI
+ * version it found (e.g. kind "claude" at version "2.1.5"). */
+export interface DaemonRuntime {
+  id: string;
+  daemon_id: string;
+  kind: string;
+  executable_path?: string;
+  version?: string;
+  max_concurrency: number;
+  status?: string;
+  diagnostics?: string;
+}
+
+export interface Daemon {
+  id: string;
+  name: string;
+  status: string;
+  os: string;
+  arch: string;
+  daemon_version: string;
+  last_seen_at: string | null;
+  connected_at: string | null;
+  registered_at: string;
+  runtimes: DaemonRuntime[];
+}
+
+/** An agent bound to a runtime, as seen from the machine it runs on. */
+export interface DaemonAgent {
+  id: string;
+  workspace_id: string;
+  workspace_slug: string;
+  workspace_name: string;
+  name: string;
+  avatar_url?: string;
+  provider: string;
+  model: string;
+  enabled: boolean;
+  running_count: number;
+  queued_count: number;
+  total_runs: number;
+  current_task?: AgentCurrentTask | null;
+}
+
+/** A runtime with the agents configured against it. */
+export interface DaemonRuntimeDetail extends DaemonRuntime {
+  agents: DaemonAgent[];
+}
+
+export interface DaemonDetail extends Omit<Daemon, "runtimes"> {
+  runtimes: DaemonRuntimeDetail[];
+}
+
+export const daemonApi = {
+  list: () => api.get<Daemon[]>("/api/v1/daemons"),
+  get: (id: string) => api.get<DaemonDetail>(`/api/v1/daemons/${encodeURIComponent(id)}`),
+  rename: (id: string, name: string) =>
+    api.patch<Daemon>(`/api/v1/daemons/${encodeURIComponent(id)}`, { name }),
+  remove: (id: string) =>
+    api.delete<{ deleted: boolean }>(`/api/v1/daemons/${encodeURIComponent(id)}`),
+};
 
 export const agentApi = {
   list: (workspaceId: string) => api.get<Agent[]>(`/api/v1/workspaces/${workspaceId}/agents`),

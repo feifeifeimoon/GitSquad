@@ -133,11 +133,16 @@ export class TestApiClient {
   /**
    * Seed an "online" daemon with one runtime per `kind` so the agents page
    * shows it in the daemon/provider selectors. Returns the daemon id.
+   *
+   * last_seen_at is set for an online daemon because the UI derives liveness
+   * from the heartbeat: an online row with no timestamp reads as "unstable"
+   * (see web/lib/agent-status.ts). Pass lastSeenMsAgo to seed that stale state.
    */
   async seedDaemon(opts: {
     name?: string;
     status?: string;
     kinds?: string[];
+    lastSeenMsAgo?: number;
   } = {}): Promise<TestDaemon> {
     const name = opts.name ?? `E2E Daemon ${Date.now().toString(36)}`;
     const status = opts.status ?? "online";
@@ -146,18 +151,24 @@ export class TestApiClient {
     const client = new pg.Client({ connectionString: DATABASE_URL });
     await client.connect();
     try {
+      const seen =
+        opts.lastSeenMsAgo !== undefined
+          ? new Date(Date.now() - opts.lastSeenMsAgo)
+          : status === "online"
+            ? new Date()
+            : null;
       const daemon = await client.query(
-        `INSERT INTO daemons (user_id, name, os, arch, daemon_version, status, registered_at)
-         VALUES ($1, $2, 'darwin', 'arm64', '0.1.0', $3, now())
+        `INSERT INTO daemons (user_id, name, os, arch, daemon_version, status, last_seen_at, registered_at)
+         VALUES ($1, $2, 'darwin', 'arm64', '0.1.0', $3, $4, now())
          RETURNING id`,
-        [this.getUserId(), name, status],
+        [this.getUserId(), name, status, seen],
       );
       const daemonId: string = daemon.rows[0].id;
 
       for (const kind of kinds) {
         await client.query(
           `INSERT INTO runtimes (daemon_id, kind, name, executable_path, version, status, checked_at, max_concurrency)
-           VALUES ($1, $2, $2, '/usr/local/bin/' || $2, '1.0.0', 'available', now(), 1)`,
+           VALUES ($1, $2, $2, '/usr/local/bin/' || $2, '1.2.3', 'available', now(), 1)`,
           [daemonId, kind],
         );
       }
@@ -165,6 +176,42 @@ export class TestApiClient {
     } finally {
       await client.end();
     }
+  }
+
+  /**
+   * Insert a task row directly so status derivation has in-flight work to see.
+   * Claiming a task for real would need a live daemon, which E2E does not run.
+   * Both 'running' and 'dispatched' count as running in the UI.
+   */
+  async seedTask(opts: {
+    workspaceId: string;
+    issueId: string;
+    agentId: string;
+    daemonId: string;
+    status?: string;
+  }): Promise<void> {
+    const client = new pg.Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query(
+        `INSERT INTO tasks (workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, context, started_at)
+         VALUES ($1, $2, $3, $4, $5, 'claude', '{}', now())`,
+        [
+          opts.workspaceId,
+          opts.issueId,
+          opts.agentId,
+          opts.status ?? "running",
+          opts.daemonId,
+        ],
+      );
+    } finally {
+      await client.end();
+    }
+  }
+
+  /** Read a daemon through the API, for asserting a write actually persisted. */
+  async getDaemon(id: string): Promise<TestDaemon & { status: string }> {
+    return this.authedFetch(`/api/v1/daemons/${id}`);
   }
 
   /** Create an issue via the real API. */
