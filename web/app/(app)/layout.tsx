@@ -46,7 +46,7 @@ interface User {
 const globalNavItems = [
   { href: "/workspaces", label: "Workspaces", icon: FolderGit2 },
   { href: "/daemons", label: "Daemons", icon: Monitor },
-  { href: "/usage", label: "Usage", icon: Gauge },
+  { href: paths.usage(), label: "Usage", icon: Gauge },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

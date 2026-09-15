@@ -5,9 +5,14 @@ const encode = (id: string) => encodeURIComponent(id);
 
 // Root-level slugs that would collide with top-level routes or framework
 // assets. Kept in sync with the backend reserved list (service/workspace.go).
+//
+// Every literal top-level route must appear here. A missing one is not a
+// hypothetical: /usage was absent, so the console layout read it as a workspace
+// named "usage" and cleared the workspace it was showing. lib/paths.test.mjs
+// walks the real route directories and fails if one is missing.
 export const RESERVED_SLUGS = new Set([
   "login", "auth", "daemon", "daemons",
-  "workspaces", "settings", "new", "api",
+  "workspaces", "settings", "usage", "new", "api",
   "_next", "_vercel", "favicon.ico", "manifest",
   "robots.txt", "sitemap.xml", "icons",
   "home", "homepage", "dashboard", "docs",
@@ -22,6 +27,7 @@ export const paths = {
   newWorkspaceConfigure: () => "/workspaces/new/configure",
   daemons: () => "/daemons",
   daemon: (id: string) => `/daemons/${encode(id)}`,
+  usage: () => "/usage",
   settings: () => "/settings",
   workspace: (slug: string) => ({
     board: () => `/${encode(slug)}`,

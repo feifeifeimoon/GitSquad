@@ -29,9 +29,14 @@ var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
 
 // reservedSlugs are root-level slugs that would collide with top-level routes
 // or framework assets now that workspaces live at /{slug}. Rejected at creation.
+//
+// Must stay in sync with the frontend list (web/lib/paths.ts), which the console
+// layout consults to tell a workspace from a system route. A slug missing on
+// either side breaks the console: the workspace becomes unreachable at /{slug},
+// and the system page at that path gets read as a workspace.
 var reservedSlugs = map[string]bool{
 	"login": true, "auth": true, "daemon": true, "daemons": true,
-	"workspaces": true, "settings": true, "new": true, "api": true,
+	"workspaces": true, "settings": true, "usage": true, "new": true, "api": true,
 	"_next": true, "_vercel": true, "favicon.ico": true, "manifest": true,
 	"robots.txt": true, "sitemap.xml": true, "icons": true,
 	"home": true, "homepage": true, "dashboard": true, "docs": true,
@@ -66,7 +71,7 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID
 	if err != nil {
 		return nil, ErrInstallationMismatch
 	}
-		if inst.UserID != userID {
+	if inst.UserID != userID {
 		return nil, ErrInstallationMismatch
 	}
 
