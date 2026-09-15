@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -47,12 +48,12 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 
 	remoteURL := GitHubCloneURL(task.Repo.Owner, task.Repo.Name, task.InstallationToken)
 	if err := r.git.CloneOrFetch(ctx, wsDir, remoteURL); err != nil {
-		return r.fail(ctx, task, fmt.Errorf("checkout: %w", err))
+		return r.fail(ctx, task, nil, fmt.Errorf("checkout: %w", err))
 	}
 	// No branch yet: a task that only reads the repo (analysis, design, review)
 	// must not leave one behind. The branch is created at commit time below.
 	if err := r.git.ResetToDefault(ctx, wsDir, task.Repo.DefaultBranch); err != nil {
-		return r.fail(ctx, task, fmt.Errorf("reset checkout: %w", err))
+		return r.fail(ctx, task, nil, fmt.Errorf("reset checkout: %w", err))
 	}
 
 	if _, err := execenv.Prepare(wsDir, execenv.PrepareParams{
@@ -63,7 +64,7 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		Issue:       task.Issue,
 		Agent:       task.Agent,
 	}); err != nil {
-		return r.fail(ctx, task, fmt.Errorf("prepare env: %w", err))
+		return r.fail(ctx, task, nil, fmt.Errorf("prepare env: %w", err))
 	}
 
 	sess, err := r.backend.Execute(ctx, triggerPrompt(task), provider.ExecOptions{
@@ -72,7 +73,7 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		Timeout: r.timeout,
 	})
 	if err != nil {
-		return r.fail(ctx, task, fmt.Errorf("execute: %w", err))
+		return r.fail(ctx, task, nil, fmt.Errorf("execute: %w", err))
 	}
 
 	for m := range sess.Messages {
@@ -83,17 +84,22 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	}
 	res := <-sess.Result
 
+	// Collected before the status check so a run that timed out or aborted still
+	// reports what it burned — the provider accumulates usage as turns stream in
+	// precisely so the tokens are not lost with the process.
+	usage := taskUsage(r.backend.Kind(), res.Usage)
+
 	if res.Status != "completed" {
 		errMsg := res.Error
 		if errMsg == "" {
 			errMsg = res.Status
 		}
-		return r.fail(ctx, task, fmt.Errorf("provider %s: %s", res.Status, errMsg))
+		return r.fail(ctx, task, usage, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
 
 	diff, err := r.git.Diff(ctx, wsDir, "origin/"+task.Repo.DefaultBranch)
 	if err != nil {
-		return r.fail(ctx, task, fmt.Errorf("diff: %w", err))
+		return r.fail(ctx, task, usage, fmt.Errorf("diff: %w", err))
 	}
 
 	// No code change is a normal outcome (analysis / design / review work), not
@@ -102,17 +108,18 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		return r.reporter.Report(ctx, task.ID, v1.TaskReport{
 			Status:  v1.TaskReportSucceeded,
 			Summary: &v1.TaskSummary{Output: res.Output},
+			Usage:   usage,
 		})
 	}
 
 	if err := r.git.CreateBranch(ctx, wsDir, branch); err != nil {
-		return r.fail(ctx, task, fmt.Errorf("create branch: %w", err))
+		return r.fail(ctx, task, usage, fmt.Errorf("create branch: %w", err))
 	}
 	if err := r.git.Commit(ctx, wsDir, commitMessage(task)); err != nil {
-		return r.fail(ctx, task, fmt.Errorf("commit: %w", err))
+		return r.fail(ctx, task, usage, fmt.Errorf("commit: %w", err))
 	}
 	if err := r.git.Push(ctx, wsDir, branch); err != nil {
-		return r.fail(ctx, task, fmt.Errorf("push: %w", err))
+		return r.fail(ctx, task, usage, fmt.Errorf("push: %w", err))
 	}
 
 	return r.reporter.Report(ctx, task.ID, v1.TaskReport{
@@ -122,13 +129,49 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 			Branch:   branch,
 			DiffStat: diffStat(diff),
 		},
+		Usage: usage,
 	})
 }
 
-// fail reports a failed terminal state and returns the error.
-func (r *Runner) fail(ctx context.Context, task v1.Task, err error) error {
-	_ = r.reporter.Report(ctx, task.ID, v1.TaskReport{Status: v1.TaskReportFailed, Error: err.Error()})
+// fail reports a failed terminal state and returns the error. usage is nil for
+// failures that happened before the agent ever ran.
+func (r *Runner) fail(ctx context.Context, task v1.Task, usage []v1.TaskUsage, err error) error {
+	_ = r.reporter.Report(ctx, task.ID, v1.TaskReport{
+		Status: v1.TaskReportFailed,
+		Error:  err.Error(),
+		Usage:  usage,
+	})
 	return err
+}
+
+// taskUsage converts the provider's per-model accumulation into wire entries.
+// providerKind is the backend's own kind, so an agent configured for one
+// provider while the daemon runs another still reports what actually ran.
+// Sorted by model because Go map iteration is random and the order ends up in
+// the database and in test expectations.
+func taskUsage(providerKind string, byModel map[string]provider.TokenUsage) []v1.TaskUsage {
+	if len(byModel) == 0 {
+		return nil
+	}
+	out := make([]v1.TaskUsage, 0, len(byModel))
+	for model, u := range byModel {
+		if u.IsZero() {
+			continue
+		}
+		out = append(out, v1.TaskUsage{
+			Provider:         providerKind,
+			Model:            model,
+			InputTokens:      u.InputTokens,
+			OutputTokens:     u.OutputTokens,
+			CacheReadTokens:  u.CacheReadTokens,
+			CacheWriteTokens: u.CacheWriteTokens,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Model < out[j].Model })
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func taskBranch(task v1.Task) string {

@@ -43,9 +43,11 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	issueHandler := NewIssueHandler(issueSvc, workspaceSvc)
 	agentSvc := service.NewAgentService(s)
 	skillSvc := service.NewSkillService(s)
+	usageSvc := service.NewUsageService(s)
 	agentHandler := NewAgentHandler(agentSvc, workspaceSvc)
 	skillHandler := NewSkillHandler(skillSvc, workspaceSvc)
 	taskHandler := NewTaskHandler(taskSvc)
+	usageHandler := NewUsageHandler(usageSvc)
 	daemonHandler := NewDaemonHandler(cfg, daemonSvc, agentSvc)
 	daemonSvc.SetPendingTasks(taskSvc.HasPending)
 
@@ -140,6 +142,12 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.GET("/daemons/:id", daemonHandler.GetDaemon)
 			protected.PATCH("/daemons/:id", daemonHandler.UpdateDaemon)
 			protected.DELETE("/daemons/:id", daemonHandler.DeleteDaemon)
+
+			// Token usage. Scoped to the caller's workspaces, so no path carries
+			// a workspace id that would need authorising separately.
+			protected.GET("/usage/summary", usageHandler.Summary)
+			protected.GET("/usage/series", usageHandler.Series)
+			protected.GET("/usage/breakdown", usageHandler.Breakdown)
 
 			// Workspace management
 			protected.POST("/workspaces", workspaceHandler.Create)

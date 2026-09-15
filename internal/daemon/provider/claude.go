@@ -125,6 +125,7 @@ func (b *claudeBackend) Execute(ctx context.Context, prompt string, opts ExecOpt
 		start := time.Now()
 		var out strings.Builder
 		var final Result
+		usage := newUsageTracker(opts.Model)
 
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 64*1024), 4*1024*1024)
@@ -139,14 +140,22 @@ func (b *claudeBackend) Execute(ctx context.Context, prompt string, opts ExecOpt
 				}
 				trySend(msgs, m)
 			}
+			if model, u, ok := evt.assistantUsage(); ok {
+				usage.addTurn(model, u)
+			}
 			if r, ok := evt.result(); ok {
 				final = r
+				if totals, ok := evt.resultUsage(usage.lastModel()); ok {
+					usage.replaceTotals(totals)
+				}
 			}
 		}
 		close(msgs)
 
 		waitErr := cmd.Wait()
-		result <- finalizeResult(final, out.String(), waitErr, stderr.String(), ctx.Err(), time.Since(start))
+		res := finalizeResult(final, out.String(), waitErr, stderr.String(), ctx.Err(), time.Since(start))
+		res.Usage = usage.snapshot()
+		result <- res
 	}()
 
 	return &Session{Messages: msgs, Result: result}, nil
@@ -165,40 +174,184 @@ func trySend(ch chan<- Message, m Message) {
 
 // claudeEvent is a single stream-json line from claude stdout.
 type claudeEvent struct {
-	Type       string          `json:"type"`
-	Subtype    string          `json:"subtype"`
-	IsError    bool            `json:"is_error"`
-	Message    *claudeMessage  `json:"message"`
-	Result     string          `json:"result"`
-	SessionID  string          `json:"session_id"`
-	DurationMs int64           `json:"duration_ms"`
-	Usage      *claudeUsage    `json:"usage"`
+	Type       string         `json:"type"`
+	Subtype    string         `json:"subtype"`
+	IsError    bool           `json:"is_error"`
+	Message    *claudeMessage `json:"message"`
+	Result     string         `json:"result"`
+	SessionID  string         `json:"session_id"`
+	DurationMs int64          `json:"duration_ms"`
+	Usage      *claudeUsage   `json:"usage"`
+	// ModelUsage is the per-model breakdown on the result event. Preferred over
+	// the flat Usage above because it preserves the model dimension.
+	ModelUsage map[string]claudeUsage `json:"modelUsage"`
 }
 
 type claudeMessage struct {
 	Role    string            `json:"role"`
 	Content []json.RawMessage `json:"content"`
+	// Model and Usage are present on assistant turns; capturing them per turn is
+	// what makes a run that times out mid-stream still report a token figure.
+	Model string       `json:"model"`
+	Usage *claudeUsage `json:"usage"`
 }
 
 type claudeUsage struct {
-	InputTokens       int64 `json:"input_tokens"`
-	OutputTokens      int64 `json:"output_tokens"`
-	CacheReadTokens   int64 `json:"cache_read_input_tokens"`
-	CacheWriteTokens  int64 `json:"cache_creation_input_tokens"`
+	InputTokens      int64
+	OutputTokens     int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
 }
+
+// UnmarshalJSON tolerates both key spellings the CLI uses for token counts: the
+// flat `usage` object on the result event is snake_case (`input_tokens`) while
+// `modelUsage` entries are camelCase (`inputTokens`). One type covers both.
+//
+// It decodes through map[string]any rather than a numeric map because these
+// objects carry non-integer siblings — `costUSD` is a float, `serviceTier` a
+// string — and a stricter decode would fail. parseClaudeEvent would then drop
+// the entire line, losing the event rather than one field.
+func (u *claudeUsage) UnmarshalJSON(data []byte) error {
+	var raw map[string]any
+	if err := json.Unmarshal(data, &raw); err != nil {
+		// Never fail the enclosing event over an unexpected usage shape.
+		return nil
+	}
+	pick := func(keys ...string) int64 {
+		for _, key := range keys {
+			if v, ok := raw[key]; ok {
+				if n, ok := numeric(v); ok {
+					return n
+				}
+			}
+		}
+		return 0
+	}
+	u.InputTokens = pick("input_tokens", "inputTokens")
+	u.OutputTokens = pick("output_tokens", "outputTokens")
+	u.CacheReadTokens = pick("cache_read_input_tokens", "cacheReadInputTokens",
+		"cached_input_tokens", "cachedInputTokens")
+	u.CacheWriteTokens = pick("cache_creation_input_tokens", "cacheCreationInputTokens",
+		"cache_write_tokens", "cacheWriteTokens")
+	return nil
+}
+
+// numeric coerces a decoded JSON value to int64 when it is a token count.
+func numeric(v any) (int64, bool) {
+	switch n := v.(type) {
+	case float64:
+		return int64(n), true
+	case json.Number:
+		i, err := n.Int64()
+		return i, err == nil
+	default:
+		return 0, false
+	}
+}
+
+// tokenUsage converts the wire shape into the provider-neutral buckets. The
+// four are already mutually exclusive in this format: input_tokens excludes
+// both cache buckets.
+func (u claudeUsage) tokenUsage() TokenUsage {
+	return TokenUsage{
+		InputTokens:      u.InputTokens,
+		OutputTokens:     u.OutputTokens,
+		CacheReadTokens:  u.CacheReadTokens,
+		CacheWriteTokens: u.CacheWriteTokens,
+	}
+}
+
+// usageTracker accumulates per-model token usage across one run.
+//
+// Assistant turns stream in as the agent works, so a run that times out or is
+// cancelled still has a figure; the terminal result event then replaces the
+// accumulation with the CLI's own totals for the whole run.
+type usageTracker struct {
+	byModel  map[string]TokenUsage
+	lastSeen string
+	fallback string
+}
+
+func newUsageTracker(configuredModel string) *usageTracker {
+	fallback := configuredModel
+	if fallback == "" {
+		fallback = UnknownModel
+	}
+	return &usageTracker{byModel: map[string]TokenUsage{}, fallback: fallback}
+}
+
+// modelKey resolves which model a usage figure belongs to. The CLI omits the
+// model on some events, so fall back to the most recent turn that named one,
+// then to the model the agent was configured with.
+func (t *usageTracker) modelKey(model string) string {
+	if model != "" {
+		t.lastSeen = model
+		return model
+	}
+	if t.lastSeen != "" {
+		return t.lastSeen
+	}
+	return t.fallback
+}
+
+// addTurn folds one streamed assistant turn in.
+func (t *usageTracker) addTurn(model string, u TokenUsage) {
+	if u.IsZero() {
+		return
+	}
+	key := t.modelKey(model)
+	t.byModel[key] = t.byModel[key].Add(u)
+}
+
+// replaceTotals discards the accumulated turns in favour of the CLI's own
+// run totals, which already cover every turn. Replacing avoids double-counting
+// the final turn.
+func (t *usageTracker) replaceTotals(totals map[string]TokenUsage) {
+	kept := make(map[string]TokenUsage, len(totals))
+	for model, u := range totals {
+		if u.IsZero() {
+			continue
+		}
+		if model != "" {
+			t.lastSeen = model
+		}
+		kept[model] = u
+	}
+	if len(kept) == 0 {
+		return
+	}
+	t.byModel = kept
+}
+
+// snapshot returns what the run consumed. Empty means the CLI reported nothing
+// — distinct from a run that genuinely used zero tokens.
+func (t *usageTracker) snapshot() map[string]TokenUsage {
+	if len(t.byModel) == 0 {
+		return nil
+	}
+	out := make(map[string]TokenUsage, len(t.byModel))
+	for model, u := range t.byModel {
+		out[model] = u
+	}
+	return out
+}
+
+// lastModel is the most recently named model, for attributing a flat result
+// total that carries no model of its own.
+func (t *usageTracker) lastModel() string { return t.modelKey("") }
 
 // claudeContentBlock is one entry in a message's content array. Not every
 // field is set for every block type.
 type claudeContentBlock struct {
-	Type      string         `json:"type"`
-	Text      string         `json:"text"`
-	Thinking  string         `json:"thinking"`
-	ID        string         `json:"id"`
-	Name      string         `json:"name"`
-	Input     map[string]any `json:"input"`
-	ToolUseID string         `json:"tool_use_id"`
+	Type      string          `json:"type"`
+	Text      string          `json:"text"`
+	Thinking  string          `json:"thinking"`
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	Input     map[string]any  `json:"input"`
+	ToolUseID string          `json:"tool_use_id"`
 	Content   json.RawMessage `json:"content"`
-	IsError   bool           `json:"is_error"`
+	IsError   bool            `json:"is_error"`
 }
 
 func parseClaudeEvent(line []byte) (claudeEvent, bool) {
@@ -258,7 +411,9 @@ func (e claudeEvent) messages() []Message {
 	}
 }
 
-// result maps a "result" event into a final Result.
+// result maps a "result" event into a final Result. Usage is filled in by the
+// caller from the tracker, since the terminal totals have to be reconciled with
+// whatever the streamed turns already contributed.
 func (e claudeEvent) result() (Result, bool) {
 	if e.Type != "result" {
 		return Result{}, false
@@ -267,20 +422,45 @@ func (e claudeEvent) result() (Result, bool) {
 	if e.Subtype != "success" || e.IsError {
 		status = "failed"
 	}
-	usage := map[string]TokenUsage{}
-	if e.Usage != nil {
-		usage[""] = TokenUsage{
-			InputTokens:  e.Usage.InputTokens,
-			OutputTokens: e.Usage.OutputTokens,
-		}
-	}
 	return Result{
 		Status:     status,
 		Output:     e.Result,
 		SessionID:  e.SessionID,
 		DurationMs: e.DurationMs,
-		Usage:      usage,
 	}, true
+}
+
+// assistantUsage reports the usage of a streamed assistant turn.
+func (e claudeEvent) assistantUsage() (string, TokenUsage, bool) {
+	if e.Type != "assistant" || e.Message == nil || e.Message.Usage == nil {
+		return "", TokenUsage{}, false
+	}
+	u := e.Message.Usage.tokenUsage()
+	if u.IsZero() {
+		return "", TokenUsage{}, false
+	}
+	return e.Message.Model, u, true
+}
+
+// resultUsage reports the run's total usage from the terminal event, keyed by
+// model. The per-model map wins when present; otherwise the flat total is
+// attributed to defaultModel, the only model the run is known to have used.
+func (e claudeEvent) resultUsage(defaultModel string) (map[string]TokenUsage, bool) {
+	if len(e.ModelUsage) > 0 {
+		out := make(map[string]TokenUsage, len(e.ModelUsage))
+		for model, u := range e.ModelUsage {
+			if !u.tokenUsage().IsZero() {
+				out[model] = u.tokenUsage()
+			}
+		}
+		if len(out) > 0 {
+			return out, true
+		}
+	}
+	if e.Usage == nil || e.Usage.tokenUsage().IsZero() {
+		return nil, false
+	}
+	return map[string]TokenUsage{defaultModel: e.Usage.tokenUsage()}, true
 }
 
 // toolResultText flattens a tool_result content (string or array of text

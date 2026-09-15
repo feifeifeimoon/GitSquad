@@ -11,6 +11,7 @@
 // has zero build-time coupling to the web app (mirrors the multica approach).
 
 import pg from "pg";
+import { createHash, randomUUID } from "node:crypto";
 import { API_BASE, DATABASE_URL } from "./env";
 
 export interface TestUser {
@@ -189,13 +190,14 @@ export class TestApiClient {
     agentId: string;
     daemonId: string;
     status?: string;
-  }): Promise<void> {
+  }): Promise<{ id: string }> {
     const client = new pg.Client({ connectionString: DATABASE_URL });
     await client.connect();
     try {
-      await client.query(
+      const res = await client.query(
         `INSERT INTO tasks (workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, context, started_at)
-         VALUES ($1, $2, $3, $4, $5, 'claude', '{}', now())`,
+         VALUES ($1, $2, $3, $4, $5, 'claude', '{}', now())
+         RETURNING id`,
         [
           opts.workspaceId,
           opts.issueId,
@@ -204,8 +206,78 @@ export class TestApiClient {
           opts.daemonId,
         ],
       );
+      return { id: res.rows[0].id as string };
     } finally {
       await client.end();
+    }
+  }
+
+  /**
+   * Give a seeded daemon a working bearer token, so tests can drive the real
+   * daemon endpoints instead of writing their side effects straight into the
+   * database. Returns the raw token.
+   *
+   * The server stores only SHA-256(raw); `gitsquad_dm_` is the prefix the auth
+   * middleware insists on.
+   */
+  async seedDaemonToken(daemonId: string): Promise<string> {
+    const raw = `gitsquad_dm_${randomUUID().replace(/-/g, "")}`;
+    const hash = createHash("sha256").update(raw).digest("hex");
+    const client = new pg.Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query(
+        `INSERT INTO daemon_tokens (user_id, daemon_id, token_hash, token_prefix, status)
+         VALUES ($1, $2, $3, $4, 'active')`,
+        [this.getUserId(), daemonId, hash, raw.slice(0, 20)],
+      );
+    } finally {
+      await client.end();
+    }
+    return raw;
+  }
+
+  /**
+   * Report a task lifecycle event as the daemon would, over the real API. The
+   * terminal succeeded report is what writes token usage, so this is how a test
+   * gets usage into the ledger through the production path.
+   */
+  async reportTaskStatus(
+    daemonToken: string,
+    taskId: string,
+    report: {
+      status: string;
+      output?: string;
+      usage?: Array<{
+        provider: string;
+        model: string;
+        input_tokens: number;
+        output_tokens: number;
+        cache_read_tokens?: number;
+        cache_write_tokens?: number;
+      }>;
+    },
+  ): Promise<void> {
+    const body = {
+      status: report.status,
+      ...(report.output !== undefined
+        ? { summary: { output: report.output } }
+        : {}),
+      ...(report.usage ? { usage: report.usage } : {}),
+    };
+    const res = await fetch(
+      `${API_BASE}/api/v1/daemon/tasks/${taskId}/status`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${daemonToken}`,
+        },
+        body: JSON.stringify(body),
+      },
+    );
+    if (!res.ok) {
+      throw new Error(`report task status failed: ${res.status}`);
     }
   }
 

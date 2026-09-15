@@ -89,7 +89,25 @@ type TaskReport struct {
 	Progress *TaskProgress `json:"progress,omitempty"`
 	// Summary is set on the terminal succeeded/failed report.
 	Summary *TaskSummary `json:"summary,omitempty"`
-	Error   string       `json:"error,omitempty"`
+	// Usage is the run's token consumption, reported on the terminal event.
+	// Absent means the provider reported nothing — not that the run used no
+	// tokens, so readers must keep those two apart. It rides on failures too:
+	// an agent burns tokens whether it finishes or dies.
+	Usage []TaskUsage `json:"usage,omitempty"`
+	Error string      `json:"error,omitempty"`
+}
+
+// TaskUsage is the token consumption of one task run, per provider and model.
+// A run that used two models reports two entries. The buckets are mutually
+// exclusive: InputTokens excludes both cache buckets, so the four sum to the
+// run's total without double-counting a cached token.
+type TaskUsage struct {
+	Provider         string `json:"provider"`
+	Model            string `json:"model"`
+	InputTokens      int64  `json:"input_tokens"`
+	OutputTokens     int64  `json:"output_tokens"`
+	CacheReadTokens  int64  `json:"cache_read_tokens"`
+	CacheWriteTokens int64  `json:"cache_write_tokens"`
 }
 
 // TaskProgress is one streamed agent event forwarded to the server during
@@ -98,7 +116,7 @@ type TaskProgress struct {
 	Type    string         `json:"type"` // text | thinking | tool_use | tool_result | status | error
 	Content string         `json:"content,omitempty"`
 	Tool    string         `json:"tool,omitempty"`
-	Input   map[string]any `json:"input,omitempty"` // tool_use 的入参(如命令)
+	Input   map[string]any `json:"input,omitempty"`  // tool_use 的入参(如命令)
 	Output  string         `json:"output,omitempty"` // tool_result 的输出
 }
 

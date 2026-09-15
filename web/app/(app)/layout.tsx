@@ -14,6 +14,7 @@ import {
   Search,
   Bot,
   CircleDot,
+  Gauge,
   Sparkles,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
@@ -45,6 +46,7 @@ interface User {
 const globalNavItems = [
   { href: "/workspaces", label: "Workspaces", icon: FolderGit2 },
   { href: "/daemons", label: "Daemons", icon: Monitor },
+  { href: "/usage", label: "Usage", icon: Gauge },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

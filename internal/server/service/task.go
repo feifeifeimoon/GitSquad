@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
@@ -207,6 +208,21 @@ func (s *TaskService) Report(ctx context.Context, daemonID uuid.UUID, taskID uui
 		return errors.New("task not assigned to this daemon")
 	}
 
+	// Usage is recorded before the lifecycle switch, and independently of it.
+	// Two reasons: a report that loses the terminal CAS race still came from the
+	// daemon that ran the task, so its numbers are worth keeping; and a replayed
+	// report has to be able to correct usage it reported earlier.
+	//
+	// A failure here is logged but does not fail the report. The terminal
+	// transition matters more — refusing it would strand the task in a
+	// non-terminal state and leave the issue without its result, which is a far
+	// worse outcome than a missing token figure.
+	if len(report.Usage) > 0 {
+		if err := s.recordUsage(ctx, taskID, report.Usage); err != nil {
+			slog.Error("record task usage", "error", err, "task", taskID)
+		}
+	}
+
 	switch report.Status {
 	case v1.TaskReportStarted:
 		return s.handleStarted(ctx, task)
@@ -219,6 +235,34 @@ func (s *TaskService) Report(ctx context.Context, daemonID uuid.UUID, taskID uui
 	default:
 		return nil
 	}
+}
+
+// recordUsage upserts one row per provider/model pair. Overwriting rather than
+// adding makes a replayed report idempotent: the daemon is the source of truth
+// for its own run, so a second report corrects the first instead of doubling it.
+func (s *TaskService) recordUsage(ctx context.Context, taskID uuid.UUID, usage []v1.TaskUsage) error {
+	return s.store.ExecTx(ctx, func(q *db.Queries) error {
+		for _, u := range usage {
+			model := strings.TrimSpace(u.Model)
+			if model == "" {
+				// The ledger's key is (task, provider, model), so a blank model
+				// would collide two different rows into one.
+				model = v1.UnknownModel
+			}
+			if err := q.UpsertTaskUsage(ctx, db.UpsertTaskUsageParams{
+				TaskID:           taskID,
+				Provider:         strings.ToLower(strings.TrimSpace(u.Provider)),
+				Model:            model,
+				InputTokens:      u.InputTokens,
+				OutputTokens:     u.OutputTokens,
+				CacheReadTokens:  u.CacheReadTokens,
+				CacheWriteTokens: u.CacheWriteTokens,
+			}); err != nil {
+				return fmt.Errorf("upsert task usage: %w", err)
+			}
+		}
+		return nil
+	})
 }
 
 // FailDaemonTasks marks a daemon's in-flight tasks failed when it goes

@@ -228,6 +228,27 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		{name: "035_pending_task_per_agent", sql: `DROP INDEX IF EXISTS idx_one_pending_task_per_issue`},
 		{name: "036_pending_task_per_agent_idx", sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_agent
 			ON tasks(issue_id, agent_id) WHERE status IN ('queued','dispatched')`},
+		// Token usage per run: one row per (task, provider, model), so a run that
+		// used two models writes two rows. Deliberately no workspace/agent/daemon/
+		// issue copies — those live on the task row, and duplicating them would
+		// give one fact two sources that drift when a task is reassigned. The
+		// buckets are mutually exclusive, so input_tokens excludes both cache
+		// buckets and the four sum to the run's total.
+		{name: "037_create_task_usage", sql: `CREATE TABLE IF NOT EXISTS task_usage (
+			task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+			provider TEXT NOT NULL DEFAULT '',
+			model TEXT NOT NULL DEFAULT '',
+			input_tokens BIGINT NOT NULL DEFAULT 0,
+			output_tokens BIGINT NOT NULL DEFAULT 0,
+			cache_read_tokens BIGINT NOT NULL DEFAULT 0,
+			cache_write_tokens BIGINT NOT NULL DEFAULT 0,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			PRIMARY KEY (task_id, provider, model)
+		)`},
+		// Every read filters or buckets on created_at, so it leads the index.
+		{name: "038_task_usage_created_idx", sql: `CREATE INDEX IF NOT EXISTS idx_task_usage_created_at
+			ON task_usage(created_at)`},
 	}
 
 	for _, m := range migrations {

@@ -225,3 +225,20 @@ CREATE TABLE task_messages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_task_messages_task_seq ON task_messages(task_id, seq);
+
+-- Token usage per run: one row per (task, provider, model), overwritten when a
+-- daemon re-reports. Dimensions come from the task row, not from copies here.
+CREATE TABLE task_usage (
+    task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    provider TEXT NOT NULL DEFAULT '',
+    model TEXT NOT NULL DEFAULT '',
+    input_tokens BIGINT NOT NULL DEFAULT 0,
+    output_tokens BIGINT NOT NULL DEFAULT 0,
+    cache_read_tokens BIGINT NOT NULL DEFAULT 0,
+    cache_write_tokens BIGINT NOT NULL DEFAULT 0,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (task_id, provider, model)
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_usage_created_at ON task_usage(created_at);

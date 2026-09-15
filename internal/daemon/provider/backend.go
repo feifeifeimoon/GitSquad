@@ -8,6 +8,8 @@ import (
 	"context"
 	"log/slog"
 	"time"
+
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
 
 // Backend is the unified interface for executing a prompt via a coding CLI.
@@ -60,10 +62,39 @@ type Result struct {
 	Usage      map[string]TokenUsage // keyed by model name
 }
 
-// TokenUsage tracks token consumption for a single model.
+// TokenUsage tracks token consumption for a single model. The buckets are
+// mutually exclusive: InputTokens counts only tokens that were neither read
+// from nor written to the prompt cache, so a cached token is never counted
+// twice. A provider that reports input inclusive of cache must subtract it
+// before filling these in.
 type TokenUsage struct {
-	InputTokens  int64
-	OutputTokens int64
+	InputTokens      int64
+	OutputTokens     int64
+	CacheReadTokens  int64
+	CacheWriteTokens int64
+}
+
+// UnknownModel is the usage key used when the CLI reports tokens without naming
+// the model. Aliases the shared wire constant so the daemon and the server
+// cannot disagree on it.
+const UnknownModel = v1.UnknownModel
+
+// IsZero reports whether nothing at all was recorded — what a provider that
+// does not report usage returns. Kept distinct from a genuine zero-token run so
+// callers can tell "not reported" from "reported nothing".
+func (u TokenUsage) IsZero() bool {
+	return u.InputTokens == 0 && u.OutputTokens == 0 &&
+		u.CacheReadTokens == 0 && u.CacheWriteTokens == 0
+}
+
+// Add returns u with other's buckets folded in.
+func (u TokenUsage) Add(other TokenUsage) TokenUsage {
+	return TokenUsage{
+		InputTokens:      u.InputTokens + other.InputTokens,
+		OutputTokens:     u.OutputTokens + other.OutputTokens,
+		CacheReadTokens:  u.CacheReadTokens + other.CacheReadTokens,
+		CacheWriteTokens: u.CacheWriteTokens + other.CacheWriteTokens,
+	}
 }
 
 // ExecOptions configures a single execution.

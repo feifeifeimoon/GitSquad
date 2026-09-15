@@ -174,3 +174,126 @@ func TestRunnerRunCheckoutError(t *testing.T) {
 		t.Errorf("last report = %+v, want failed with error", last)
 	}
 }
+
+// Usage must survive every terminal path once the agent has run: a task that
+// commits and pushes, one that fails after the agent finished, and one whose
+// provider timed out mid-stream.
+func TestRunnerReportsUsageOnSuccess(t *testing.T) {
+	git := &fakeGit{diff: "diff --git a/x b/x\n+x\n"}
+	backend := &fakeBackend{res: provider.Result{
+		Status: "completed",
+		Output: "done",
+		Usage: map[string]provider.TokenUsage{
+			"claude-sonnet-4-5": {InputTokens: 10, OutputTokens: 20, CacheReadTokens: 30, CacheWriteTokens: 40},
+			"claude-opus-4":     {InputTokens: 1, OutputTokens: 2},
+		},
+	}}
+	rep := &fakeReporter{}
+	r := New(git, backend, rep, t.TempDir())
+
+	if err := r.Run(context.Background(), testTask()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	last := rep.reports[len(rep.reports)-1]
+	if last.Status != v1.TaskReportSucceeded {
+		t.Fatalf("status = %s, want succeeded", last.Status)
+	}
+	if len(last.Usage) != 2 {
+		t.Fatalf("usage = %+v, want both models", last.Usage)
+	}
+	// Sorted by model so the wire order is deterministic.
+	if last.Usage[0].Model != "claude-opus-4" || last.Usage[1].Model != "claude-sonnet-4-5" {
+		t.Errorf("usage order = %s, %s, want sorted by model", last.Usage[0].Model, last.Usage[1].Model)
+	}
+	got := last.Usage[1]
+	if got.Provider != "claude" || got.InputTokens != 10 || got.OutputTokens != 20 ||
+		got.CacheReadTokens != 30 || got.CacheWriteTokens != 40 {
+		t.Errorf("usage = %+v, want claude 10/20/30/40", got)
+	}
+}
+
+func TestRunnerReportsUsageWhenProviderFails(t *testing.T) {
+	// A timed-out run: the provider never emitted a result event, so the usage
+	// is only what accumulated from streamed turns.
+	backend := &fakeBackend{res: provider.Result{
+		Status: "timeout",
+		Usage:  map[string]provider.TokenUsage{"claude-sonnet-4-5": {InputTokens: 7, OutputTokens: 8}},
+	}}
+	rep := &fakeReporter{}
+	r := New(&fakeGit{}, backend, rep, t.TempDir())
+
+	if err := r.Run(context.Background(), testTask()); err == nil {
+		t.Fatal("Run() = nil, want error")
+	}
+
+	last := rep.reports[len(rep.reports)-1]
+	if last.Status != v1.TaskReportFailed {
+		t.Fatalf("status = %s, want failed", last.Status)
+	}
+	if len(last.Usage) != 1 || last.Usage[0].InputTokens != 7 {
+		t.Errorf("usage = %+v, want the timed-out run's tokens", last.Usage)
+	}
+}
+
+// A failure after the agent finished — the push — still carries the tokens it
+// spent producing the work.
+func TestRunnerReportsUsageWhenPushFails(t *testing.T) {
+	git := &fakeGit{diff: "diff --git a/x b/x\n+x\n", pushErr: errors.New("push failed")}
+	backend := &fakeBackend{res: provider.Result{
+		Status: "completed",
+		Usage:  map[string]provider.TokenUsage{"claude-sonnet-4-5": {OutputTokens: 99}},
+	}}
+	rep := &fakeReporter{}
+	r := New(git, backend, rep, t.TempDir())
+
+	if err := r.Run(context.Background(), testTask()); err == nil {
+		t.Fatal("Run() = nil, want error")
+	}
+	last := rep.reports[len(rep.reports)-1]
+	if last.Status != v1.TaskReportFailed {
+		t.Fatalf("status = %s, want failed", last.Status)
+	}
+	if len(last.Usage) != 1 || last.Usage[0].OutputTokens != 99 {
+		t.Errorf("usage = %+v, want the tokens spent before the push", last.Usage)
+	}
+}
+
+// A failure before the agent runs has no usage, and must not fabricate a zero
+// row — "not reported" and "used nothing" are different facts.
+func TestRunnerPreAgentFailureHasNoUsage(t *testing.T) {
+	git := &fakeGit{cloneErr: errors.New("clone failed")}
+	rep := &fakeReporter{}
+	r := New(git, &fakeBackend{}, rep, t.TempDir())
+
+	if err := r.Run(context.Background(), testTask()); err == nil {
+		t.Fatal("Run() = nil, want error")
+	}
+	last := rep.reports[len(rep.reports)-1]
+	if last.Usage != nil {
+		t.Errorf("usage = %+v, want nil for a failure before the agent ran", last.Usage)
+	}
+}
+
+// A provider that reports no usage leaves the field empty rather than sending a
+// zero row, so the server can tell it apart from a real zero-token run.
+func TestRunnerOmitsEmptyUsage(t *testing.T) {
+	backend := &fakeBackend{res: provider.Result{
+		Status: "completed",
+		Output: "no code change",
+		Usage:  map[string]provider.TokenUsage{"claude-sonnet-4-5": {}},
+	}}
+	rep := &fakeReporter{}
+	r := New(&fakeGit{}, backend, rep, t.TempDir())
+
+	if err := r.Run(context.Background(), testTask()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	last := rep.reports[len(rep.reports)-1]
+	if last.Status != v1.TaskReportSucceeded {
+		t.Fatalf("status = %s, want succeeded", last.Status)
+	}
+	if last.Usage != nil {
+		t.Errorf("usage = %+v, want nil for an all-zero report", last.Usage)
+	}
+}

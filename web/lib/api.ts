@@ -275,6 +275,87 @@ export const daemonApi = {
     api.delete<{ deleted: boolean }>(`/api/v1/daemons/${encodeURIComponent(id)}`),
 };
 
+// ── Token usage ───────────────────────────────────────────────────────
+
+/** The four mutually exclusive buckets. Input excludes both cache buckets. */
+export interface TokenBuckets {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_tokens: number;
+  cache_write_tokens: number;
+}
+
+/** The boundaries the server aggregated over, and the timezone it used. */
+export interface UsageWindow {
+  range: string;
+  from: string;
+  to: string;
+  timezone: string;
+}
+
+export interface UsageSummary extends TokenBuckets {
+  runs_with_usage: number;
+  runs_total: number;
+}
+
+export interface UsagePoint extends TokenBuckets {
+  bucket: string;
+  run_count: number;
+}
+
+export interface UsageBreakdownRow extends TokenBuckets {
+  key: string;
+  label: string;
+  avatar_url?: string;
+  workspace_slug?: string;
+  run_count: number;
+}
+
+export interface UsageSummaryResponse {
+  window: UsageWindow;
+  summary: UsageSummary;
+}
+
+export interface UsageSeriesResponse {
+  window: UsageWindow;
+  bucket: "hour" | "day";
+  points: UsagePoint[];
+}
+
+export interface UsageBreakdownResponse {
+  window: UsageWindow;
+  group_by: string;
+  rows: UsageBreakdownRow[];
+}
+
+/** Shared query parameters for every usage endpoint. */
+interface UsageParams {
+  range?: string;
+  tz?: string;
+  workspaceId?: string;
+}
+
+function usageQuery(params: UsageParams, extra: Record<string, string> = {}): string {
+  const q = new URLSearchParams({ ...extra });
+  if (params.range) q.set("range", params.range);
+  if (params.tz) q.set("tz", params.tz);
+  if (params.workspaceId) q.set("workspace_id", params.workspaceId);
+  return q.toString();
+}
+
+export const usageApi = {
+  summary: (params: UsageParams) =>
+    api.get<UsageSummaryResponse>(`/api/v1/usage/summary?${usageQuery(params)}`),
+  series: (params: UsageParams & { bucket?: "hour" | "day" }) =>
+    api.get<UsageSeriesResponse>(
+      `/api/v1/usage/series?${usageQuery(params, params.bucket ? { bucket: params.bucket } : {})}`,
+    ),
+  breakdown: (params: UsageParams & { groupBy: string }) =>
+    api.get<UsageBreakdownResponse>(
+      `/api/v1/usage/breakdown?${usageQuery(params, { group_by: params.groupBy })}`,
+    ),
+};
+
 export const agentApi = {
   list: (workspaceId: string) => api.get<Agent[]>(`/api/v1/workspaces/${workspaceId}/agents`),
   get: (workspaceId: string, agentId: string) =>
