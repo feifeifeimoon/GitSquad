@@ -22,9 +22,23 @@ go run ./cmd/server
 # → http://localhost:8080
 
 # 5. Start frontend
-cd web && npm run dev
+cd web && bun install && bun run dev
 # → http://localhost:3000
 ```
+
+> **Package manager.** `web/` is a bun project — `web/bun.lock` is the only
+> lockfile. Do not run `npm install` or `yarn` there; any lockfile they produce
+> is git-ignored on purpose, because a second lockfile goes stale silently while
+> CI keeps installing from bun. Install bun from https://bun.sh if you do not
+> have it. (`e2e/` is the exception: it is an npm package and its
+> `package-lock.json` is committed.)
+
+> **Line endings.** The repository stores every text file with LF endings and
+> `.gitattributes` enforces that on checkout, so `gofmt` and `git diff` behave
+> the same on Windows as on Linux. If you cloned before `.gitattributes`
+> existed, refresh your working tree once with:
+> `git rm --cached -r . && git reset --hard` — or, if you have local work,
+> `git add --renormalize .` followed by `git stash && git stash pop`.
 
 ---
 
@@ -162,7 +176,7 @@ user, err := s.store.FindByProvider(ctx, id)
 source .env && go run ./cmd/server
 
 # Terminal 2: Frontend
-cd web && npm run dev
+cd web && bun run dev
 
 # Terminal 3: CLI (optional)
 go run ./cmd/gitsquad daemon login
@@ -170,15 +184,36 @@ go run ./cmd/gitsquad daemon login
 
 ### Before committing
 
-```bash
-# Build everything
-go build ./cmd/server/...
-go build ./cmd/gitsquad/...
-cd web && npx next build
+CI runs several gates on every pull request. Run the same ones locally — `make check`
+covers everything the backend job enforces, in the same order:
 
-# Regenerate sqlc (if SQL changed)
+```bash
+make check        # gofmt check + go vet + staticcheck + go test -race
+make vuln         # govulncheck: advisories reachable from this code
+make cover        # statement coverage (prints the total)
+
+# Frontend (from web/)
+bun run lint
+bun run test
+bun run build
+
+# Regenerate sqlc (if SQL changed, from the repo root)
 sqlc generate
 ```
+
+Individual targets: `make fmt` (rewrite files), `make fmt-check` (fail if any file
+is unformatted), `make vet`, `make lint` (staticcheck), `make test`, `make cover`,
+`make vuln`.
+
+The CI coverage floor is a ratchet, not a target — it exists to stop the figure
+drifting down. The largest untested areas are `internal/server/handler`,
+`middleware`, `store` and `crypto`, which have no test files at all; raise the
+floor in `.github/workflows/ci.yml` as those gain coverage.
+
+The Go toolchain used by CI is pinned separately from the `go` directive in
+`go.mod` (see `GO_TOOLCHAIN` in `.github/workflows/ci.yml`). `go.mod` states the
+language floor contributors must be able to build with; the CI pin tracks a
+patched patch release so the standard library has no open advisories.
 
 ### Environment variables
 
