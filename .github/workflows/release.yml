@@ -13,6 +13,12 @@ concurrency:
   group: goreleaser-release
   cancel-in-progress: false
 
+# Patched Go toolchain. Kept in sync with .github/workflows/ci.yml: the `go`
+# directive in go.mod is the language floor (1.26.2), whose standard library
+# carries advisories that would otherwise ship inside the released binaries.
+env:
+  GO_TOOLCHAIN: "1.26.8"
+
 jobs:
   test:
     name: Backend Build & Test
@@ -24,7 +30,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: ${{ env.GO_TOOLCHAIN }}
           cache: true
 
       - name: Test
@@ -43,7 +49,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version-file: go.mod
+          go-version: ${{ env.GO_TOOLCHAIN }}
           cache: true
 
       - name: Run GoReleaser
