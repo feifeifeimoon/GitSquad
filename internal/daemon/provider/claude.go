@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -111,7 +110,7 @@ func (b *claudeBackend) Execute(ctx context.Context, prompt string, opts ExecOpt
 
 	// Feed the user message and close stdin so the turn is complete.
 	go func() {
-		_, _ = io.WriteString(stdin, string(buildClaudeInput(prompt)))
+		_, _ = stdin.Write(buildClaudeInput(prompt))
 		_ = stdin.Close()
 	}()
 
@@ -253,12 +252,7 @@ func numeric(v any) (int64, bool) {
 // four are already mutually exclusive in this format: input_tokens excludes
 // both cache buckets.
 func (u claudeUsage) tokenUsage() TokenUsage {
-	return TokenUsage{
-		InputTokens:      u.InputTokens,
-		OutputTokens:     u.OutputTokens,
-		CacheReadTokens:  u.CacheReadTokens,
-		CacheWriteTokens: u.CacheWriteTokens,
-	}
+	return TokenUsage(u)
 }
 
 // usageTracker accumulates per-model token usage across one run.
