@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# bun is the package manager for web/ — bun.lock is the only lockfile.
+# An npm lockfile here goes stale silently because CI never runs npm, so it is
+# ignored rather than trusted. The e2e/ package does use npm; its lockfile lives
+# outside this directory and stays committed.
+package-lock.json
+npm-shrinkwrap.json
+yarn.lock
+pnpm-lock.yaml
