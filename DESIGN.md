@@ -1,7 +1,7 @@
 ---
 version: alpha
-name: Vercel-design-analysis
-description: An inspired interpretation of Vercel's design language — a developer-platform brand whose surface is a stark black-and-ink duet on near-white canvas, broken at hero scale by a multi-color mesh gradient (cyan / blue / magenta / amber) that acts as the entire decorative system, paired with a custom geometric sans for headlines and a monospaced caption face for technical labels.
+name: gitsquad-design-system
+description: The design language for the GitSquad web console — a stark ink-on-canvas engineering surface, broken at hero scale by a multi-colour mesh gradient that is the entire decorative system, paired with a geometric sans for narrative text and a monospaced face for technical labels, status data, and code.
 
 colors:
   primary: "#171717"
@@ -20,26 +20,39 @@ colors:
   success: "#0070f3"
   error: "#ee0000"
   error-soft: "#f7d4d6"
-  error-deep: "#c50000"
   warning: "#f5a623"
   warning-soft: "#ffefcf"
   warning-deep: "#ab570a"
   violet: "#7928ca"
   violet-soft: "#d8ccf1"
-  violet-deep: "#4c2889"
-  cyan: "#50e3c2"
   cyan-soft: "#aaffec"
   cyan-deep: "#29bc9b"
-  highlight-pink: "#ff0080"
-  highlight-magenta: "#eb367f"
-  gradient-develop-start: "#007cf0"
-  gradient-develop-end: "#00dfd8"
-  gradient-preview-start: "#7928ca"
-  gradient-preview-end: "#ff0080"
-  gradient-ship-start: "#ff4d4d"
-  gradient-ship-end: "#f9cb28"
+  gradient-blue: "#007cf0"
+  gradient-violet: "#7928ca"
+  gradient-magenta: "#ff0080"
+  gradient-teal: "#00dfd8"
+  gradient-amber: "#f9cb28"
   selection-bg: "#171717"
   selection-fg: "#f2f2f2"
+  # Semantic layer consumed by the vendored shadcn/Radix primitives. These are
+  # the names those components reference internally, mapped onto the brand
+  # ladder above so a primitive styled out of the box still lands on-brand.
+  background: "#fafafa"
+  foreground: "#171717"
+  card: "#ffffff"
+  card-foreground: "#171717"
+  popover: "#ffffff"
+  popover-foreground: "#171717"
+  secondary: "#fafafa"
+  secondary-foreground: "#171717"
+  muted: "#f5f5f5"
+  muted-foreground: "#888888"
+  accent: "#f5f5f5"
+  accent-foreground: "#171717"
+  destructive: "#ee0000"
+  border: "#ebebeb"
+  input: "#ebebeb"
+  ring: "#a1a1a1"
 
 typography:
   display-xl:
@@ -71,7 +84,6 @@ typography:
     fontSize: 18px
     fontWeight: 400
     lineHeight: 28px
-    letterSpacing: 0px
   body-md:
     fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
     fontSize: 16px
@@ -127,8 +139,9 @@ rounded:
   md: 8px
   lg: 12px
   xl: 16px
-  pill-sm: 64px
-  pill: 100px
+  2xl: 20px
+  3xl: 24px
+  4xl: 28px
   full: 9999px
 
 spacing:
@@ -142,8 +155,6 @@ spacing:
   3xl: 48px
   4xl: 64px
   5xl: 96px
-  6xl: 128px
-  section: 192px
 
 components:
   nav-bar:
@@ -157,149 +168,157 @@ components:
     typography: "{typography.body-sm}"
     rounded: "{rounded.full}"
     padding: "{spacing.xs} {spacing.sm}"
-  nav-cta-signup:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.body-sm-strong}"
-    rounded: "{rounded.sm}"
-    padding: "0px {spacing.xs}"
-    height: 28px
-  nav-cta-login:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-sm-strong}"
-    rounded: "{rounded.sm}"
-    padding: "0px {spacing.xs}"
-    height: 28px
-  nav-cta-ask-ai:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    borderColor: "{colors.hairline}"
-    typography: "{typography.body-sm-strong}"
-    rounded: "{rounded.sm}"
-    padding: "0px {spacing.xs}"
-    height: 28px
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
     typography: "{typography.button-lg}"
-    rounded: "{rounded.pill}"
-    padding: "0px {spacing.sm}"
-  button-secondary:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.button-lg}"
-    rounded: "{rounded.pill}"
-    padding: "0px {spacing.sm}"
-  button-primary-sm:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.button-md}"
-    rounded: "{rounded.pill}"
-    padding: "0px {spacing.xs}"
-  button-secondary-sm:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.button-md}"
-    rounded: "{rounded.pill}"
-    padding: "0px {spacing.xs}"
-  tab-ghost:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.pill-sm}"
-    padding: "0px {spacing.md}"
-  icon-button-circular:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    borderColor: "{colors.hairline}"
     rounded: "{rounded.full}"
-  card-marketing:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.lg}"
-  card-marketing-large:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.xl}"
-  card-soft:
-    backgroundColor: "{colors.canvas-soft}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.lg}"
-  template-card:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.md}"
-  code-editor-mockup:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.code}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.lg}"
-  form-input:
-    backgroundColor: "{colors.canvas}"
+    padding: "0px {spacing.lg}"
+    height: 48px
+  button-secondary:
+    backgroundColor: "{colors.card}"
     textColor: "{colors.ink}"
     borderColor: "{colors.hairline}"
-    typography: "{typography.body-sm}"
+    typography: "{typography.button-lg}"
+    rounded: "{rounded.full}"
+    shadow: "Level 1"
+  button-default:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button-md}"
     rounded: "{rounded.sm}"
     padding: "0px {spacing.sm}"
-    height: 40px
-  form-input-sm:
-    backgroundColor: "{colors.canvas}"
+    height: 32px
+  button-ghost:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
+    padding: "0px {spacing.sm}"
+    height: 32px
+  button-destructive:
+    backgroundColor: "{colors.error}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.sm}"
+    height: 32px
+  icon-button:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.sm}"
+  form-input:
+    backgroundColor: "{colors.card}"
     textColor: "{colors.ink}"
     borderColor: "{colors.hairline}"
     typography: "{typography.body-sm}"
     rounded: "{rounded.sm}"
     padding: "0px {spacing.sm}"
     height: 32px
-  form-input-lg:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    borderColor: "{colors.hairline}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.sm}"
-    padding: "0px {spacing.sm}"
-    height: 48px
   badge-secondary:
     backgroundColor: "{colors.canvas-soft}"
     textColor: "{colors.body}"
     typography: "{typography.caption}"
     rounded: "{rounded.full}"
     padding: "0px {spacing.xs}"
-  pricing-card:
+  card:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    typography: "{typography.body-md}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.md}"
+    shadow: "Level 2"
+  card-soft:
+    backgroundColor: "{colors.canvas-soft}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.lg}"
+  panel-settings:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.lg}"
+    shadow: "Level 2"
+  modal-card:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.lg}"
+    shadow: "Level 5"
+  dropdown-surface:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.md}"
+    shadow: "Level 4"
+  table-container:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.lg}"
+    shadow: "Level 2"
+  table-header-cell:
+    backgroundColor: "{colors.canvas-soft}"
+    textColor: "{colors.mute}"
+    typography: "{typography.caption-mono}"
+    rowBorder: "{colors.hairline}"
+  data-table-cell:
+    typography: "{typography.body-sm}"
+    cellPadding: "{spacing.xs} {spacing.sm}"
+    rowBorder: "{colors.hairline}"
+  app-shell-sidebar:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.xl}"
-  pricing-card-featured:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
-    typography: "{typography.body-md}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.xl}"
-  logo-strip:
-    backgroundColor: "{colors.canvas}"
+    borderColor: "{colors.hairline}"
+    width: 240px
+  app-shell-nav-row:
     textColor: "{colors.body}"
+    activeIndicator: "{colors.primary}"
+    rounded: "{rounded.sm}"
+    padding: "{spacing.xs} {spacing.sm}"
+  sidebar-section-label:
+    textColor: "{colors.mute}"
+    typography: "{typography.caption}"
+    transform: uppercase
+    letterSpacing: wide
+  board-column:
+    backgroundColor: "{colors.canvas-soft-2}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.xl}"
+    width: 288px
+  board-card:
+    backgroundColor: "{colors.card}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.sm}"
+    shadow: "Level 1"
+  status-badge:
+    typography: "{typography.caption}"
+    structure: "dot + written label"
+  empty-state:
+    backgroundColor: "{colors.card}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.md}"
+    padding: "{spacing.3xl}"
+  toast:
+    backgroundColor: "{colors.card}"
+    rounded: "{rounded.md}"
+    padding: "{spacing.sm} {spacing.md}"
     typography: "{typography.body-sm}"
-    padding: "{spacing.lg} {spacing.xl}"
+  kbd-hint:
+    backgroundColor: "{colors.muted}"
+    textColor: "{colors.mute}"
+    borderColor: "{colors.hairline}"
+    typography: "{typography.caption-mono}"
+    rounded: "{rounded.xs}"
   hero-band:
     backgroundColor: "{colors.canvas}"
     textColor: "{colors.ink}"
     typography: "{typography.display-xl}"
-    padding: "{spacing.4xl} {spacing.lg}"
-  feature-mesh-band:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    typography: "{typography.display-lg}"
     padding: "{spacing.5xl} {spacing.lg}"
   showcase-band-light:
     backgroundColor: "{colors.canvas-soft}"
@@ -311,426 +330,315 @@ components:
     textColor: "{colors.on-primary}"
     typography: "{typography.display-lg}"
     padding: "{spacing.5xl} {spacing.lg}"
-  footer:
+  code-editor-mockup:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.code}"
+    rounded: "{rounded.md}"
+    padding: "{spacing.lg}"
+    shadow: "Level 3"
+  nav-cta-ghost:
     backgroundColor: "{colors.canvas}"
-    textColor: "{colors.body}"
-    typography: "{typography.body-sm}"
-    padding: "{spacing.4xl} {spacing.lg}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    typography: "{typography.body-sm-strong}"
+    rounded: "{rounded.sm}"
+    padding: "0px {spacing.xs}"
+    height: 28px
   link-inline:
     textColor: "{colors.link}"
     typography: "{typography.body-md}"
-  banner-marketing:
-    backgroundColor: "{colors.canvas-soft}"
-    textColor: "{colors.body}"
-    typography: "{typography.body-sm}"
-    rounded: "{rounded.full}"
-    padding: "{spacing.xs} {spacing.sm}"
-
-  # ─── Examples (illustrative) — auto-derived; resolve any TO_FILL markers below ───
-  ex-pricing-tier:
-    description: "Default tier card. Mirrors pricing-card chrome on canvas-soft surface with a hairline border."
-    backgroundColor: "{colors.canvas-soft}"
-    textColor: "{colors.ink}"
-    borderColor: "{colors.hairline}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.xl}"
-  ex-pricing-tier-featured:
-    description: "Featured tier — polarity-flipped to ink primary with white text and white CTA."
-    backgroundColor: "{colors.ink}"
-    textColor: "{colors.on-primary}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.xl}"
-  ex-product-selector:
-    description: "What's Included summary card — repurposed for the brand's GPU / inference / Pro feature tiers."
-    backgroundColor: "{colors.canvas-soft}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.lg}"
-  ex-cart-drawer:
-    description: "Subscription summary — line items per add-on (NOT a literal e-commerce cart)."
-    backgroundColor: "{colors.canvas}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.lg}"
-    item-divider: "{colors.hairline}"
-  ex-app-shell-row:
-    description: "Sidebar nav row. Active state uses brand primary as a left-edge indicator bar."
-    backgroundColor: "{colors.canvas}"
-    activeIndicator: "{colors.primary}"
-    rounded: "{rounded.sm}"
-    padding: "{spacing.xs} {spacing.sm}"
-  ex-data-table-cell:
-    description: "Mirrors the brand's table chrome. Header uses caption-mono uppercase mono; body uses body-sm."
-    headerBackground: "{colors.canvas-soft}"
-    headerTypography: "{typography.caption-mono}"
-    bodyTypography: "{typography.body-sm}"
-    cellPadding: "{spacing.xs} {spacing.sm}"
-    rowBorder: "{colors.hairline}"
-  ex-auth-form-card:
-    description: "Sign-in / sign-up card. Mirrors card-marketing-large chrome with form-input primitives inside."
-    backgroundColor: "{colors.canvas-soft}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.xl}"
-  ex-modal-card:
-    description: "Modal dialog surface — same chrome as card-marketing-large with Level 5 modal shadow."
-    backgroundColor: "{colors.canvas}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.xl}"
-  ex-empty-state-card:
-    description: "Empty-state illustration frame. Generous padding on canvas-soft."
-    backgroundColor: "{colors.canvas-soft}"
-    rounded: "{rounded.lg}"
-    padding: "{spacing.3xl}"
-    captionTypography: "{typography.body-md}"
-  ex-toast:
-    description: "Toast notification surface — flat-cornered card-marketing chrome with Level 4 shadow."
-    backgroundColor: "{colors.canvas}"
-    rounded: "{rounded.md}"
-    padding: "{spacing.sm} {spacing.md}"
-    typography: "{typography.body-sm}"
-
 ---
-
 
 ## Overview
 
-Vercel is a developer-platform brand — the page is a deployment dashboard's marketing surface, written for engineers who already know the syntax. It earns that posture with one of the cleanest stark systems on the web: near-white `{colors.canvas-soft}` body background, ink-near-black `{colors.ink}` text, a 200-step gray scale that gives every divider, border, and disabled state its own deliberate step. The only place the brand introduces colour at marketing scale is the multi-stop mesh gradient (`{colors.gradient-develop-start}` → `{colors.gradient-preview-end}` → `{colors.gradient-ship-start}` → cyan / magenta / amber) that floats in atmospheric backdrops, never miniaturised to a swatch. That gradient is the entire decoration system.
+GitSquad is a multi-agent orchestration product: a console where a developer watches autonomous agents pick up GitHub issues, work in a repository, and report back. The interface has to carry a lot of machine state — agent reachability, task progress, token spend, live logs — without turning into a dashboard of competing widgets. The design language answers that with restraint: a near-white `{colors.canvas-soft}` body, ink-near-black `{colors.ink}` text, a quiet gray ladder that gives every divider and disabled state its own deliberate step, and exactly one loud element — the mesh gradient — which appears at hero scale only and nowhere else.
 
-Type is the second decisive voice. The brand's own custom geometric sans (Geist) carries display, body, button — everything narrative — at weight 600 for display, 500 for buttons, 400 for body. A matching monospaced face (Geist Mono) carries technical labels: terminal mockups, code blocks, sometimes filename captions. Headlines are sentence-case with aggressive negative letter-spacing (`-2.4px` at 48 px hero) — the brand never letter-spaces positively, never goes uppercase outside of mono labels.
+Type carries the second half of the job. Headlines are set in a geometric sans at weight 600 with aggressive negative tracking; everything that reports machine state — statuses, token counts, log lines, model identifiers, keyboard hints — is set in a monospaced face at 12–13 px. That split is the information architecture: narrative text is sans, telemetry is mono. A reader can tell at a glance which words are the product talking and which are the machine talking.
 
-Surfaces use a four-step ladder: `{colors.canvas}` (pure white for cards), `{colors.canvas-soft}` 98% (the page body), `{colors.canvas-soft-2}` 95% (occasional inset region), `{colors.primary}` (the deep ink-near-black used as the polarity-flipped band when a section needs the dark mode treatment). Shadows are exceptionally subtle — every elevated card carries a stacked shadow built from `0px 1px 1px #00000005` + `0px 2px 2px #0000000a` + an inset border. Cards never float on heavy drop-shadow; they sit on the page held by hairline + soft glow.
+Surfaces use a four-step ladder: `{colors.canvas}` for cards and dialogs, `{colors.canvas-soft}` for the page body, `{colors.canvas-soft-2}` for inset regions (sidebar hovers, code blocks, table headers), and `{colors.primary}` for the polarity-flipped dark band. Elevation is built from stacked small shadows plus an inset hairline ring, never a single heavy drop-shadow — cards sit *on* the page rather than floating above it.
+
+> **Provenance.** This visual language is an interpretation of the design language Vercel publishes on its marketing site — the surface ladder, the ink-primary CTA, the stacked-shadow elevation levels, the mesh gradient and the Geist type family all originate there. GitSquad adapts it to a console rather than a marketing site. The token names below are GitSquad's own (`web/app/globals.css` is the source of truth); nothing here should be read as an official Vercel specification.
 
 **Key Characteristics:**
-- A single black-ink primary CTA `{colors.primary}` carries every conversion target, paired with white-on-white `button-secondary` for the secondary action. The brand uses 100 px pill shape for marketing CTAs and a tight 6 px square shape for in-app nav buttons.
-- A multi-stop mesh gradient (cyan-blue-magenta-amber) is the only decorative chrome — used at hero scale and inside feature-band atmospheric backdrops. It is the brand.
-- Every section eyebrow and small label uses the monospace face `{typography.caption-mono}` or `{typography.code}`; everything else is in the geometric sans.
-- Subtle stacked-shadow elevation — three offsets layered with 4-12 % black opacity — never a single heavy drop-shadow.
-- A complete 100–1000 gray + blue + red + amber + green + teal + purple + pink colour scale exists as a system token set, but the marketing surface uses only the `100`, `1000`, and `700`-level tones; the rest stay in the design-system tokens for in-product surfaces.
-- An "Active CPU" pricing rhythm: `pricing-card` lays out 3-up on the pricing page with `pricing-card-featured` (Pro tier) polarity-flipped to `{colors.primary}` against white-card siblings.
+- A single ink primary `{colors.primary}` carries every affirmative action. There is no sixth accent colour and no green "success" hue — `{colors.success}` aliases the link blue.
+- The multi-stop mesh gradient (blue / violet / magenta / teal / amber) is the only decorative chrome, and it appears at hero scale only.
+- Status is never communicated by colour alone. Every status renders as a dot plus a written label so it survives colour-blindness and grayscale.
+- Every machine-reported value is set in `{typography.caption-mono}` or `{typography.code}`; every narrative sentence is set in the geometric sans.
+- Elevation is stacked (three or four small offsets at 4–12 % black) with an inset hairline ring, never one heavy drop-shadow.
+- Radius is a two-scale system: 6 px `{rounded.sm}` for in-app controls and 100 % pill for marketing CTAs. The two scales coexist deliberately and are never mixed on one screen.
+- Surfaces are cycled `{colors.canvas-soft}` → `{colors.canvas}` → `{colors.primary}`; the polarity-flipped dark band is the primary depth cue between sections.
 
 ## Colors
 
 ### Brand & Accent
-- **Ink** (`{colors.primary}` — `#171717`): The single primary CTA color. Black-near-pure ink that carries every Sign Up pill, every footer CTA, the dark-band polarity-flip. Used as text color throughout the page on light surfaces. (Resolved from `--ds-gray-1000`.)
-- **Cyan** (`{colors.cyan}` — `#50e3c2`): A signature mint-cyan used in the brand gradient and inside Geist-system spotlight tokens. Visible inside the hero gradient stops.
-- **Highlight Pink** (`{colors.highlight-pink}` — `#ff0080`): The brand's highlight magenta, used as the high-saturation stop in the preview-gradient pair.
-- **Violet** (`{colors.violet}` — `#7928ca`): The deep purple used as the start of the preview-gradient and inside developer-console highlights.
-- **Link Blue** (`{colors.link}` — `#0070f3`): The brand's primary link color and the legacy `--geist-success` semantic.
+- **Ink** (`{colors.primary}` — `#171717`): The single primary CTA colour. Carries every affirmative button, the active nav indicator, the polarity-flipped dark band and the `::selection` background. Also the default `{colors.ink}` text colour on light surfaces.
+- **Link Blue** (`{colors.link}` — `#0070f3`): Inline links and the "info / running" semantic. In dark mode it is the one accent that keeps its light-mode value.
+- **Violet** (`{colors.violet}` — `#7928ca`) and **Cyan Deep** (`{colors.cyan-deep}` — `#29bc9b`): Telemetry series colours. `{colors.violet}` marks cache-read tokens, `{colors.cyan-deep}` marks output tokens.
 
 ### Surface
-- **Canvas** (`{colors.canvas}` — `#ffffff`): The pure-white card / dialog / modal surface.
-- **Canvas Soft** (`{colors.canvas-soft}` — `#fafafa`): The default page background — 98 % white. Almost every section sits on this tone.
-- **Canvas Soft 2** (`{colors.canvas-soft-2}` — `#f5f5f5`): A slightly deeper inset surface for "code editor inner background", template-card hover states, and dropdown menus.
-- **Hairline** (`{colors.hairline}` — `#ebebeb`): 1 px dividers — table rows, card borders, input borders.
-- **Hairline Strong** (`{colors.hairline-strong}` — `#a1a1a1`): The 500-level gray, used as the slightly-stronger divider on light bands and as the deemphasised text color.
+- **Canvas** (`{colors.canvas}` — `#ffffff`): Card, dialog, sidebar and dropdown surface.
+- **Canvas Soft** (`{colors.canvas-soft}` — `#fafafa`): The default page background. `body` resolves to this via `--background`.
+- **Canvas Soft 2** (`{colors.canvas-soft-2}` — `#f5f5f5`): Inset regions — sidebar row hover, table header row, inline code, code blocks, the daemon pairing card.
+- **Hairline** (`{colors.hairline}` — `#ebebeb`): The 1 px divider used by every card border, table row, sidebar edge and input outline.
+- **Hairline Strong** (`{colors.hairline-strong}` — `#a1a1a1`): The heavier divider, used for card hover borders, the sidebar resize handle on hover, blockquote rules and the focus ring.
 
 ### Text
-- **Ink** (`{colors.ink}` — `#171717`): Every heading and body paragraph on light surfaces.
-- **Body** (`{colors.body}` — `#4d4d4d`): Secondary text — sub-headings, body captions, nav-link inactive text, footer column body.
-- **Mute** (`{colors.mute}` — `#888888`): Lowest-priority text — placeholder text, fine print, low-key labels.
+- **Ink** (`{colors.ink}` — `#171717`): Every heading and primary body paragraph on light surfaces.
+- **Body** (`{colors.body}` — `#4d4d4d`): Secondary text — supporting paragraphs, table cells, sidebar inactive rows, footer copy. Also the TipTap editor's default text colour.
+- **Mute** (`{colors.mute}` — `#888888`): Lowest-priority text — sidebar section labels, placeholders, keyboard hints, empty-state supporting copy.
 - **On Primary** (`{colors.on-primary}` — `#ffffff`): All text on `{colors.primary}` surfaces.
 
 ### Semantic
-- **Success / Link** (`{colors.success}` — `#0070f3`): The brand's legacy success indicator doubles as the primary link color. Visible underline-on-hover for inline body links.
-- **Link Deep** (`{colors.link-deep}` — `#0761d1`): The pressed / visited tone for inline links.
-- **Link Bg Soft** (`{colors.link-bg-soft}` — `#d3e5ff`): Soft pastel blue fill for "what's new" pill banners and informational badges.
-- **Error** (`{colors.error}` — `#ee0000`): Validation red for destructive actions and form errors.
-- **Error Soft** (`{colors.error-soft}` — `#f7d4d6`): Soft pastel red for destructive-state backgrounds.
-- **Error Deep** (`{colors.error-deep}` — `#c50000`): Pressed / deep destructive state.
-- **Warning** (`{colors.warning}` — `#f5a623`): Caution / pending status indicator.
-- **Warning Soft** (`{colors.warning-soft}` — `#ffefcf`) / **Warning Deep** (`{colors.warning-deep}` — `#ab570a`): Background + pressed variants.
+- **Success** (`{colors.success}` — `#0070f3`): Deliberately identical to `{colors.link}`. GitSquad has no green. "Healthy" is rendered as the link blue, which keeps the palette to ink + gray + blue + the gradient stops. It is the first segment of the token-usage chart (input tokens).
+- **Warning** (`{colors.warning}` — `#f5a623`): Caution and pending. Used as the cache-write token series and the `in_progress` board column fill (via `{colors.warning-soft}`).
+- **Warning Soft** (`{colors.warning-soft}` — `#ffefcf`) / **Warning Deep** (`{colors.warning-deep}` — `#ab570a`): Soft fill and readable-text variants of warning.
+- **Error** (`{colors.error}` — `#ee0000`): Destructive actions and validation failures. Bound to the `--destructive` token that the vendored shadcn primitives consume, so `Button variant="destructive"` and `aria-invalid` outlines pick it up automatically.
+- **Error Soft** (`{colors.error-soft}` — `#f7d4d6`): The `blocked` board column fill.
+- **Violet Soft** (`{colors.violet-soft}` — `#d8ccf1`): The `in_review` board column fill.
+- **Cyan Soft** (`{colors.cyan-soft}` — `#aaffec`): The `done` board column fill.
+- **Link Deep** (`{colors.link-deep}` — `#0761d1`) / **Link Bg Soft** (`{colors.link-bg-soft}` — `#d3e5ff`): Pressed link tone and soft informational fill.
 
-### Brand Gradient
-The brand's signature decoration is a three-pair gradient stack:
-- **Develop** (`{colors.gradient-develop-start}` `#007cf0` → `{colors.gradient-develop-end}` `#00dfd8`) — the blue-to-teal pair used to mark the "deploy" / "develop" rhythm.
-- **Preview** (`{colors.gradient-preview-start}` `#7928ca` → `{colors.gradient-preview-end}` `#ff0080`) — the violet-to-pink pair used for "preview" surfaces.
-- **Ship** (`{colors.gradient-ship-start}` `#ff4d4d` → `{colors.gradient-ship-end}` `#f9cb28`) — the coral-to-amber pair used for "ship" surfaces.
+### Primitives & Gradient
+- **Blue** (`{colors.gradient-blue}` — `#007cf0`), **Violet** (`{colors.gradient-violet}` — `#7928ca`), **Magenta** (`{colors.gradient-magenta}` — `#ff0080`), **Teal** (`{colors.gradient-teal}` — `#00dfd8`), **Amber** (`{colors.gradient-amber}` — `#f9cb28`): The five mesh-gradient stops. Treated as one object — never cropped to a single colour, never reordered, never miniaturised to a swatch or icon.
+- The same five values are exposed as `--chart-1`…`--chart-5` so a future charting library inherits the brand palette.
 
-The three pairs collapse into a single multi-color mesh gradient when used as the hero atmospheric backdrop. Treat the gradient as one unified object — do not crop down to a single colour, do not reorder the stops, and do not miniaturise. Used at hero scale only.
+### Dark Mode
+
+The console ships a full dark theme (`.dark`), toggled from the sidebar. It is a polarity flip of the same ladder, not a second palette:
+
+| Token | Light | Dark |
+|---|---|---|
+| `{colors.canvas}` | `#ffffff` | `#171717` |
+| `{colors.canvas-soft}` | `#fafafa` | `#0a0a0a` |
+| `{colors.canvas-soft-2}` | `#f5f5f5` | `#262626` |
+| `{colors.ink}` | `#171717` | `#ededed` |
+| `{colors.body}` | `#4d4d4d` | `#a1a1a1` |
+| `{colors.mute}` | `#888888` | `#888888` |
+| `{colors.hairline}` | `#ebebeb` | `#ffffff14` |
+| `{colors.primary}` | `#171717` | `#ededed` |
+| `{colors.link}` | `#0070f3` | `#0070f3` |
+
+Dark mode carries one deliberate difference: borders become translucent white (`#ffffff14`) instead of an opaque gray, so a hairline over a card and over the page body read the same.
+
+**Known gap.** The pastel "soft" fills used by the board columns (`{colors.warning-soft}`, `{colors.violet-soft}`, `{colors.cyan-soft}`, `{colors.error-soft}`) and the text tones `{colors.success}`, `{colors.link-deep}`, `{colors.link-bg-soft}`, `{colors.warning-deep}` have no `.dark` override, so they keep their light values on a dark page. Column headers in particular lose contrast in dark mode. Dark variants for the soft/strong pairs are outstanding work; do not add new surfaces that depend on them until they exist.
 
 ## Typography
 
 ### Font Family
-Two custom faces carry the entire system:
+Two faces carry the entire system, both loaded through `next/font/google` in `web/app/layout.tsx` and exposed to CSS as `--font-geist-sans` and `--font-geist-mono` (mapped to `--font-sans`, `--font-mono` and `--font-heading` in `globals.css`):
 
-1. **A custom geometric sans** (extracted as `Geist`) for every display, body, button, link, and label. Weights 400 / 500 / 600 are the working set; the face never appears in 700 or heavier. Display sizes are tracked aggressively negative (`-2.4 px` at 48 px hero, `-1.28 px` at 32 px section); body stays at neutral or slightly-negative tracking.
-2. **A custom monospaced face** (extracted as `Geist Mono`) for terminal mockups, code blocks, and small mono-caption labels — anything that wants to signal "technical." Weight 400 only at 12 – 13 px. Tracking neutral.
+1. **Geist** — every display, body, button, link and label. Weights 400 / 500 / 600 are the working set; 700 or heavier never appears. Display sizes are tracked aggressively negative (`-0.04em` on the hero), body text stays neutral or slightly negative, and `body` sets `font-feature-settings: "ss01", "ss02"` to switch on Geist's geometric alternates.
+2. **Geist Mono** — statuses, token counts, model identifiers, log lines, inline code, code blocks and keyboard hints. Weight 400 at 12–13 px, neutral tracking. `{typography.code}` is the only place mono appears above 13 px.
 
-A condensed display sans (`Space Grotesk`) is loaded as a third face for occasional editorial moments but does not render as the primary face anywhere in the captured surfaces.
+Both faces are open source under the SIL Open Font License and are fetched at build time; there is no self-hosted font binary and no proprietary face in the system.
 
-### Hierarchy
+### Type Scale
 
-| Token | Size | Weight | Line Height | Letter Spacing | Use |
-|---|---|---|---|---|---|
-| `{typography.display-xl}` | 48px | 600 | 48px | -2.4px | Hero headline ("Build and deploy on the AI Cloud."). |
-| `{typography.display-lg}` | 32px | 600 | 40px | -1.28px | Section headlines ("Your frontend, delivered.", "A compute model for all workloads."). |
-| `{typography.display-md}` | 24px | 600 | 32px | -0.96px | Card-cluster headlines, pricing-tier names. |
-| `{typography.display-sm}` | 20px | 600 | 28px | -0.6px | Inline display micro-headings. |
-| `{typography.body-lg}` | 18px | 400 | 28px | 0 | Lead paragraphs under section headlines. |
-| `{typography.body-md}` | 16px | 400 | 24px | 0 | Default body paragraph. |
-| `{typography.body-md-strong}` | 16px | 500 | 24px | 0 | Bolded inline body. |
-| `{typography.body-sm}` | 14px | 400 | 20px | -0.28px | Secondary body, nav-link text, button-md labels. |
-| `{typography.body-sm-strong}` | 14px | 500 | 20px | -0.28px | Nav CTA labels, table-row emphasis. |
-| `{typography.caption}` | 12px | 400 | 16px | 0 | Footer secondary lines, badge labels. |
-| `{typography.caption-mono}` | 12px | 400 | 16px | 0 | Section eyebrows and label captions that want a technical voice. |
-| `{typography.code}` | 13px | 400 | 20px | 0 | Inline code, terminal mockups, command snippets. |
-| `{typography.button-md}` | 14px | 500 | 20px | 0 | Small / nav-scale button labels. |
-| `{typography.button-lg}` | 16px | 500 | 24px | 0 | Marketing-scale pill button labels. |
+The frontmatter above names the roles; this table maps each role to the Tailwind utility actually used in the codebase, since the console is built with Tailwind v4 rather than with raw pixel values.
+
+| Role | Utility | Size / Weight / Tracking | Use |
+|---|---|---|---|
+| `{typography.display-xl}` | `text-4xl sm:text-5xl lg:text-6xl` | 36→60px / 600 / `-0.04em` | Marketing hero headline only. `leading-[1.05]`. |
+| `{typography.display-lg}` | `text-3xl sm:text-4xl` | 30→36px / 600 / `-0.04em` | Section headlines in marketing bands. |
+| `{typography.display-md}` | `text-2xl` | 24px / 600 / `-0.02em` | Page titles in the console. |
+| `{typography.display-sm}` | `text-xl` | 20px / 600 / `-0.015em` | Dialog titles, settings section headings. |
+| `{typography.body-lg}` | `text-lg` | 18px / 400 | Marketing lead paragraph under a section headline. |
+| `{typography.body-md}` | `text-base` | 16px / 400 | Default paragraph, marketing body. |
+| `{typography.body-md-strong}` | `text-base font-medium` | 16px / 500 | Emphasised inline copy. |
+| `{typography.body-sm}` | `text-sm` | 14px / 400 | The console's default body size — table cells, card copy, descriptions. |
+| `{typography.body-sm-strong}` | `text-sm font-medium` | 14px / 500 | Nav CTA labels, list-row titles, form labels. |
+| `{typography.caption}` | `text-xs` | 12px / 400 | Badges, sidebar section labels, dense metadata. |
+| `{typography.caption-mono}` | `font-mono text-xs` | 12px / 400 | Table headers, keyboard hints, model identifiers. |
+| `{typography.code}` | `font-mono text-[13px]` | 13px / 400 | Inline code and code blocks. |
+| `{typography.button-md}` | `text-sm font-medium` | 14px / 500 | In-app button labels (sizes `sm` / `default` / `lg`). |
+| `{typography.button-lg}` | `text-base font-medium` | 16px / 500 | Marketing pill CTAs (size `pill`). |
 
 ### Principles
-- **Negative tracking is part of the voice.** Display sizes use aggressive `-2.4` to `-0.6` px tracking. Reverting to default tracking breaks the brand.
-- **Sentence-case headlines, period-terminated.** Headlines like "Build and deploy on the AI Cloud." end with a deliberate period — that punctuation is part of the brand's voice.
-- **Mono for the technical layer only.** Section eyebrows, code blocks, terminal mockups. Body paragraphs never set in mono.
-- **Weight 600 is the display ceiling.** The geometric sans never appears at 700 / 800. The brand reads as a calmer system because of this.
-
-### Note on Font Substitutes
-The two primary faces are proprietary (custom-cut for the brand). Open-source substitutes:
-- **Geometric sans** — *Inter* (400 / 500 / 600) is the closest stylistic match; `font-feature-settings: "ss01", "ss02"` enables the geometric alternates. *Satoshi* is a passable second choice.
-- **Monospace** — *JetBrains Mono* (400) at 12 – 13 px matches the technical voice. *IBM Plex Mono* is the second-best option.
+- **Weight 600 is the display ceiling.** The sans never appears at 700+. The interface reads as calm partly because of this.
+- **Negative tracking is part of the voice.** Display sizes use `-0.04em` down to `-0.015em`. Reverting to default tracking makes the headline look generic.
+- **Sentence-case headlines, period-terminated.** "Your autonomous developer team on GitHub." — the full stop is part of the voice, not a typo.
+- **Mono is the voice of the machine.** Statuses, counts, ids, logs and code. A narrative sentence is never set in mono.
+- **Uppercase is reserved for `{typography.caption}` labels only** — sidebar section headers ("Workspace", "Account"). Headlines are never all-caps.
 
 ## Layout
 
 ### Spacing System
-- **Base unit**: 4 px. The brand's `--geist-space` token is exactly 4 px and every captured value is a multiple of 4.
-- **Tokens**: `{spacing.xxs}` 4 px · `{spacing.xs}` 8 px · `{spacing.sm}` 12 px · `{spacing.md}` 16 px · `{spacing.lg}` 24 px · `{spacing.xl}` 32 px · `{spacing.2xl}` 40 px · `{spacing.3xl}` 48 px · `{spacing.4xl}` 64 px · `{spacing.5xl}` 96 px · `{spacing.6xl}` 128 px · `{spacing.section}` 192 px.
-- **Section padding**: marketing bands use `{spacing.4xl}` to `{spacing.5xl}` top/bottom. Hero bands stretch to `{spacing.section}` to give the mesh gradient room to breathe.
-- **Card interior padding**: marketing cards sit at `{spacing.lg}` to `{spacing.xl}`; template-grid cards stay tighter at `{spacing.md}` because they sit in a denser grid.
-- **Inline gap**: button rows, nav rows, and chip rows use `{spacing.sm}` to `{spacing.md}` between siblings. The brand's `--geist-gap` is exactly 24 px.
+- **Base unit**: 4 px. Tailwind v4's `--spacing` is `0.25rem`, and every value in the system is a multiple of it.
+- **Tokens**: `{spacing.xxs}` 4 px (`1`) · `{spacing.xs}` 8 px (`2`) · `{spacing.sm}` 12 px (`3`) · `{spacing.md}` 16 px (`4`) · `{spacing.lg}` 24 px (`6`) · `{spacing.xl}` 32 px (`8`) · `{spacing.2xl}` 40 px (`10`) · `{spacing.3xl}` 48 px (`12`) · `{spacing.4xl}` 64 px (`16`) · `{spacing.5xl}` 96 px (`24`).
+- **Marketing bands**: `{spacing.5xl}` (96 px) top and bottom — `px-6 pb-24 pt-24 sm:pt-32` on the hero. The gradient needs that room.
+- **Card interior padding**: `{spacing.md}` to `{spacing.lg}`. Settings panels use `p-5`; the marketing feature cards use `p-6`.
+- **Inline gaps**: `{spacing.xs}` to `{spacing.sm}` between siblings in a button row, nav row or chip row.
 
 ### Grid & Container
-- **Max width**: ~1400 px (`--ds-page-width`); the legacy `--geist-page-width` is 1200 px and still appears on some marketing surfaces. Content centres with horizontal gutters of `{spacing.lg}` 24 px on desktop, `{spacing.md}` 16 px on mobile.
+- **Marketing max width**: `max-w-[1200px]`, centred with `px-6` gutters. Headline blocks cap narrower (`max-w-4xl`) and lead paragraphs narrower still (`max-w-xl`) so the measure stays readable.
+- **Console layout**: a full-height flex shell. The sidebar is a resizable fixed-width column (`240px` default) with `border-r border-hairline bg-canvas`; the main region scrolls independently. The board scrolls horizontally inside the main region.
 - **Column patterns**:
-  - Three-feature row: 3-up at desktop, 1-up at mobile (rows like "Web Apps / Composable Commerce / Multi-tenant Platforms").
-  - Tab pill row: 5-up centred row of `tab-ghost` pills.
-  - Template-grid cluster: 5-up at desktop, scaling to 1-up at mobile.
-  - Pricing tier grid: 3-up at desktop with the middle tier polarity-flipped.
-  - Logo strip: ~5 logos wide, single row.
+  - Marketing feature row: 3-up at `md` and above, 1-up below. Titles `text-base font-semibold`, body `text-sm`.
+  - Board: 7 equal fixed-width (`288px`) columns in a horizontally scrolling row — never a responsive grid, because a board column must not change width as issues move.
+  - Card grids: 2-up at `md`, 3-up at `lg`, 1-up at mobile.
 
 ### Whitespace Philosophy
-The mesh gradient does most of the heavy decorative lifting; whitespace separates the bands. Section spacing is generous — `{spacing.4xl}` to `{spacing.5xl}` between bands lets the gradient breathe. Inside a card, the headline/paragraph stack is tight (`{spacing.xs}` 8 px gap), then a wider gap before the CTA cluster. The page reads as engineered — large gaps + tight interior, never the other way around.
+The mesh gradient does the decorative work, so whitespace is left to separate bands rather than to fill them. Marketing sections are generous (`{spacing.5xl}` between bands) while interiors stay tight: a heading/body stack uses `{spacing.xs}` gaps, then a wider gap before the CTA row. In the console the opposite applies — density is the point, and vertical rhythm comes from consistent `p-4`/`p-5` card padding rather than large gaps. The rule in both cases is the same: never a uniform stack of same-sized gaps.
 
 ### Responsive Strategy
 
-#### Breakpoints
+Breakpoints are Tailwind v4's defaults, unmodified — `globals.css` overrides the radius and colour scales but not `--breakpoint-*`:
 
 | Name | Width | Key Changes |
 |---|---|---|
-| Mobile | < 600px | Hero stacks; nav collapses to hamburger; 3-up feature grids drop to 1-up; tab pill row enables horizontal scroll. |
-| Tablet | 600–959px | 3-up grids drop to 2-up; nav still horizontal. |
-| Desktop | 960–1199px | Full 3-up grids; pricing 3-up. |
-| Wide | 1200–1399px | Container caps at 1400 px content width. |
-| Ultra-wide | ≥ 1400px | Content stays centred at 1400 px; bands stretch edge-to-edge in colour but content holds the max-width. |
+| Base | < 640px | Marketing hero stacks and drops to `text-4xl`; nav collapses; feature rows go 1-up; board columns keep their 288px width and scroll horizontally. |
+| `sm` | ≥ 640px | Hero steps up to `text-5xl`; CTA row becomes horizontal (`sm:flex-row`); padding grows to `sm:pt-32`. |
+| `md` | ≥ 768px | Feature rows go 3-up; card grids go 2-up. |
+| `lg` | ≥ 1024px | Hero reaches `text-6xl`; card grids go 3-up; the console sidebar is shown. |
+| `xl` | ≥ 1280px | Extra breathing room on wide marketing bands. |
+
+Usage is concentrated at `sm:` (35 occurrences) and `lg:` (11) — the interface is designed mobile-and-desktop, with single-step stops in between rather than a tuned tablet layout.
 
 #### Touch Targets
-The `button-primary` pill renders at ~32 px tall in nav and ~48 px tall in marketing contexts. Marketing CTAs comfortably meet WCAG AAA at all breakpoints; nav buttons inflate touch area through `{spacing.xs}` padding on mobile to meet the 44 × 44 px floor.
+The `button-default` size is 32 px tall and the `button-lg` size 36 px, both below the 44 px recommendation, so in-app controls rely on `{spacing.xs}` padding and generous row heights to reach an adequate hit area. Marketing CTAs use the `pill` size at 48 px and comfortably clear the floor. Anything below 32 px should be treated as a defect.
 
 #### Collapsing Strategy
-- **Nav**: full link row + Ask AI / Log In / Sign Up pills at desktop. Collapses to logo + hamburger at mobile with the menu opening as a full-overlay.
-- **Hero**: mesh gradient stays centred; headline + body stack vertically at all breakpoints (the brand doesn't use a split-hero pattern).
-- **Three-feature row**: 3-up → 2-up → 1-up at the breakpoints above; cards keep their `{rounded.md}` 8 px shape across all viewports.
-- **Pricing card grid**: 3-up at desktop, vertical stack at mobile with `pricing-card-featured` always sitting in the middle.
-- **Template grid**: 5-up → 3-up → 2-up → 1-up. Each `template-card` keeps its 16:9 aspect on the image.
+- **Nav**: logo plus a ghost CTA at base; the full link row and account menu appear from `sm` up.
+- **Hero**: the gradient stays centred and full-bleed at the top of the band; headline and body stack vertically at every breakpoint. There is no split-hero pattern.
+- **Feature rows**: 3-up → 1-up, cards keeping their `{rounded.lg}` shape.
+- **Board**: never collapses. Columns hold their width and the row scrolls, because a reflowed board stops being a board.
+- **Tables**: the workspace and daemon lists switch to a card grid below `md` via an explicit view switcher the user can also drive manually.
 
-#### Image Behavior
-- **Mesh gradient**: rendered as inline SVG or canvas-painted gradient; scales fluidly with the hero container; never crops, never tiles.
-- **Customer logos**: rendered as monochrome SVGs in the logo strip; consistent 24 px height.
-- **Code editor mockup**: dark `{colors.primary}` rectangle with mono text rendered inside; treated as an image at the layout level.
-- **Template thumbnails**: 16:9 landscape inside `{rounded.md}` card chrome; lazy-loaded; consistent grayscale palette in the placeholder state.
+#### Imagery
+- **Mesh gradient**: rendered as one absolutely-positioned element (`MeshGradient`, `aria-hidden`) with `h-[480px] opacity-50` at the top of the hero. It scales with the container and is never cropped to a frame or tiled.
+- **Code editor mockup**: a dark `{colors.primary}` rectangle (`bg-[#0a0a0a]`) with mono text inside, treated as a single layout object rather than as real editable UI.
+- **Provider marks**: monochrome brand SVGs (`provider-icon.tsx`) and the Google/GitHub marks at consistent optical size. Brand assets are third-party trademarks used nominatively; see the notices requirement in the review notes.
 
 ## Elevation & Depth
 
+Implemented as five utility classes (`.shadow-level-1` … `.shadow-level-5`) defined in `globals.css`. Every level includes the inset hairline ring, so a card's edge stays crisp regardless of the background beneath it.
+
 | Level | Treatment | Use |
 |---|---|---|
-| Level 0 — Flat | No shadow, no border. | Full-bleed hero bands and the polarity-flipped dark sections. |
-| Level 1 — Inset Hairline | `0 0 0 1px #00000014` inset 1 px border. | Default card chrome — the brand's universal "you can see this card" cue. |
-| Level 2 — Subtle Drop | `0px 1px 1px #00000005, 0px 2px 2px #0000000a` plus inset hairline. | Slightly elevated cards (template-grid, marketing-card). |
-| Level 3 — Soft Stack | `0px 2px 2px #0000000a, 0px 8px 8px -8px #0000000a` plus inset hairline. | The "medium" elevation — feature-grid cards. |
-| Level 4 — Float Stack | `0px 2px 2px #0000000a, 0px 8px 16px -4px #0000000a` plus inset hairline. | "Large" elevation — pricing cards, callout panels. |
-| Level 5 — Modal | `0px 1px 1px #00000005, 0px 8px 16px -4px #0000000a, 0px 24px 32px -8px #0000000f` plus inset hairline. | Modal / dialog surfaces and dropdown menus. |
+| Level 1 — Inset hairline | `inset 0 0 0 1px #00000014` | Board cards, `button-secondary`, the hero announcement badge. The universal "this is a surface" cue. |
+| Level 2 — Subtle drop | Level 1 + `0 1px 1px #00000005, 0 2px 2px #0000000a` | The default card: workspace and daemon cards, table containers, settings panels, the empty-state frame. |
+| Level 3 — Soft stack | Level 1 + `0 2px 2px #0000000a, 0 8px 8px -8px #0000000a` | Hover state of an interactive card; the marketing code panel. |
+| Level 4 — Float stack | Level 1 + `0 2px 2px #0000000a, 0 8px 16px -4px #0000000a` | Dropdown surfaces, the drag preview, the daemon pairing card. |
+| Level 5 — Modal | Level 1 + `0 1px 1px #00000005, 0 8px 16px -4px #0000000a, 0 24px 32px -8px #0000000f` | Dialogs and the sign-out confirmation. |
 
-The brand uses STACKED shadows — multiple small offsets layered to fake natural light — never a single 8-px-blur generic drop. Inset hairline rings are always added so the card edge stays crisp.
+The system uses **stacked** shadows — several small offsets layered to imitate soft light — and never a single large-blur drop. That is what keeps the elevation reading as flat-but-lifted rather than as Material.
 
 ### Decorative Depth
-- **Mesh gradient as atmospheric depth**: the hero's multi-stop gradient is the brand's only "atmospheric" effect — applied as a flat 2-D backdrop rather than a 3-D illustration.
-- **Polarity-flipped dark band as section-depth**: switching the surface from `{colors.canvas-soft}` to `{colors.primary}` (the deep ink) is the brand's chief depth cue between bands.
-- **Inset-shadow + drop-shadow combo**: the cards' combination of an inset 1 px ring and a multi-stop drop produces a "card sits on the page" effect without ever feeling material-heavy.
+- **Mesh gradient as atmosphere**: the only "atmospheric" effect, applied as a flat 2-D backdrop behind the hero, never as a 3-D illustration.
+- **Polarity flip as section depth**: switching a band from `{colors.canvas-soft}` to `{colors.primary}` is the chief depth cue between marketing sections. The console has one such band (the control-centre showcase).
+- **Inset ring + stacked drop**: the combination produces "card sits on the page" without weight.
 
 ## Shapes
 
 ### Border Radius Scale
 
-| Token | Value | Use |
-|---|---|---|
-| `{rounded.none}` | 0px | Full-bleed hero / footer bands. |
-| `{rounded.xs}` | 4px | Tightest inline pill — the `nav-cta-signup` 6-px-radius button (mapped to `xs/sm`). |
-| `{rounded.sm}` | 6px | The brand's `--geist-radius` token — base UI radius for in-app buttons, form inputs, dropdown menus. |
-| `{rounded.md}` | 8px | The brand's `--geist-marketing-radius` token — feature cards, template cards. |
-| `{rounded.lg}` | 12px | Slightly larger card chrome (pricing-card variants). |
-| `{rounded.xl}` | 16px | Largest card chrome — when a card hosts a hero image cap. |
-| `{rounded.pill-sm}` | 64px | Tab-ghost pills inside the "AI Apps / Web Apps / Ecommerce / Marketing / Platforms" row. |
-| `{rounded.pill}` | 100px | The marketing CTA pill — `button-primary`, `button-secondary`, "Start Deploying" pill. |
-| `{rounded.full}` | 9999px | Icon-button circular containers, nav-link ghost pills. |
+| Token | Utility | Value | Use |
+|---|---|---|---|
+| `{rounded.none}` | `rounded-none` | 0px | Full-bleed bands. |
+| `{rounded.xs}` | `rounded-xs` | 4px | Inline code chips, keyboard hints. |
+| `{rounded.sm}` | `rounded-sm` | 6px | Inset-step radius for buttons, inputs, selects and icon buttons (all in-app control sizes). This is the working radius of the console. |
+| `{rounded.md}` | `rounded-md` | 8px | Small drop-down surfaces, empty-state frames, code blocks, the marketing badge tile. |
+| `{rounded.lg}` | `rounded-lg` | 12px | The default card and modal radius — workspace cards, daemon cards, settings panels, dialogs. |
+| `{rounded.xl}` | `rounded-xl` | 16px | Board columns. |
+| `{rounded.2xl}` … `{rounded.4xl}` | `rounded-2xl` … `rounded-4xl` | 20 / 24 / 28px | Declared in `globals.css` for completeness; currently unused. |
+| `{rounded.full}` | `rounded-full` | 9999px | Marketing pill CTAs (`size="pill"` / `"pill-sm"`), badges, status dots, avatars, the announcement banner. |
 
-### Photography Geometry
-- **Mesh gradient**: full-bleed 2-D atmospheric backdrop, never cropped to a frame; treated as the page's wallpaper.
-- **Customer logos**: monochrome SVG, consistent 24 px height in a flex row.
-- **Code editor mockup**: 16:10 dark rectangle, `{rounded.md}` corners.
-- **Template thumbnails**: 16:9 landscape inside `{rounded.md}` chrome.
-- **Showcase imagery**: 2:1 or 16:9 inside `{rounded.lg}` to `{rounded.xl}` chrome with a stacked shadow.
+Two scales coexist and must not be mixed on one screen: an in-app control uses `{rounded.sm}`, a marketing CTA uses `{rounded.full}`.
+
+### Geometry Notes
+- **Mesh gradient**: full-bleed 2-D backdrop, never framed.
+- **Board column**: `w-72` (288px) fixed, `{rounded.xl}`, `border-hairline/50` over a pastel fill.
+- **Code panel**: `{rounded.md}` dark rectangle containing `{typography.code}`.
+- **Status dot**: `size-1.5` (6px) `rounded-full`, always paired with a written label.
+- **Sidebar resize handle**: a 4 px full-height hit area (`w-1`) that turns `{colors.hairline-strong}` on hover.
 
 ## Components
 
 ### Buttons
 
-**`button-primary`** — the canonical 100-px-radius black pill, marketing scale.
-- Background `{colors.primary}`, text `{colors.on-primary}`, label set in `{typography.button-lg}`, padding `0px {spacing.sm}` 12 px, shape `{rounded.pill}` 100 px. Renders ~48 px tall when paired with the marketing flex layout.
+The `Button` primitive (`web/components/ui/button.tsx`) is a `cva` component with six variants and seven sizes. Everything interactive in the console goes through it.
 
-**`button-secondary`** — the white pill paired with the black primary inside marketing bands.
-- Background `{colors.canvas}`, text `{colors.ink}`, same typography + padding as `button-primary`, shape `{rounded.pill}`.
+**Variants**
+- `default` — `bg-primary text-primary-foreground`, hover at 85 % opacity. The affirmative action.
+- `secondary` — `bg-card text-foreground` with a Level 1 shadow. The paired non-committal action.
+- `outline` — `bg-card` with a visible `border-border`. Lower emphasis in dense toolbars.
+- `ghost` — text only, `hover:bg-muted`. Icon buttons in list rows and table rows.
+- `destructive` — `bg-destructive` (`{colors.error}`) with white text. Deleting a workspace, agent or skill.
+- `link` — link-coloured text with an underline on hover, for inline "view details" affordances.
 
-**`button-primary-sm`** — the smaller-scale primary pill used inside nav and pricing-card CTAs.
-- Background `{colors.primary}`, text `{colors.on-primary}`, label set in `{typography.button-md}` (14 px / 500), shape `{rounded.pill}`.
+**Sizes**
+- `default` — `h-8 rounded-sm px-3 text-sm font-medium`. The console's standard button.
+- `sm` — `h-7`, for table toolbars.
+- `lg` — `h-9`, for the primary action in a page header.
+- `pill` — `h-12 rounded-full px-6 text-base font-medium`. Marketing CTAs only.
+- `pill-sm` — `h-8 rounded-full px-4 text-sm font-medium`. Marketing nav CTAs.
+- `icon` / `icon-sm` / `icon-lg` — `size-8` / `size-7` / `size-9` square, `{rounded.sm}`.
 
-**`button-secondary-sm`** — the smaller-scale white pill paired with `button-primary-sm`.
-- Background `{colors.canvas}`, text `{colors.ink}`, same typography + shape as `button-primary-sm`.
+Every button carries `active:translate-y-px` and `focus-visible:ring-3 focus-visible:ring-ring/40`, which is the system's focus treatment: a soft 3 px ring in `{colors.hairline-strong}`, never a hard outline.
 
-**`tab-ghost`** — the centred-row tab pill ("AI Apps / Web Apps / Ecommerce / Marketing / Platforms").
-- Background `{colors.canvas}`, text `{colors.ink}`, label set in `{typography.body-sm}`, padding `0px {spacing.md}`, shape `{rounded.pill-sm}` 64 px.
+### Forms
 
-**`icon-button-circular`** — the circular icon container (often a "?" or arrow inside).
-- Background `{colors.canvas}`, dark icon, 1 px solid hairline border, shape `{rounded.full}`.
+- **`form-input`** — `h-8` (32px), `bg-card`, `border-border` (hairline), `{rounded.sm}`, `text-sm`. This is the console default. `aria-invalid` swaps the border to `{colors.error}` and adds a 3 px `destructive/20` ring, so validation is visible without a separate error component.
+- **Textarea** — same chrome, auto-growing via `field-sizing-content`, `min-h-16`.
+- **Select** — shadcn/Radix `Select`; the trigger reuses the input chrome so a select and an input in the same form row align exactly.
+- **Labels** — `text-sm font-medium text-ink`. Note: several existing forms render a bare `<label>` without `htmlFor`; new forms must associate the label with its control.
 
-**Nav CTAs:**
+### Surfaces
 
-**`nav-cta-signup`** — the small black "Sign Up" button in the nav row.
-- Background `{colors.primary}`, text `{colors.on-primary}`, label `{typography.body-sm-strong}`, padding `0px {spacing.xs}`, height 28 px, shape `{rounded.sm}` 6 px (the brand's `--geist-radius`).
-
-**`nav-cta-login`** — the white "Log In" button in the nav.
-- Background `{colors.canvas}`, text `{colors.ink}`, same typography / height / shape as `nav-cta-signup`.
-
-**`nav-cta-ask-ai`** — the small "Ask AI" button with a faint border.
-- Background `{colors.canvas}`, text `{colors.ink}`, 1 px solid `{colors.hairline}` border (extracted as `0px solid rgb(235, 235, 235)`), same typography / height / shape.
-
-### Cards & Containers
-
-**`card-marketing`** — the canonical marketing feature card (3-up section cards).
-- Background `{colors.canvas}`, text `{colors.ink}`, padding `{spacing.lg}` 24 px, shape `{rounded.md}` 8 px (the `--geist-marketing-radius`). Carries Level 3 soft-stack shadow.
-
-**`card-marketing-large`** — the larger marketing card used for "compute model" / "AI Gateway" callouts.
-- Background `{colors.canvas}`, text `{colors.ink}`, padding `{spacing.xl}`, shape `{rounded.lg}` 12 px. Carries Level 4 float-stack shadow.
-
-**`card-soft`** — the soft-tinted card used inside cluster groups (lighter than canvas-soft).
-- Background `{colors.canvas-soft}`, text `{colors.ink}`, padding `{spacing.lg}`, shape `{rounded.md}`.
-
-**`template-card`** — the deploy-template card in the "Deploy your first app" grid.
-- Background `{colors.canvas}`, text `{colors.ink}`, padding `{spacing.md}` 16 px, shape `{rounded.md}` 8 px. Hosts a 16:9 thumbnail at the top.
-
-**`code-editor-mockup`** — the dark code-preview surface inside marketing bands.
-- Background `{colors.primary}`, text `{colors.on-primary}`, body in `{typography.code}` (13 px / Geist Mono), padding `{spacing.lg}` 24 px, shape `{rounded.md}` 8 px.
-
-**`pricing-card`** — the default pricing-tier card.
-- Background `{colors.canvas}`, text `{colors.ink}`, padding `{spacing.xl}` 32 px, shape `{rounded.lg}` 12 px. Inside: tier name in `{typography.display-md}`, price in `{typography.display-xl}`, feature list in `{typography.body-md}` rows, CTA at the bottom.
-
-**`pricing-card-featured`** — the polarity-flipped "Pro" tier card.
-- Background `{colors.primary}`, text `{colors.on-primary}`, same shape + padding as `pricing-card`. CTA inverts to `button-secondary-sm` (white pill on black card).
-
-### Inputs & Forms
-
-**`form-input`** — the canonical text input.
-- Background `{colors.canvas}`, text `{colors.ink}`, 1 px solid `{colors.hairline}` border, body in `{typography.body-sm}` (14 px), padding `0px {spacing.sm}`, height 40 px (the brand's `--geist-form-height`), shape `{rounded.sm}` 6 px.
-
-**`form-input-sm`** — small-height variant (32 px tall) for tight forms.
-- Same as `form-input` but height 32 px (the `--geist-form-small-height`).
-
-**`form-input-lg`** — large-height variant (48 px tall) for hero CTAs.
-- Same as `form-input` but height 48 px (the `--geist-form-large-height`); body in `{typography.body-md}` 16 px.
+- **`card`** — `bg-card border border-hairline rounded-lg shadow-level-2`. The workhorse: workspace cards, daemon cards, skill rows, runtime rows.
+- **`panel-settings`** — the card chrome at `p-5`, used for grouped settings sections with a heading and a description.
+- **`table-container`** — `overflow-hidden rounded-lg border border-hairline shadow-level-2` wrapping a full-width table. Header cells are `{typography.caption-mono}` uppercase in `{colors.mute}` on a `{colors.canvas-soft}` row; body cells are `{typography.body-sm}` with `border-b border-hairline` rows.
+- **`modal-card`** — `bg-card rounded-lg shadow-level-5`, used for dialogs and the sign-out confirmation.
+- **`dropdown-surface`** — `bg-card rounded-md shadow-level-4`, used for the workspace switcher, the account menu and the repository picker.
+- **`empty-state`** — a centred `Empty` primitive: media tile, `text-sm font-medium` title, `text-sm text-body` description, optional action. Used by every list that can be empty.
 
 ### Navigation
 
-**`nav-bar`** — the sticky top nav.
-- Background `{colors.canvas}`, text `{colors.ink}`, height 64 px (the brand's `--header-height`), padding `{spacing.sm} {spacing.lg}`. Layout: logo left, link row centre, "Ask AI / Log In / Sign Up" cluster right.
+- **`nav-bar`** — the marketing top bar: 64 px tall, `bg-canvas`, hairline bottom border, logo left and a ghost CTA plus account control right.
+- **`app-shell-sidebar`** — the console's left column: `bg-canvas`, `border-r border-hairline`, a 64 px workspace-switcher header with a hairline bottom border, grouped nav rows, and a 64 px user block pinned to the bottom.
+- **`sidebar-section-label`** — `text-xs font-semibold uppercase tracking-wide text-mute`. The only uppercase text in the product.
+- **`app-shell-nav-row`** — `{typography.body-sm}` in `{colors.body}`, `{rounded.sm}`, with the active row indicated by a foreground text colour plus `bg-muted`; hover is a half-strength muted fill.
+- **`kbd-hint`** — `font-mono text-xs` in `{colors.mute}` on a `{colors.muted}` chip with a hairline border, e.g. the ⌘K affordance on the search row.
 
-**`nav-link`** — the centred link row inside `nav-bar`.
-- Text `{colors.body}`, set in `{typography.body-sm}`, padding `{spacing.xs} {spacing.sm}`, shape `{rounded.full}` (ghost pill — visible only on hover or active, but the radius is documented).
+### Console-Specific Components
 
-**`footer`** — the bottom 4-column nav.
-- Background `{colors.canvas}`, text `{colors.body}`, padding `{spacing.4xl} {spacing.lg}`. Eyebrow column labels in `{typography.caption-mono}` (uppercase mono effect); link rows in `{typography.body-sm}`.
+- **`board-column`** — `w-72` fixed, `{rounded.xl}`, `border-hairline/50`, filled with a per-status pastel: `backlog`/`todo`/`cancelled` use `bg-muted/40`, `in_progress` uses `{colors.warning-soft}`, `in_review` uses `{colors.violet-soft}`, `done` uses `{colors.cyan-soft}`, `blocked` uses `{colors.error-soft}`. A column shows a sticky header with the status icon, the label, a count and a create affordance.
+- **`board-card`** — `bg-card border border-hairline rounded-lg shadow-level-1`, rising to Level 3 on hover. While dragging, the preview rotates 2° and takes Level 4 — the only rotation in the system.
+- **`status-badge`** — a 6 px `rounded-full` dot plus a written label (`AgentStatusBadge`, `DaemonStatusBadge`). The dot is `aria-hidden`; the label carries the state. Colour never carries meaning alone.
+- **`usage-series`** — the token-usage chart and its legend use, in order: input `{colors.success}` (link blue), output `{colors.cyan-deep}`, cache read `{colors.violet}`, cache write `{colors.warning}`. Percentages are floored rather than rounded so a figure can never claim a false 100 %.
+- **`live-log`** — a `{colors.canvas-soft-2}` panel of `{typography.caption-mono}` lines with the newest pinned to the bottom; it is an output surface, never interactive.
+- **`toast`** — the sonner surface: `bg-card rounded-md`, `{typography.body-sm}`, Level 4 shadow. Toasts report transient outcomes only; they are never the sole error surface for a failed page load.
 
-### Signature Components
+### Marketing Components
 
-**`hero-band`** — the white hero with the mesh gradient backdrop.
-- Background `{colors.canvas}` (or `{colors.canvas-soft}` on some surfaces), text `{colors.ink}`, padding `{spacing.4xl} {spacing.lg}`. Inside: a small mono badge above the headline, the headline in `{typography.display-xl}` (sentence-case, period-terminated), a body lead in `{typography.body-lg}`, then a CTA row with `button-primary` + `button-secondary`. The mesh gradient sits behind, scaled to occupy roughly the top half of the band.
-
-**`feature-mesh-band`** — the secondary section that hosts a mesh-gradient atmospheric backdrop with feature copy on top.
-- Background `{colors.canvas}`, text `{colors.ink}`, padding `{spacing.5xl} {spacing.lg}`. Section headline in `{typography.display-lg}`; supporting body in `{typography.body-md}`.
-
-**`showcase-band-light`** — a soft-canvas section ("Deploy your first app in seconds").
-- Background `{colors.canvas-soft}`, text `{colors.ink}`, padding `{spacing.5xl} {spacing.lg}`.
-
-**`showcase-band-dark`** — the polarity-flipped dark band ("A compute model for all workloads").
-- Background `{colors.primary}`, text `{colors.on-primary}`, padding `{spacing.5xl} {spacing.lg}`. Section headline in `{typography.display-lg}` (white on black). Often contains a `code-editor-mockup` flush with the band.
-
-**`logo-strip`** — the customer-logo wrapping row near the top of the page.
-- Background `{colors.canvas}`, text `{colors.body}`, padding `{spacing.lg} {spacing.xl}`. Logos rendered as monochrome SVGs at consistent height.
-
-**`badge-secondary`** — the small inline metadata pill ("New", "Beta", "Live").
-- Background `{colors.canvas-soft}`, text `{colors.body}`, body in `{typography.caption}`, padding `0px {spacing.xs}`, shape `{rounded.full}`.
-
-**`banner-marketing`** — the "Introducing X" announcement pill at the top of pages.
-- Background `{colors.canvas-soft}`, text `{colors.body}`, body in `{typography.body-sm}`, padding `{spacing.xs} {spacing.sm}`, shape `{rounded.full}`.
-
-**`link-inline`** — body-copy inline links.
-- Text `{colors.link}` (`#0070f3`), body in `{typography.body-md}`, underlined.
-
-### Examples (illustrative)
-
-> Auto-derived kit-mirror demonstration surfaces (`scripts/derive-examples-block.mjs`). Each `ex-*` entry references brand-native primitives so downstream consumers (`/preview-design`, `/generate-kit`) re-skin the same 10 surfaces consistently. `TO_FILL` markers indicate missing primitives — resolve in the LLM judgment pass.
-
-**`ex-pricing-tier`** — Default Pricing tier card. Re-uses feature-card chrome with brand canvas-soft surface.
-- Properties: `backgroundColor`, `textColor`, `borderColor`, `rounded`, `padding`
-
-**`ex-pricing-tier-featured`** — Featured/highlighted tier — polarity-flipped surface (dark fill + light text in light mode, light fill + dark text in dark mode).
-- Properties: `backgroundColor`, `textColor`, `rounded`, `padding`
-
-**`ex-product-selector`** — What's Included summary card — re-purposed for SaaS / B2B verticals (NOT a literal product gallery).
-- Properties: `backgroundColor`, `rounded`, `padding`
-
-**`ex-cart-drawer`** — Subscription summary — re-purposed for SaaS / B2B (line items per add-on, not literal cart).
-- Properties: `backgroundColor`, `rounded`, `padding`, `item-divider`
-
-**`ex-app-shell-row`** — Sidebar nav row inside the App Shell example. Active state uses brand primary as the indicator.
-- Properties: `backgroundColor`, `activeIndicator`, `rounded`, `padding`
-
-**`ex-data-table-cell`** — Default data-table th + td chrome. Header uses mono-caps eyebrow typography; body uses body-sm.
-- Properties: `headerBackground`, `headerTypography`, `bodyTypography`, `cellPadding`, `rowBorder`
-
-**`ex-auth-form-card`** — Sign-in / sign-up card. Re-uses feature-card chrome with text-input primitives inside.
-- Properties: `backgroundColor`, `rounded`, `padding`
-
-**`ex-modal-card`** — Modal dialog surface — same chrome as feature-card with elevated shadow.
-- Properties: `backgroundColor`, `rounded`, `padding`
-
-**`ex-empty-state-card`** — Empty-state illustration frame.
-- Properties: `backgroundColor`, `rounded`, `padding`, `captionTypography`
-
-**`ex-toast`** — Toast notification surface — feature-card shape + medium shadow.
-- Properties: `backgroundColor`, `rounded`, `padding`, `typography`
-
+- **`hero-band`** — `bg-canvas` with the mesh gradient behind the top ~480 px. Contents: a `badge-secondary` pill announcement, a 56 px logo tile at Level 2, the headline in `{typography.display-xl}` (sentence-case, period-terminated), a lead paragraph in `{typography.body-lg}` capped at `max-w-xl`, then a CTA row of a `pill` primary plus a `pill-sm` secondary.
+- **`showcase-band-dark`** — `bg-primary text-white`, holding the control-centre mock: a `code-editor-mockup` panel alongside status rows.
+- **`showcase-band-light`** — `bg-canvas-soft`, holding the 3-up "how it works" feature row.
+- **`code-editor-mockup`** — `bg-[#0a0a0a] rounded-md shadow-level-3` containing mono text. The one place the system goes darker than `{colors.primary}`.
+- **`badge-secondary`** — the rounded-full announcement pill with `{typography.caption}` text on `{colors.canvas}` at Level 1.
+- **`link-inline`** — `{colors.link}` text, underlined on hover.
 
 ## Do's and Don'ts
 
 ### Do
-- Reserve `{colors.primary}` (`#171717`) for primary CTAs across the page. Black ink IS the conversion target.
-- Use `{rounded.pill}` 100 px for every marketing-scale CTA and `{rounded.sm}` 6 px for nav-scale buttons. The two pill scales coexist deliberately.
-- Set every headline in `{typography.display-*}` weight 600, sentence-case, often period-terminated. Aggressive negative tracking is part of the voice.
-- Use the brand mesh gradient as atmospheric decoration at hero scale only — never miniaturise it to an icon, never reduce to a single colour.
-- Layer stacked shadows (multiple small offsets with inset hairline) rather than single heavy drops. The brand's elevation is calmer than Material.
-- Cycle page surfaces in `{colors.canvas-soft}` → `{colors.canvas}` → `{colors.primary}` polarity-flipped bands; the dark band IS the depth cue.
-- Set every code block and technical eyebrow in `{typography.code}` / `{typography.caption-mono}`. Mono is the voice of the platform.
+- Reserve `{colors.primary}` (`#171717`) for affirmative actions. Ink is the conversion target.
+- Use `{rounded.sm}` 6 px for every in-app control and `{rounded.full}` for marketing CTAs. Pick a scale per screen and stay there.
+- Set display type at weight 600 with `-0.04em`-class tracking, sentence-case and period-terminated.
+- Use the mesh gradient at hero scale only, as one unbroken object.
+- Layer stacked shadows with the inset hairline ring rather than a single heavy drop.
+- Cycle surfaces with the polarity-flipped `{colors.primary}` band as the depth cue.
+- Put every machine-reported value — status, count, id, model, log line — in a mono face.
+- Pair every status dot with a written label so state survives grayscale.
+- Keep the sidebar's uppercase `{typography.caption}` labels as the only all-caps text in the product.
 
 ### Don't
-- Don't introduce a sixth accent colour. The brand operates with ink + gray + the four-pair gradient palette; new accents flatten the voice.
-- Don't render headlines in all-caps. Sentence-case + negative tracking is non-negotiable.
-- Don't drop a single heavy drop-shadow on cards. The brand's elevation is built from stacked small offsets + inset hairline rings.
-- Don't render the brand gradient at icon scale or in a single-colour reduced form. The gradient lives at hero scale only.
-- Don't promote the geometric sans to weight 700. The brand's display ceiling is 600.
-- Don't pair the marketing 100-px pill CTA shape with the 6-px nav radius on the same screen — pick a scale and stay there.
-- Don't set body paragraphs in the mono face. The mono is for code + technical labels only.
+- Don't introduce a sixth accent colour, and don't add a green "success" hue — `{colors.success}` is the link blue by design.
+- Don't render headlines in all-caps.
+- Don't drop a single large-blur shadow on a card.
+- Don't shrink or recolour the gradient to an icon or a single stop.
+- Don't promote the sans to weight 700. The display ceiling is 600.
+- Don't put body paragraphs in mono.
+- Don't let a board column change width responsively — the board scrolls, it never reflows.
+- Don't communicate a state with colour alone anywhere.
+- Don't add a surface that depends on the pastel "soft" fills until those tokens have dark-mode variants (see the Dark Mode gap above).
