@@ -13,11 +13,12 @@ concurrency:
   group: goreleaser-release
   cancel-in-progress: false
 
-# Patched Go toolchain. Kept in sync with .github/workflows/ci.yml: the `go`
-# directive in go.mod is the language floor (1.26.2), whose standard library
-# carries advisories that would otherwise ship inside the released binaries.
+# Go toolchain, kept in sync with .github/workflows/ci.yml. The `go` directive in
+# go.mod is the language floor (1.26.2), whose standard library carries
+# advisories that would otherwise ship inside the released binaries, so this
+# floats to the newest 1.26 patch rather than tracking that floor.
 env:
-  GO_TOOLCHAIN: "1.26.8"
+  GO_TOOLCHAIN: "1.26.x"
 
 jobs:
   test:

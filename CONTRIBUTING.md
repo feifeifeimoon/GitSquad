@@ -210,10 +210,11 @@ drifting down. The largest untested areas are `internal/server/handler`,
 `middleware`, `store` and `crypto`, which have no test files at all; raise the
 floor in `.github/workflows/ci.yml` as those gain coverage.
 
-The Go toolchain used by CI is pinned separately from the `go` directive in
-`go.mod` (see `GO_TOOLCHAIN` in `.github/workflows/ci.yml`). `go.mod` states the
-language floor contributors must be able to build with; the CI pin tracks a
-patched patch release so the standard library has no open advisories.
+The Go toolchain CI uses is set separately from the `go` directive in `go.mod`
+(see `GO_TOOLCHAIN` in `.github/workflows/ci.yml`). `go.mod` states the language
+floor contributors must be able to build with; CI floats within that minor
+(`1.26.x`) so a patched patch release — the only way a standard-library advisory
+gets fixed — is picked up automatically instead of waiting on a PR.
 
 ### Environment variables
 
