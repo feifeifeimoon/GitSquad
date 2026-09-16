@@ -1,0 +1,20 @@
+# Normalize every text file to LF inside the repository and check it out as LF
+# on all platforms. Without this, a Windows contributor running with
+# core.autocrlf=true gets CRLF in the worktree, and both `gofmt -l` and
+# `git diff` then report every Go file as modified.
+* text=auto eol=lf
+
+# Windows-native scripts stay CRLF so they run under legacy shells.
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Binary assets are never normalized.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
