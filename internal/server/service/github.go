@@ -298,9 +298,7 @@ func (s *GitHubAppService) syncRepos(ctx context.Context, client *github.Client,
 		if err != nil {
 			return fmt.Errorf("list repos: %w", err)
 		}
-		for _, repo := range listRepos.Repositories {
-			allRepos = append(allRepos, repo)
-		}
+		allRepos = append(allRepos, listRepos.Repositories...)
 		if resp.NextPage == 0 {
 			break
 		}
