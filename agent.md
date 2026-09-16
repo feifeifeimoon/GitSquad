@@ -28,10 +28,10 @@
 ├── .codex/                    # Agent skill definitions (openspec-* workflow)
 ├── .github/
 │   ├── workflows/
-│   │   ├── ci.yml             # CI: go test/build + bun test/lint/build + Playwright E2E
+│   │   ├── ci.yml             # CI: gofmt + vet + Staticcheck + go test/coverage + govulncheck + bun test/lint/build + Playwright E2E
 │   │   ├── deploy-backend.yml # Fly.io auto-deploy on main (backend paths)
 │   │   └── release.yml        # GoReleaser on v* tags
-│   └── dependabot.yml         # Auto-deps: bun + github-actions, weekly
+│   └── dependabot.yml         # Auto-deps: gomod + bun + github-actions, weekly
 ├── bin/                       # Local build output (gitignored)
 ├── cmd/
 │   ├── server/main.go         # Entrypoint: HTTP API server (Gin)
@@ -171,9 +171,9 @@ Handler (HTTP concerns) → Service (business logic) → Store (data access)
 ### Code Quality
 
 6. **Go**:
-   - Run `go fmt ./...` before committing.
-   - Run `go vet ./...` and fix all warnings.
-   - Tests must pass with `-race` (CI requirement).
+   - Formatting is a CI gate: `make fmt-check` must pass (run `make fmt` to fix). Do not commit unformatted Go.
+   - `make vet` and `make lint` (Staticcheck, pinned) must be clean. Fix findings rather than suppressing them.
+   - Tests must pass with `-race` (CI requirement). Note `-race` needs cgo, so on a Windows checkout without a C toolchain `make test` runs without it and says so.
    - New features need tests in `*_test.go` alongside the source.
    - Errors must never be silently discarded — if you intentionally ignore one, comment why.
 7. **TypeScript / React**:
@@ -195,11 +195,14 @@ After EVERY task completion, run these checks locally. Do NOT consider the task 
 #### Backend
 
 ```bash
-# Tests with race detection (excluding /web/ which is frontend)
-go test -v -race $(go list ./... | grep -v '/web/')
+# Everything CI enforces: gofmt check + go vet + Staticcheck + go test
+make check
 
-# Build
-go build $(go list ./... | grep -v '/web/')
+# Vulnerability scan (needs the vuln DB on first run)
+make vuln
+
+# Coverage total
+make cover
 ```
 
 #### Frontend
