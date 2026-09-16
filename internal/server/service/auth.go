@@ -34,7 +34,7 @@ type OAuthUserInfo struct {
 // AuthResult is the outcome of a successful OAuth callback.
 type AuthResult struct {
 	User  *v1.User `json:"user"`
-	Token string         `json:"token"`
+	Token string   `json:"token"`
 }
 
 // AuthService orchestrates OAuth login flows across multiple providers.

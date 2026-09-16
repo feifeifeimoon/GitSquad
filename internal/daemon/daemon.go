@@ -31,8 +31,8 @@ type Daemon struct {
 	ready      atomic.Bool        // flips to true after preflight (liveness vs readiness)
 
 	// Task execution (max_concurrency=1).
-	taskWake     chan struct{}       // buffered signal to claim a task
-	taskMu       sync.Mutex          // guards activeTaskID / activeCancel
+	taskWake     chan struct{} // buffered signal to claim a task
+	taskMu       sync.Mutex    // guards activeTaskID / activeCancel
 	activeTaskID string
 	activeCancel context.CancelFunc
 
