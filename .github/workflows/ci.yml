@@ -16,15 +16,21 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Patched Go toolchain used by every Go job.
+  # Go toolchain used by every Go job, as a floating patch range.
   #
-  # This is deliberately NOT `go-version-file: go.mod`. The `go` directive in
-  # go.mod is the *language* floor (1.26.2) that contributors must be able to
-  # build with; the 1.26.2 standard library additionally carries advisories
-  # (net/http, crypto/tls, crypto/x509, net/url, net/mail, encoding/xml,
-  # encoding/asn1) that govulncheck reports as reachable from this code. Bump
-  # this when a newer 1.26 patch is released.
-  GO_TOOLCHAIN: "1.26.8"
+  # This is deliberately NOT `go-version-file: go.mod`. The `go` directive is the
+  # *language* floor (1.26.2) that contributors must be able to build with, and
+  # that standard library carries advisories (net/http, crypto/tls, crypto/x509,
+  # net/url, net/mail, encoding/xml, encoding/asn1) which govulncheck reports as
+  # reachable from this code. Only a patched patch release clears them.
+  #
+  # The wildcard is what keeps that current: every run picks the newest 1.26
+  # patch, so a security release lands with no PR, while the minor is pinned so
+  # the toolchain cannot drift to 1.27 on its own. An exact pin would rot —
+  # Dependabot's github-actions ecosystem only rewrites `uses:` refs, never a
+  # string in `env:`. This is the same shape prometheus (`1.27.x`) and caddy
+  # (`~1.26`) use.
+  GO_TOOLCHAIN: "1.26.x"
 
   # Minimum total statement coverage for the Go packages. This is a ratchet, not
   # a target: it sits below the current figure so an OS-dependent skip cannot
@@ -58,6 +64,13 @@ jobs:
             exit 1
           fi
           echo "All Go files are gofmt-formatted."
+
+      # `go mod tidy -diff` exits non-zero when go.mod/go.sum need changes, so
+      # this catches a hand-edited go.mod or a missing `go mod tidy` before it
+      # reaches main. (Note: `go fix -diff` does NOT exit non-zero on a non-empty
+      # diff — it would silently pass — so it is intentionally not used here.)
+      - name: Check module tidiness
+        run: go mod tidy -diff
 
       - name: Vet
         run: go vet $(go list ./... | grep -v '/web/')
