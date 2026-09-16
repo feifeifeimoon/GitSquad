@@ -21,8 +21,8 @@ func TestTaskJSONRoundTrip(t *testing.T) {
 				{AuthorName: "alice", Type: "comment", Content: "@coder please fix", CreatedAt: time.Now().UTC()},
 			},
 		},
-		Repo:  TaskRepoContext{Owner: "feifeifeimoon", Name: "demo", DefaultBranch: "main"},
-		Agent: TaskAgentContext{Name: "coder", Instructions: "be conservative", Provider: "claude"},
+		Repo:              TaskRepoContext{Owner: "feifeifeimoon", Name: "demo", DefaultBranch: "main"},
+		Agent:             TaskAgentContext{Name: "coder", Instructions: "be conservative", Provider: "claude"},
 		InstallationToken: "ghs_secret",
 	}
 

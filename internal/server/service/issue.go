@@ -409,7 +409,7 @@ func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, use
 		comment, err := q.CreateComment(ctx, db.CreateCommentParams{
 			IssueID:    issueID,
 			AuthorType: "user",
-				AuthorID:   util.Ptr(userID),
+			AuthorID:   util.Ptr(userID),
 			AuthorName: userLogin,
 			Type:       "comment",
 			Content:    content,

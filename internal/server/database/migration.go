@@ -58,7 +58,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
 			updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 		)`},
-			{name: "008_create_github_repos", sql: `CREATE TABLE IF NOT EXISTS github_repos (
+		{name: "008_create_github_repos", sql: `CREATE TABLE IF NOT EXISTS github_repos (
 				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 				installation_id UUID NOT NULL REFERENCES github_installations(id),
 				github_repo_id BIGINT NOT NULL,
@@ -68,7 +68,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 				private BOOLEAN NOT NULL DEFAULT false,
 				UNIQUE(installation_id, github_repo_id)
 			)`},
-			{name: "009_create_webhook_events", sql: `CREATE TABLE IF NOT EXISTS webhook_events (
+		{name: "009_create_webhook_events", sql: `CREATE TABLE IF NOT EXISTS webhook_events (
 				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 				github_delivery_id TEXT UNIQUE,
 				event_type TEXT NOT NULL,
