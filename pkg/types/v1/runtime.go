@@ -2,6 +2,14 @@ package v1
 
 import "github.com/google/uuid"
 
+// Detection outcomes for a runtime the daemon found. One that cannot be
+// resolved at all is absent from the report rather than reported as an error,
+// so only these two ever reach the runtimes.status column.
+const (
+	RuntimeStatusAvailable = "available"
+	RuntimeStatusError     = "error"
+)
+
 // Runtime is a capability record reported by the daemon.
 // Only available runtimes are reported — missing ones are simply absent.
 // Kind is the runtime identifier (e.g. "claude", "codex", "git").

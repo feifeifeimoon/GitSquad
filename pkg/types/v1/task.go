@@ -63,18 +63,13 @@ type TaskSkill struct {
 	Content     string `json:"content"`
 }
 
-// Task lifecycle status values. The full state machine is owned by task
-// dispatch (chapter 9); the daemon only reports progress and terminal state
-// via TaskReport.
-const (
-	TaskStatusQueued    = "queued"
-	TaskStatusClaimed   = "claimed"
-	TaskStatusRunning   = "running"
-	TaskStatusSucceeded = "succeeded"
-	TaskStatusFailed    = "failed"
-)
-
 // TaskReportStatus are the lifecycle events a daemon reports for a task.
+//
+// These are events, not the persisted states. The server translates each one
+// onto the tasks.status column (started → running, succeeded → completed), and
+// that column — not this vocabulary — owns the state machine: queued,
+// dispatched, running, completed, failed, cancelled. No value from this block
+// is ever stored as a status.
 const (
 	TaskReportStarted   = "started"
 	TaskReportRunning   = "running" // progress event while the agent works

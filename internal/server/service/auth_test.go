@@ -25,7 +25,9 @@ func TestAuthServiceE2ELoginIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open database: %v", err)
 	}
-	defer pool.Close()
+	// t.Cleanup, not defer: the row deletes registered below run through this
+	// pool, and t.Cleanup is LIFO, so a defer here would close it first.
+	t.Cleanup(pool.Close)
 
 	if err := database.Migrate(ctx, pool); err != nil {
 		t.Fatalf("migrate: %v", err)

@@ -263,6 +263,45 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// from the task queue (TotalRuns) instead.
 		{name: "040_drop_agents_run_count", sql: `ALTER TABLE agents
 			DROP COLUMN IF EXISTS run_count`},
+		// Five status columns carried no CHECK constraint, so a typo in a writer
+		// was stored rather than rejected — the silent-failure shape the issues
+		// and tasks status columns already avoid. Each set is exactly the values
+		// the code writes.
+		//
+		// NOT VALID is deliberate: it constrains future inserts and updates
+		// without scanning existing rows, so a legacy value cannot fail the
+		// migration and stop the server from booting (Migrate runs at startup,
+		// and an error here is fatal). Once a table's existing rows are known to
+		// be clean it can be tightened with
+		// `ALTER TABLE <table> VALIDATE CONSTRAINT <name>`.
+		//
+		// The IF NOT EXISTS guards are per-constraint rather than one exception
+		// handler: a plpgsql block abandons the rest of its body once a statement
+		// raises, so a single duplicate_object handler would skip every
+		// constraint after the first one that already existed.
+		{name: "041_status_check_constraints", sql: `DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'daemon_tokens_status_check' AND conrelid = 'daemon_tokens'::regclass) THEN
+					ALTER TABLE daemon_tokens ADD CONSTRAINT daemon_tokens_status_check
+						CHECK (status IN ('pending','active','expired')) NOT VALID;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'daemons_status_check' AND conrelid = 'daemons'::regclass) THEN
+					ALTER TABLE daemons ADD CONSTRAINT daemons_status_check
+						CHECK (status IN ('online','offline')) NOT VALID;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'runtimes_status_check' AND conrelid = 'runtimes'::regclass) THEN
+					ALTER TABLE runtimes ADD CONSTRAINT runtimes_status_check
+						CHECK (status IN ('unknown','available','error')) NOT VALID;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'workspaces_status_check' AND conrelid = 'workspaces'::regclass) THEN
+					ALTER TABLE workspaces ADD CONSTRAINT workspaces_status_check
+						CHECK (status IN ('active','archived')) NOT VALID;
+				END IF;
+				IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'github_installations_status_check' AND conrelid = 'github_installations'::regclass) THEN
+					ALTER TABLE github_installations ADD CONSTRAINT github_installations_status_check
+						CHECK (status IN ('active','revoked')) NOT VALID;
+				END IF;
+			END $$`},
 	}
 
 	for _, m := range migrations {

@@ -385,10 +385,6 @@ export const agentApi = {
     api.delete<{ deleted: boolean }>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`),
 };
 
-export const runtimeApi = {
-  list: (workspaceId: string) => api.get<AgentRuntime[]>(`/api/v1/workspaces/${workspaceId}/runtimes`),
-};
-
 export const skillApi = {
   list: (workspaceId: string) => api.get<Skill[]>(`/api/v1/workspaces/${workspaceId}/skills`),
   create: (workspaceId: string, body: { name: string; description?: string; content?: string }) =>

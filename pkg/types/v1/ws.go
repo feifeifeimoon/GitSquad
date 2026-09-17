@@ -48,7 +48,7 @@ type WSHeartbeatPayload struct {
 
 // WSHeartbeatAckPayload is the server's response to a heartbeat frame.
 // PendingActions is an extensible command channel: the server can piggyback
-// instructions (task_available, runtime_rescan, shutdown, etc.) on the ack.
+// instructions on the ack.
 type WSHeartbeatAckPayload struct {
 	PendingActions []PendingAction `json:"pending_actions,omitempty"`
 }
@@ -59,11 +59,10 @@ type PendingAction struct {
 	Payload json.RawMessage `json:"payload,omitempty"`
 }
 
-// PendingAction type constants.
+// PendingAction type constants. A daemon ignores an action it does not
+// recognise, so a new one can ship server-side before daemons understand it.
 const (
 	ActionTaskAvailable = "task_available"
-	ActionRuntimeRescan = "runtime_rescan"
-	ActionShutdown      = "shutdown"
 )
 
 // TaskAvailablePayload lists tasks the daemon should claim.

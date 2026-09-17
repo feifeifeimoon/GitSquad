@@ -311,7 +311,7 @@ func (s *TaskService) handleStarted(ctx context.Context, task db.Task) error {
 	if _, err := s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
 		ID:          task.IssueID,
 		WorkspaceID: task.WorkspaceID,
-		Status:      "in_progress",
+		Status:      v1.IssueStatusInProgress,
 	}); err != nil {
 		return err
 	}
@@ -404,7 +404,7 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 	if _, err := s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
 		ID:          task.IssueID,
 		WorkspaceID: task.WorkspaceID,
-		Status:      "in_review",
+		Status:      v1.IssueStatusInReview,
 	}); err != nil {
 		return err
 	}

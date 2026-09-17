@@ -8,7 +8,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
@@ -35,43 +34,6 @@ func deriveIssuePrefix(name string) string {
 		return strings.ToUpper(letters[:3])
 	}
 	return "WS"
-}
-
-// issueStatuses is the canonical status set (Multica-style, 7 states).
-var issueStatuses = map[string]bool{
-	"backlog": true, "todo": true, "in_progress": true, "in_review": true,
-	"done": true, "blocked": true, "cancelled": true,
-}
-
-func validIssueStatus(s string) bool { return issueStatuses[s] }
-
-type IssueResponse struct {
-	ID             uuid.UUID `json:"id"`
-	Number         int32     `json:"number"`
-	IssueKey       string    `json:"issue_key"`
-	Title          string    `json:"title"`
-	Description    string    `json:"description"`
-	Status         string    `json:"status"`
-	AssignedAgents []string  `json:"assigned_agents"`
-	LinkedPRs      []string  `json:"linked_prs"`
-	CreatorName    string    `json:"creator_name"`
-	CommentsCount  int       `json:"comments_count"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-}
-
-type CommentResponse struct {
-	ID         uuid.UUID `json:"id"`
-	AuthorType string    `json:"author_type"`
-	AuthorName string    `json:"author_name"`
-	Type       string    `json:"type"`
-	Content    string    `json:"content"`
-	CreatedAt  time.Time `json:"created_at"`
-}
-
-type IssueDetailResponse struct {
-	IssueResponse
-	Comments []CommentResponse `json:"comments"`
 }
 
 type IssueService struct {
@@ -154,8 +116,8 @@ func (s *IssueService) ResolveIssueID(ctx context.Context, workspaceID uuid.UUID
 }
 
 // listRowToResponse maps a ListIssuesByWorkspaceRow to the API shape.
-func listRowToResponse(row db.ListIssuesByWorkspaceRow) IssueResponse {
-	return IssueResponse{
+func listRowToResponse(row db.ListIssuesByWorkspaceRow) v1.Issue {
+	return v1.Issue{
 		ID:             row.ID,
 		Number:         row.Number,
 		IssueKey:       issueKey(row.IssuePrefix, row.Number),
@@ -172,8 +134,8 @@ func listRowToResponse(row db.ListIssuesByWorkspaceRow) IssueResponse {
 }
 
 // getRowToResponse maps a GetIssueRow to the API shape.
-func getRowToResponse(row db.GetIssueRow) IssueResponse {
-	return IssueResponse{
+func getRowToResponse(row db.GetIssueRow) v1.Issue {
+	return v1.Issue{
 		ID:             row.ID,
 		Number:         row.Number,
 		IssueKey:       issueKey(row.IssuePrefix, row.Number),
@@ -192,14 +154,14 @@ func getRowToResponse(row db.GetIssueRow) IssueResponse {
 // CreateIssue creates an issue with a per-workspace sequential number,
 // scans the description for @mentions, and appends system hints for
 // mentions that match no agent. Runs in one transaction.
-func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid.UUID, userLogin, title, description, status string) (*IssueResponse, error) {
+func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid.UUID, userLogin, title, description, status string) (*v1.Issue, error) {
 	if strings.TrimSpace(title) == "" {
 		return nil, ErrEmptyTitle
 	}
 	if status == "" {
-		status = "backlog"
+		status = v1.IssueStatusBacklog
 	}
-	if !validIssueStatus(status) {
+	if !v1.ValidIssueStatus(status) {
 		return nil, ErrInvalidStatus
 	}
 
@@ -209,7 +171,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 	}
 	matched, unmatched := processMentions(description, agents)
 
-	var resp *IssueResponse
+	var resp *v1.Issue
 	err = s.store.ExecTx(ctx, func(q *db.Queries) error {
 		prefix, err := q.GetWorkspaceNumbering(ctx, workspaceID)
 		if err != nil {
@@ -242,7 +204,7 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 				return fmt.Errorf("append unmatched-mention hint: %w", err)
 			}
 		}
-		resp = &IssueResponse{
+		resp = &v1.Issue{
 			ID:             issue.ID,
 			Number:         issue.Number,
 			IssueKey:       issueKey(prefix, issue.Number),
@@ -269,12 +231,12 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 
 // ListIssues returns every issue in the workspace, ordered by status then
 // newest-first, for the kanban board.
-func (s *IssueService) ListIssues(ctx context.Context, workspaceID uuid.UUID) ([]IssueResponse, error) {
+func (s *IssueService) ListIssues(ctx context.Context, workspaceID uuid.UUID) ([]v1.Issue, error) {
 	rows, err := s.store.ListIssuesByWorkspace(ctx, workspaceID)
 	if err != nil {
 		return nil, fmt.Errorf("list issues: %w", err)
 	}
-	list := make([]IssueResponse, len(rows))
+	list := make([]v1.Issue, len(rows))
 	for i, row := range rows {
 		list[i] = listRowToResponse(row)
 	}
@@ -282,7 +244,7 @@ func (s *IssueService) ListIssues(ctx context.Context, workspaceID uuid.UUID) ([
 }
 
 // GetIssue returns the issue with its full comment stream (oldest first).
-func (s *IssueService) GetIssue(ctx context.Context, workspaceID, issueID uuid.UUID) (*IssueDetailResponse, error) {
+func (s *IssueService) GetIssue(ctx context.Context, workspaceID, issueID uuid.UUID) (*v1.IssueDetail, error) {
 	row, err := s.store.GetIssue(ctx, db.GetIssueParams{ID: issueID, WorkspaceID: workspaceID})
 	if err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrIssueNotFound, err)
@@ -291,12 +253,12 @@ func (s *IssueService) GetIssue(ctx context.Context, workspaceID, issueID uuid.U
 	if err != nil {
 		return nil, fmt.Errorf("list comments: %w", err)
 	}
-	detail := IssueDetailResponse{
-		IssueResponse: getRowToResponse(row),
-		Comments:      make([]CommentResponse, len(comments)),
+	detail := v1.IssueDetail{
+		Issue:    getRowToResponse(row),
+		Comments: make([]v1.IssueComment, len(comments)),
 	}
 	for i, c := range comments {
-		detail.Comments[i] = CommentResponse{
+		detail.Comments[i] = v1.IssueComment{
 			ID:         c.ID,
 			AuthorType: c.AuthorType,
 			AuthorName: c.AuthorName,
@@ -311,15 +273,15 @@ func (s *IssueService) GetIssue(ctx context.Context, workspaceID, issueID uuid.U
 // UpdateIssue applies the non-nil fields (status / title / description).
 // A status change appends an immutable status_change comment naming the
 // actor who triggered it.
-func (s *IssueService) UpdateIssue(ctx context.Context, workspaceID, issueID uuid.UUID, actorName string, status, title, description *string) (*IssueResponse, error) {
-	if status != nil && !validIssueStatus(*status) {
+func (s *IssueService) UpdateIssue(ctx context.Context, workspaceID, issueID uuid.UUID, actorName string, status, title, description *string) (*v1.Issue, error) {
+	if status != nil && !v1.ValidIssueStatus(*status) {
 		return nil, ErrInvalidStatus
 	}
 	if title != nil && strings.TrimSpace(*title) == "" {
 		return nil, ErrEmptyTitle
 	}
 
-	var resp *IssueResponse
+	var resp *v1.Issue
 	err := s.store.ExecTx(ctx, func(q *db.Queries) error {
 		row, err := q.GetIssue(ctx, db.GetIssueParams{ID: issueID, WorkspaceID: workspaceID})
 		if err != nil {
@@ -382,7 +344,7 @@ func (s *IssueService) UpdateIssue(ctx context.Context, workspaceID, issueID uui
 // matched agents and hinting at unmatched ones), and fires the dispatch
 // hook for matched agents. Comment insert and mention effects share one
 // transaction.
-func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, userID uuid.UUID, userLogin, content string) (*CommentResponse, error) {
+func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, userID uuid.UUID, userLogin, content string) (*v1.IssueComment, error) {
 	if strings.TrimSpace(content) == "" {
 		return nil, ErrEmptyComment
 	}
@@ -393,7 +355,7 @@ func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, use
 	}
 	matched, unmatched := processMentions(content, agents)
 
-	var resp *CommentResponse
+	var resp *v1.IssueComment
 	err = s.store.ExecTx(ctx, func(q *db.Queries) error {
 		if _, err := q.GetIssue(ctx, db.GetIssueParams{ID: issueID, WorkspaceID: workspaceID}); err != nil {
 			return fmt.Errorf("%w: %v", ErrIssueNotFound, err)
@@ -428,7 +390,7 @@ func (s *IssueService) AddComment(ctx context.Context, workspaceID, issueID, use
 				return fmt.Errorf("append unmatched-mention hint: %w", err)
 			}
 		}
-		resp = &CommentResponse{
+		resp = &v1.IssueComment{
 			ID:         comment.ID,
 			AuthorType: comment.AuthorType,
 			AuthorName: comment.AuthorName,

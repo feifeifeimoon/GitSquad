@@ -100,7 +100,7 @@ func (h *WorkspaceHandler) Get(c *gin.Context) {
 		return
 	}
 
-	workspace, err := h.workspaces.ResolveWorkspace(c.Request.Context(), user.ID, c.Param("id"))
+	workspace, err := h.workspaces.ResolveWorkspaceResponse(c.Request.Context(), user.ID, c.Param("id"))
 	if err != nil {
 		if errors.Is(err, service.ErrWorkspaceNotFound) {
 			c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))

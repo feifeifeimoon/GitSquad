@@ -15,7 +15,8 @@ CREATE TABLE daemon_tokens (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID REFERENCES users(id),
     daemon_id UUID, token_hash TEXT UNIQUE NOT NULL, token_prefix TEXT NOT NULL DEFAULT 'gtsq_dm_',
     pairing_code TEXT UNIQUE, machine_name TEXT, os TEXT NOT NULL DEFAULT '', arch TEXT NOT NULL DEFAULT '',
-    daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'pending',
+    daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'pending'
+        CHECK (status IN ('pending','active','expired')),
     expires_at TIMESTAMPTZ, issued_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     confirmed_at TIMESTAMPTZ, last_used_at TIMESTAMPTZ
 );
@@ -24,7 +25,8 @@ CREATE TABLE daemons (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES users(id),
     token_id UUID REFERENCES daemon_tokens(id), name TEXT NOT NULL,
     os TEXT NOT NULL DEFAULT '', arch TEXT NOT NULL DEFAULT '',
-    daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'offline',
+    daemon_version TEXT NOT NULL DEFAULT '0.0.0', status TEXT NOT NULL DEFAULT 'offline'
+        CHECK (status IN ('online','offline')),
     last_seen_at TIMESTAMPTZ, connected_at TIMESTAMPTZ,
     registered_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -32,7 +34,9 @@ CREATE TABLE daemons (
 CREATE TABLE runtimes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(), daemon_id UUID NOT NULL REFERENCES daemons(id),
     kind TEXT NOT NULL, name TEXT NOT NULL, executable_path TEXT NOT NULL DEFAULT '', version TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'unknown', checked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    status TEXT NOT NULL DEFAULT 'unknown'
+        CHECK (status IN ('unknown','available','error')),
+    checked_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     diagnostics TEXT, max_concurrency INT NOT NULL DEFAULT 1,
     UNIQUE(daemon_id, kind, name)
 );
@@ -44,7 +48,8 @@ CREATE TABLE github_installations (
     account_login TEXT NOT NULL,
     account_type TEXT NOT NULL,
     repository_selection TEXT NOT NULL DEFAULT 'selected',
-    status TEXT NOT NULL DEFAULT 'active',
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active','revoked')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -76,7 +81,8 @@ CREATE TABLE workspaces (
     installation_id UUID NOT NULL REFERENCES github_installations(id),
     github_repo_id UUID NOT NULL REFERENCES github_repos(id),
     name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active',
+    status TEXT NOT NULL DEFAULT 'active'
+        CHECK (status IN ('active','archived')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
