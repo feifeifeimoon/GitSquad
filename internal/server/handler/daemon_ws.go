@@ -22,15 +22,22 @@ func NewDaemonWS(hub *ws.Hub, daemonSvc *service.DaemonService, taskSvc *service
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		uid, _ := uuid.Parse(daemonID)
+		// Status only. The daemon's in-flight tasks are not touched here: this
+		// callback is reached after a socket ended, which is not evidence that
+		// the daemon stopped working, and marking the status wrongly now heals
+		// itself on the next batched heartbeat flush. Work is released on its own
+		// clock by the TaskFailureSweeper below.
 		_ = daemonSvc.MarkOffline(ctx, uid)
-		// In-flight tasks can no longer report back; fail them and tell the
-		// issues instead of leaving them stuck in dispatched/running.
-		_ = taskSvc.FailDaemonTasks(ctx, uid)
 	}
 
 	// HeartbeatScheduler batches last_seen_at (and the online assertion that goes
 	// with it) into one write every 60s. It lives for the process lifetime.
 	scheduler := NewHeartbeatScheduler(context.Background(), daemonSvc)
+
+	// TaskFailureSweeper releases the tasks of daemons that have gone silent.
+	// Its grace is measured from the last heartbeat, not from the disconnect, so
+	// a daemon that reconnects over a dropped socket keeps running its task.
+	NewTaskFailureSweeper(context.Background(), taskSvc)
 
 	disp.On(ws.TypeAuth, authHandler(daemonSvc, taskSvc))
 	disp.On(ws.TypeHeartbeat, heartbeatHandler(daemonSvc, scheduler))
@@ -59,23 +66,28 @@ func authHandler(daemonSvc *service.DaemonService, taskSvc *service.TaskService)
 			return errorFrame("daemon_id mismatch")
 		}
 
-		// Connecting is an immediate online assertion. The heartbeat path keeps
-		// it true from here on (see the batched flush), so a status that is ever
-		// flipped offline by mistake heals on its own instead of needing a new
-		// connection.
-		_ = daemonSvc.MarkOnline(ctx, daemon.ID)
-
 		// Set the identity *before* publishing the connection: the hub and the
 		// frame handlers read these fields without a lock, so a conn must never
 		// be visible to them half-initialised.
 		conn.DaemonID = daemon.ID.String()
 		conn.Authenticated = true
 
+		// Publish before asserting the status. Register cancels a disconnect that
+		// is still inside its grace window, so doing it first is what keeps a
+		// notification that was already on its way from undoing the assertion
+		// below and leaving a connected daemon marked offline.
+		//
 		// Register replaces and closes any previous connection for this daemon.
 		// The replacement is silent on purpose: the daemon is still connected,
 		// so firing OnDisconnect here would mark it offline and fail the tasks
 		// it is running.
 		hub.Register(conn)
+
+		// Connecting is an immediate online assertion. The heartbeat path keeps
+		// it true from here on (see the batched flush), so a status that is ever
+		// flipped offline by mistake heals on its own instead of needing a new
+		// connection.
+		_ = daemonSvc.MarkOnline(ctx, daemon.ID)
 
 		// Work may have been queued while this daemon was offline (or while it
 		// was reconnecting). Wake it now instead of making it wait for the next

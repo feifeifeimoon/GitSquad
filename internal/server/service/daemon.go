@@ -372,8 +372,11 @@ func (s *DaemonService) MarkOffline(ctx context.Context, id uuid.UUID) error {
 	return s.store.DaemonOffline(ctx, id)
 }
 
-// DaemonHeartbeat updates only last_seen_at — used by the HeartbeatScheduler
-// for batched, lower-cost liveness refresh (no status flip).
+// DaemonHeartbeat refreshes last_seen_at *and* reasserts status='online' in one
+// statement — used by the HeartbeatScheduler for batched, lower-cost liveness
+// refresh. The status rides along because a daemon that is heartbeating is
+// online by definition, which is what lets a status flipped offline by mistake
+// heal on its own rather than stick until the next WebSocket connection.
 func (s *DaemonService) DaemonHeartbeat(ctx context.Context, id uuid.UUID) error {
 	return s.store.DaemonHeartbeat(ctx, id)
 }
