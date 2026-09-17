@@ -120,7 +120,7 @@
 │   ├── helpers.ts             # localStorage token injection, page-wait helpers
 │   ├── env.ts                 # E2E env contract (API / frontend / database URLs)
 │   └── playwright.config.ts   # Chromium; serial in CI; trace/screenshot on failure
-├── docs/                      # Screenshots and brand assets (docs/assets/)
+├── docs/assets/               # Brand assets: banner, README agent marks, social-preview.jpg
 ├── scripts/                   # CLI install scripts (install.sh / install.ps1) + e2e.sh orchestrator
 ├── AGENTS.md                  # This file — agent instructions
 ├── CLAUDE.md                  # Claude Code entrypoint (includes AGENTS.md)
@@ -134,6 +134,14 @@
 ├── .env.example               # Environment variable template
 └── CONTRIBUTING.md            # Contributor guide
 ```
+
+`docs/assets/social-preview.jpg` is the repository's GitHub social preview. There
+is no API for it — it is set by hand under Settings → Social preview — and it
+must be 1280×640 and under 1 MB, or GitHub will not accept the upload. It is
+derived from `banner.png` by scaling the banner to fill a blurred 1280×640
+backdrop and compositing the whole banner on top: the banner is 1.77:1 with
+content running edge to edge, so cropping it to 2:1 would clip the dense band
+along the bottom. Regenerate it the same way rather than cropping.
 
 ---
 

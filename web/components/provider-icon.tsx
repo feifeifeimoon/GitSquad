@@ -1,8 +1,15 @@
 import { Monitor } from "lucide-react";
 
-// Provider brand marks. Claude and Codex are inline SVGs (theme-adaptable via
-// currentColor where possible); Antigravity ships as a PNG because no clean
-// vector path is available.
+// Provider brand marks. Claude and Codex are inline SVGs (Codex uses
+// currentColor, so it follows the surrounding text colour); Antigravity ships as
+// a PNG because no clean vector path is available.
+//
+// The Antigravity asset must have a transparent background. It previously
+// shipped as an opaque near-black tile, which read as a black box on the light
+// canvas and disappeared entirely in dark mode. The same glyph also sits at
+// docs/assets/agents/antigravity.png, beside the other marks the README uses,
+// because Next serves this one from /public and nothing can bridge the two — a
+// replacement has to be copied to both.
 
 function ClaudeIcon({ className }: { className?: string }) {
   return (
