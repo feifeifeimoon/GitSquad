@@ -29,6 +29,11 @@ func NewAppHub() *AppHub {
 // Publish broadcasts a workspace event to every browser subscribed to that
 // workspace. It implements service.EventPublisher. Slow consumers are dropped
 // rather than allowed to block the publisher.
+//
+// The sends happen with the read lock held, and unsubscribe needs the write
+// lock, so a connection is never sent to once it has been unsubscribed. That is
+// what makes AppConn.serve's close(c.send) safe — do not narrow this lock to
+// cover only the map lookup.
 func (h *AppHub) Publish(ev v1.AppEvent) {
 	data, err := json.Marshal(ev)
 	if err != nil {

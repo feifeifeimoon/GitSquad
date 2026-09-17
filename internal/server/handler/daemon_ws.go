@@ -28,12 +28,12 @@ func NewDaemonWS(hub *ws.Hub, daemonSvc *service.DaemonService, taskSvc *service
 		_ = taskSvc.FailDaemonTasks(ctx, uid)
 	}
 
-	// HeartbeatScheduler batches last_seen_at DB writes every 60s.
+	// HeartbeatScheduler batches last_seen_at (and the online assertion that goes
+	// with it) into one write every 60s. It lives for the process lifetime.
 	scheduler := NewHeartbeatScheduler(context.Background(), daemonSvc)
 
 	disp.On(ws.TypeAuth, authHandler(daemonSvc, taskSvc))
 	disp.On(ws.TypeHeartbeat, heartbeatHandler(daemonSvc, scheduler))
-	disp.On(ws.TypeStatusUpdate, statusUpdateHandler(daemonSvc))
 	disp.On(ws.TypeTaskWakeAck, noopHandler)
 	disp.On(ws.TypeRuntimeGoneAck, noopHandler)
 
@@ -59,15 +59,23 @@ func authHandler(daemonSvc *service.DaemonService, taskSvc *service.TaskService)
 			return errorFrame("daemon_id mismatch")
 		}
 
+		// Connecting is an immediate online assertion. The heartbeat path keeps
+		// it true from here on (see the batched flush), so a status that is ever
+		// flipped offline by mistake heals on its own instead of needing a new
+		// connection.
 		_ = daemonSvc.MarkOnline(ctx, daemon.ID)
 
-		// Reconnect: silently drop the old connection so OnDisconnect does
-		// not fire and flip the daemon to offline between unregister/register.
-		if hub.Has(daemon.ID.String()) {
-			hub.UnregisterSilent(daemon.ID.String())
-		}
+		// Set the identity *before* publishing the connection: the hub and the
+		// frame handlers read these fields without a lock, so a conn must never
+		// be visible to them half-initialised.
+		conn.DaemonID = daemon.ID.String()
+		conn.Authenticated = true
 
-		hub.Register(daemon.ID.String(), conn)
+		// Register replaces and closes any previous connection for this daemon.
+		// The replacement is silent on purpose: the daemon is still connected,
+		// so firing OnDisconnect here would mark it offline and fail the tasks
+		// it is running.
+		hub.Register(conn)
 
 		// Work may have been queued while this daemon was offline (or while it
 		// was reconnecting). Wake it now instead of making it wait for the next
@@ -104,7 +112,9 @@ func heartbeatHandler(daemonSvc *service.DaemonService, scheduler *HeartbeatSche
 		var hb v1.WSHeartbeatPayload
 		_ = json.Unmarshal(frame.Payload, &hb)
 
-		// Batched last_seen_at update — avoids a DB write on every single heartbeat.
+		// Batched rather than written here: the flush coalesces last_seen_at *and*
+		// the online assertion into one statement per daemon per interval, so a
+		// heartbeat costs no DB round trip of its own.
 		scheduler.RecordHeartbeat(uid, hb.DaemonVersion)
 
 		actions := daemonSvc.PendingActions(ctx, uid)
@@ -117,19 +127,6 @@ func heartbeatHandler(daemonSvc *service.DaemonService, scheduler *HeartbeatSche
 			Seq:     frame.Seq,
 			Payload: ackPayload,
 		}
-	}
-}
-
-func statusUpdateHandler(daemons *service.DaemonService) ws.Handler {
-	return func(conn *ws.Conn, _ *ws.Hub, _ ws.Frame) *ws.Frame {
-		if !conn.Authenticated {
-			return nil
-		}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		uid, _ := uuid.Parse(conn.DaemonID)
-		_ = daemons.MarkOnline(ctx, uid)
-		return nil
 	}
 }
 

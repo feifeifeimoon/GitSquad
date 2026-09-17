@@ -14,11 +14,15 @@ type HeartbeatStore interface {
 	UpdateDaemonVersion(ctx context.Context, id uuid.UUID, version string) error
 }
 
-// HeartbeatScheduler coalesces per-heartbeat last_seen_at updates into a
-// periodic bulk flush, avoiding a DB write on every heartbeat (every 30s).
+// HeartbeatScheduler coalesces per-heartbeat daemon liveness into a periodic
+// bulk flush, avoiding a DB write on every heartbeat (every 30s).
 //
-// The status flip (offline→online) still goes through the synchronous
-// MarkOnline path — only the repeated "still alive" bumps are batched here.
+// A flush is the authoritative "this daemon is alive" assertion: it writes
+// last_seen_at *and* status='online' in one statement. Folding the status in
+// here is what makes a daemon's online state self-healing — the batched write
+// is the only thing that reliably repeats, so an offline flag that was set by
+// mistake cannot stick while the daemon keeps heartbeating.
+//
 // Reported CLI versions ride along and are written only when they change.
 type HeartbeatScheduler struct {
 	mu       sync.Mutex

@@ -169,9 +169,14 @@ func (q *Queries) CreateToken(ctx context.Context, arg CreateTokenParams) (Daemo
 }
 
 const daemonHeartbeat = `-- name: DaemonHeartbeat :exec
-UPDATE daemons SET last_seen_at = now() WHERE id = $1
+UPDATE daemons SET last_seen_at = now(), status = 'online' WHERE id = $1
 `
 
+// Doubles as the online assertion: a daemon that is heartbeating is online by
+// definition. Writing it here is what makes the status self-healing — an
+// offline flag set in error cannot stick while the daemon keeps reporting in.
+// connected_at is deliberately untouched; only DaemonOnline (a fresh connect)
+// sets that.
 func (q *Queries) DaemonHeartbeat(ctx context.Context, id uuid.UUID) error {
 	_, err := q.db.Exec(ctx, daemonHeartbeat, id)
 	return err
