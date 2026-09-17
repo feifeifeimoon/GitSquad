@@ -117,6 +117,7 @@ func (q *Queries) GetWorkspaceBySlug(ctx context.Context, arg GetWorkspaceBySlug
 
 const getWorkspaceWithRepo = `-- name: GetWorkspaceWithRepo :one
 SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at, w.slug,
+       w.avatar_url,
        r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private
 FROM workspaces w
 JOIN github_repos r ON r.id = w.github_repo_id
@@ -133,6 +134,7 @@ type GetWorkspaceWithRepoRow struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	Slug           string    `json:"slug"`
+	AvatarUrl      string    `json:"avatar_url"`
 	RepoFullName   string    `json:"repo_full_name"`
 	RepoOwner      string    `json:"repo_owner"`
 	RepoName       string    `json:"repo_name"`
@@ -152,6 +154,7 @@ func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWo
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.Slug,
+		&i.AvatarUrl,
 		&i.RepoFullName,
 		&i.RepoOwner,
 		&i.RepoName,
@@ -199,6 +202,7 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([
 
 const listWorkspacesWithRepo = `-- name: ListWorkspacesWithRepo :many
 SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at, w.slug,
+       w.avatar_url,
        r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private
 FROM workspaces w
 JOIN github_repos r ON r.id = w.github_repo_id
@@ -216,6 +220,7 @@ type ListWorkspacesWithRepoRow struct {
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	Slug           string    `json:"slug"`
+	AvatarUrl      string    `json:"avatar_url"`
 	RepoFullName   string    `json:"repo_full_name"`
 	RepoOwner      string    `json:"repo_owner"`
 	RepoName       string    `json:"repo_name"`
@@ -241,6 +246,7 @@ func (q *Queries) ListWorkspacesWithRepo(ctx context.Context, userID uuid.UUID) 
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.Slug,
+			&i.AvatarUrl,
 			&i.RepoFullName,
 			&i.RepoOwner,
 			&i.RepoName,

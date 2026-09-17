@@ -61,7 +61,7 @@ func (r *Registry) detect(spec RuntimeSpec) *v1.Runtime {
 			Kind:           spec.Kind,
 			ExecutablePath: path,
 			MaxConcurrency: 1,
-			Status:         "error",
+			Status:         v1.RuntimeStatusError,
 			Diagnostics:    fmt.Sprintf("version probe failed: %v", verr),
 		}
 	}
@@ -73,7 +73,7 @@ func (r *Registry) detect(spec RuntimeSpec) *v1.Runtime {
 				ExecutablePath: path,
 				Version:        version,
 				MaxConcurrency: 1,
-				Status:         "error",
+				Status:         v1.RuntimeStatusError,
 				Diagnostics:    fmt.Sprintf("%s: %v", spec.Kind, err),
 			}
 		}
@@ -84,7 +84,7 @@ func (r *Registry) detect(spec RuntimeSpec) *v1.Runtime {
 		ExecutablePath: path,
 		Version:        version,
 		MaxConcurrency: 1,
-		Status:         "available",
+		Status:         v1.RuntimeStatusAvailable,
 	}
 }
 

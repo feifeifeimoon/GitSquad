@@ -6,10 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
-type DaemonStatus = string
-
+// Daemon liveness. The column holds this raw flag; the server resolves it
+// against the last heartbeat on every read (see service.liveStatus), so a row
+// saying 'online' does not by itself mean the machine is reachable.
 const (
-	DaemonStatusOnline = "online"
+	DaemonStatusOnline  = "online"
+	DaemonStatusOffline = "offline"
 )
 
 // Daemon represents a registered daemon machine.

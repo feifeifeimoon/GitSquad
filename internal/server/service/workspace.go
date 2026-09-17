@@ -12,6 +12,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
 	"github.com/feifeifeimoon/GitSquad/internal/util"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -124,6 +125,11 @@ func (s *WorkspaceService) CreateWorkspace(ctx context.Context, userID uuid.UUID
 }
 
 // WorkspaceWithRepo combines workspace and repo information for the list view.
+//
+// It is an internal record, not a wire type: the API shape is v1.Workspace, and
+// keeping the two apart is what stops server-only columns (the installation and
+// repo ids, the owning user, the issue numbering) from leaking into responses.
+// Handlers that return a workspace go through ResolveWorkspaceResponse.
 type WorkspaceWithRepo struct {
 	db.Workspace
 	RepoFullName      string `json:"repo_full_name"`
@@ -135,7 +141,26 @@ type WorkspaceWithRepo struct {
 	LastCommitAt      string `json:"last_commit_at"`
 }
 
-func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID) ([]WorkspaceWithRepo, error) {
+// toWorkspace projects the internal record onto the API shape.
+func toWorkspace(w *WorkspaceWithRepo) *v1.Workspace {
+	return &v1.Workspace{
+		ID:                w.ID,
+		Slug:              w.Slug,
+		Name:              w.Name,
+		Status:            w.Status,
+		AvatarURL:         w.AvatarUrl,
+		CreatedAt:         w.CreatedAt,
+		RepoFullName:      w.RepoFullName,
+		RepoOwner:         w.RepoOwner,
+		RepoName:          w.RepoName,
+		RepoPrivate:       w.RepoPrivate,
+		LastCommitMessage: w.LastCommitMessage,
+		LastCommitAuthor:  w.LastCommitAuthor,
+		LastCommitAt:      w.LastCommitAt,
+	}
+}
+
+func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID) ([]v1.Workspace, error) {
 	rows, err := s.store.ListWorkspacesWithRepo(ctx, userID)
 	if err != nil {
 		return nil, fmt.Errorf("list workspaces: %w", err)
@@ -153,6 +178,7 @@ func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID)
 				Status:         row.Status,
 				CreatedAt:      row.CreatedAt,
 				UpdatedAt:      row.UpdatedAt,
+				AvatarUrl:      row.AvatarUrl,
 			},
 			RepoFullName: row.RepoFullName,
 			RepoOwner:    row.RepoOwner,
@@ -187,7 +213,11 @@ func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID)
 		}
 	}
 
-	return list, nil
+	workspaces := make([]v1.Workspace, len(list))
+	for i := range list {
+		workspaces[i] = *toWorkspace(&list[i])
+	}
+	return workspaces, nil
 }
 
 func (s *WorkspaceService) GetWorkspace(ctx context.Context, id uuid.UUID) (*WorkspaceWithRepo, error) {
@@ -206,6 +236,7 @@ func (s *WorkspaceService) GetWorkspace(ctx context.Context, id uuid.UUID) (*Wor
 			Status:         row.Status,
 			CreatedAt:      row.CreatedAt,
 			UpdatedAt:      row.UpdatedAt,
+			AvatarUrl:      row.AvatarUrl,
 		},
 		RepoFullName: row.RepoFullName,
 		RepoOwner:    row.RepoOwner,
@@ -236,10 +267,27 @@ func (s *WorkspaceService) ResolveWorkspace(ctx context.Context, userID uuid.UUI
 	return s.GetWorkspace(ctx, w.ID)
 }
 
+// ResolveWorkspaceResponse resolves a workspace by UUID or slug and projects it
+// onto the API shape, for handlers that return the workspace itself. Handlers
+// that only need the row — to authorise, or to reach the ids — use
+// ResolveWorkspace and keep the record server-side.
+func (s *WorkspaceService) ResolveWorkspaceResponse(ctx context.Context, userID uuid.UUID, ref string) (*v1.Workspace, error) {
+	ws, err := s.ResolveWorkspace(ctx, userID, ref)
+	if err != nil {
+		return nil, err
+	}
+	return toWorkspace(ws), nil
+}
+
+// WorkspaceStatusArchived is the soft-delete state: archived rows are filtered
+// out of every list and lookup query. 'active' is the column default, written
+// by the database rather than by any Go caller.
+const WorkspaceStatusArchived = "archived"
+
 func (s *WorkspaceService) ArchiveWorkspace(ctx context.Context, id uuid.UUID) error {
 	return s.store.UpdateWorkspaceStatus(ctx, db.UpdateWorkspaceStatusParams{
 		ID:     id,
-		Status: "archived",
+		Status: WorkspaceStatusArchived,
 	})
 }
 

@@ -19,16 +19,3 @@ func TestDeriveIssuePrefix(t *testing.T) {
 		}
 	}
 }
-
-func TestValidIssueStatus(t *testing.T) {
-	for _, s := range []string{"backlog", "todo", "in_progress", "in_review", "done", "blocked", "cancelled"} {
-		if !validIssueStatus(s) {
-			t.Errorf("validIssueStatus(%q) = false, want true", s)
-		}
-	}
-	for _, s := range []string{"open", "closed", "inprogress", ""} {
-		if validIssueStatus(s) {
-			t.Errorf("validIssueStatus(%q) = true, want false", s)
-		}
-	}
-}

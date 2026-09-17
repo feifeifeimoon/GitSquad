@@ -33,13 +33,13 @@ const daemonLiveWindow = 3 * time.Minute
 // terms come from the server clock, so a skewed browser cannot move the
 // boundary.
 func liveStatus(status string, lastSeenAt *time.Time) string {
-	if status != "online" {
-		return "offline"
+	if status != v1.DaemonStatusOnline {
+		return v1.DaemonStatusOffline
 	}
 	if lastSeenAt == nil || time.Since(*lastSeenAt) > daemonLiveWindow {
-		return "offline"
+		return v1.DaemonStatusOffline
 	}
-	return "online"
+	return v1.DaemonStatusOnline
 }
 
 type DaemonService struct {

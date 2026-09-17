@@ -7,8 +7,9 @@ import (
 	"github.com/google/uuid"
 )
 
-type TokenStatus = string
-
+// Token lifecycle. A token sits pending until the browser confirms the pairing,
+// and expires in place once its window closes; daemon_tokens.status carries the
+// same three values under a CHECK constraint.
 const (
 	TokenPending = "pending"
 	TokenActive  = "active"

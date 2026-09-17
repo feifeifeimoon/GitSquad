@@ -253,8 +253,8 @@ func (d *Daemon) heartbeatLoop(ctx context.Context) {
 	}
 }
 
-// handleHeartbeatAck processes the server's response to a heartbeat.
-// It iterates pending actions (task_available, shutdown, etc.).
+// handleHeartbeatAck processes the server's response to a heartbeat. It
+// iterates the pending actions the server piggybacked on the ack.
 func (d *Daemon) handleHeartbeatAck(ctx context.Context, f v1.Frame) {
 	var ack v1.WSHeartbeatAckPayload
 	if err := json.Unmarshal(f.Payload, &ack); err != nil {
@@ -266,11 +266,6 @@ func (d *Daemon) handleHeartbeatAck(ctx context.Context, f v1.Frame) {
 		case v1.ActionTaskAvailable:
 			slog.Info("task available via heartbeat")
 			d.signalTask()
-		case v1.ActionShutdown:
-			slog.Info("server requested shutdown")
-			if d.cancelFunc != nil {
-				go d.cancelFunc()
-			}
 		default:
 			slog.Info("heartbeat action", "type", action.Type)
 		}

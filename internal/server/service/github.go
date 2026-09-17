@@ -386,6 +386,11 @@ func (s *GitHubAppService) handleInstallationCreated(ctx context.Context, payloa
 	slog.Info("installation.created saved to memory", "installation_id", installationID, "account", accountLogin)
 }
 
+// InstallationStatusRevoked marks an installation GitHub has removed. It is the
+// only installation status Go writes; the sync query flips a revoked row back to
+// 'active' when the app is installed again.
+const InstallationStatusRevoked = "revoked"
+
 func (s *GitHubAppService) handleInstallationDeleted(ctx context.Context, payload []byte) {
 	var ev github.InstallationEvent
 	if err := json.Unmarshal(payload, &ev); err != nil {
@@ -403,7 +408,7 @@ func (s *GitHubAppService) handleInstallationDeleted(ctx context.Context, payloa
 	if inst.ID != uuid.Nil {
 		_ = s.store.UpdateInstallationStatus(ctx, db.UpdateInstallationStatusParams{
 			InstallationID: installationID,
-			Status:         "revoked",
+			Status:         InstallationStatusRevoked,
 		})
 		slog.Info("installation revoked", "installation_id", installationID)
 		return
