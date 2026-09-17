@@ -249,6 +249,20 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// Every read filters or buckets on created_at, so it leads the index.
 		{name: "038_task_usage_created_idx", sql: `CREATE INDEX IF NOT EXISTS idx_task_usage_created_at
 			ON task_usage(created_at)`},
+		// Three columns no code ever wrote, and which the console used to paper
+		// over by deriving the value client-side instead. Dropping them is what
+		// lets daemon liveness have exactly one owner.
+		//
+		// agent_runtimes.status held the 'offline' default forever (the daemon
+		// owns machine liveness now, via service.liveStatus), and
+		// agent_runtimes.last_seen_at was never written at all.
+		{name: "039_drop_agent_runtimes_status", sql: `ALTER TABLE agent_runtimes
+			DROP COLUMN IF EXISTS status,
+			DROP COLUMN IF EXISTS last_seen_at`},
+		// agents.run_count was never incremented — terminal runs are counted
+		// from the task queue (TotalRuns) instead.
+		{name: "040_drop_agents_run_count", sql: `ALTER TABLE agents
+			DROP COLUMN IF EXISTS run_count`},
 	}
 
 	for _, m := range migrations {

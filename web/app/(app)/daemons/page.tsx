@@ -19,7 +19,7 @@ import {
   Search,
 } from "lucide-react";
 import { daemonApi, type Daemon, type DaemonRuntime } from "@/lib/api";
-import { daemonStatus } from "@/lib/agent-status";
+import { STATUS_DOT } from "@/lib/agent-status";
 import { DaemonStatusBadge } from "@/components/status-dot";
 import { paths } from "@/lib/paths";
 import { timeAgo } from "@/lib/time";
@@ -345,13 +345,7 @@ function DaemonCard({
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2">
           <span
-            className={`size-2.5 shrink-0 rounded-full ${
-              daemonStatus(daemon) === "online"
-                ? "bg-success"
-                : daemonStatus(daemon) === "unstable"
-                  ? "bg-warning-deep"
-                  : "bg-hairline-strong"
-            }`}
+            className={`size-2.5 shrink-0 rounded-full ${STATUS_DOT[daemon.status]}`}
           />
           <Link
             href={paths.daemon(daemon.id)}
@@ -361,7 +355,7 @@ function DaemonCard({
           </Link>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <DaemonStatusBadge status={daemonStatus(daemon)} />
+          <DaemonStatusBadge status={daemon.status} />
           <RemoveDaemon
             deleting={deleting}
             onConfirm={onConfirmDelete}
@@ -473,13 +467,7 @@ function DaemonTable({
                 <td className="px-4 py-3">
                   <div className="flex items-center gap-2">
                     <span
-                      className={`size-2 shrink-0 rounded-full ${
-                        daemonStatus(d) === "online"
-                          ? "bg-success"
-                          : daemonStatus(d) === "unstable"
-                            ? "bg-warning-deep"
-                            : "bg-hairline-strong"
-                      }`}
+                      className={`size-2 shrink-0 rounded-full ${STATUS_DOT[d.status]}`}
                     />
                     <Link
                       href={paths.daemon(d.id)}
@@ -490,7 +478,7 @@ function DaemonTable({
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <DaemonStatusBadge status={daemonStatus(d)} />
+                  <DaemonStatusBadge status={d.status} />
                 </td>
                 <td className="px-4 py-3">
                   <span className="font-mono text-xs text-body">

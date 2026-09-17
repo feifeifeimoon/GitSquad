@@ -127,8 +127,8 @@ func (s *AgentService) ListAgents(ctx context.Context, workspaceID uuid.UUID) ([
 			id: r.ID, workspaceID: r.WorkspaceID, runtimeID: r.RuntimeID,
 			name: r.Name, description: r.Description, instructions: r.Instructions,
 			model: r.Model, runtimeProvider: r.RuntimeProvider, runtimeName: r.RuntimeName,
-			avatarURL: r.AvatarUrl, enabled: r.Enabled, runCount: r.RunCount,
-			runtimeDaemonID: r.RuntimeDaemonID, runtimeStatus: r.RuntimeStatus,
+			avatarURL: r.AvatarUrl, enabled: r.Enabled,
+			runtimeDaemonID:   r.RuntimeDaemonID,
 			runtimeDaemonName: r.RuntimeDaemonName, runtimeDaemonStatus: r.RuntimeDaemonStatus,
 			runtimeDaemonLastSeenAt: r.RuntimeDaemonLastSeenAt,
 			runningCount:            r.RunningCount, queuedCount: r.QueuedCount, totalRuns: r.TotalRuns,
@@ -148,8 +148,8 @@ func (s *AgentService) GetAgent(ctx context.Context, workspaceID, agentID uuid.U
 		id: r.ID, workspaceID: r.WorkspaceID, runtimeID: r.RuntimeID,
 		name: r.Name, description: r.Description, instructions: r.Instructions,
 		model: r.Model, runtimeProvider: r.RuntimeProvider, runtimeName: r.RuntimeName,
-		avatarURL: r.AvatarUrl, enabled: r.Enabled, runCount: r.RunCount,
-		runtimeDaemonID: r.RuntimeDaemonID, runtimeStatus: r.RuntimeStatus,
+		avatarURL: r.AvatarUrl, enabled: r.Enabled,
+		runtimeDaemonID:   r.RuntimeDaemonID,
 		runtimeDaemonName: r.RuntimeDaemonName, runtimeDaemonStatus: r.RuntimeDaemonStatus,
 		runtimeDaemonLastSeenAt: r.RuntimeDaemonLastSeenAt,
 		runningCount:            r.RunningCount, queuedCount: r.QueuedCount, totalRuns: r.TotalRuns,
@@ -271,15 +271,15 @@ func (s *AgentService) ListRuntimes(ctx context.Context, workspaceID uuid.UUID) 
 			Name:        r.Name,
 			RuntimeMode: r.RuntimeMode,
 			Provider:    r.Provider,
-			Status:      r.Status,
-			CreatedAt:   r.CreatedAt,
-			UpdatedAt:   r.UpdatedAt,
+			DaemonStatus: liveStatus(
+				util.Value(r.DaemonStatus),
+				r.DaemonLastSeenAt,
+			),
+			CreatedAt: r.CreatedAt,
+			UpdatedAt: r.UpdatedAt,
 		}
 		if r.DaemonName != nil {
 			rt.DaemonName = *r.DaemonName
-		}
-		if r.DaemonStatus != nil {
-			rt.DaemonStatus = *r.DaemonStatus
 		}
 		out = append(out, rt)
 	}
@@ -313,9 +313,7 @@ type agentRow struct {
 	model, runtimeProvider, runtimeName    string
 	avatarURL                              string
 	enabled                                bool
-	runCount                               int32
 	runtimeDaemonID                        *uuid.UUID
-	runtimeStatus                          string
 	runtimeDaemonName, runtimeDaemonStatus *string
 	runtimeDaemonLastSeenAt                *time.Time
 	runningCount, queuedCount, totalRuns   int32
@@ -337,7 +335,6 @@ func buildAgentView(r agentRow) v1.Agent {
 		RuntimeID:    r.runtimeID,
 		Enabled:      r.enabled,
 		AvatarURL:    r.avatarURL,
-		RunCount:     int(r.runCount),
 		RunningCount: int(r.runningCount),
 		QueuedCount:  int(r.queuedCount),
 		TotalRuns:    int(r.totalRuns),
@@ -345,14 +342,14 @@ func buildAgentView(r agentRow) v1.Agent {
 		CreatedAt:    r.createdAt,
 		UpdatedAt:    r.updatedAt,
 		Runtime: &v1.AgentRuntime{
-			ID:           r.runtimeID,
-			Name:         r.runtimeName,
-			Provider:     r.runtimeProvider,
-			DaemonID:     r.runtimeDaemonID,
-			Status:       r.runtimeStatus,
-			DaemonName:   util.Value(r.runtimeDaemonName),
-			DaemonStatus: util.Value(r.runtimeDaemonStatus),
-			LastSeenAt:   r.runtimeDaemonLastSeenAt,
+			ID:         r.runtimeID,
+			Name:       r.runtimeName,
+			Provider:   r.runtimeProvider,
+			DaemonID:   r.runtimeDaemonID,
+			DaemonName: util.Value(r.runtimeDaemonName),
+			// Resolved here rather than handed to the client as a timestamp to
+			// compare against its own clock.
+			DaemonStatus: liveStatus(util.Value(r.runtimeDaemonStatus), r.runtimeDaemonLastSeenAt),
 		},
 	}
 }

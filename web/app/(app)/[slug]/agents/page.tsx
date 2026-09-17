@@ -109,6 +109,9 @@ export default function WorkspaceAgentsPage() {
       .then((ds) =>
         setDaemons(
           (ds || [])
+            // Safe to trust as-is: the server resolves liveness against the
+            // heartbeat before it sends a row, so this filter and the daemons
+            // page can never disagree about the same machine.
             .filter((d) => d.status === "online")
             .map((d) => ({
               id: d.id,

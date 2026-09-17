@@ -1,36 +1,21 @@
-// Agent and daemon liveness, derived on the client.
+// Agent and daemon status, as labels for what the server already decided.
 //
-// Neither is a stored field we can trust. `agent_runtimes.status` is never
-// refreshed by the server — it keeps its 'offline' default forever — and
-// `run_count` is never incremented, so the task queue is the only honest record
-// of what an agent is doing. Both the agents list and the daemon detail page
-// read status from here so the two surfaces can never disagree.
+// Daemon liveness is not ours to infer: the server resolves the stored status
+// against the last heartbeat before it sends a row (see service.liveStatus),
+// so `daemon.status` and `runtime.daemon_status` are already online or offline
+// by the time they arrive. Do not reintroduce a timestamp comparison here — a
+// browser clock cannot decide whether a machine is reachable, so comparing one
+// against a server timestamp makes the answer depend on who is looking.
+//
+// What is left for the client is naming the workload: an agent's task counts
+// are honest (they come from the task queue), so mapping them to a word is
+// presentation. `run_count` never was, and is gone.
 
-export type AgentStatus = "running" | "queued" | "idle" | "unstable" | "offline";
-export type DaemonStatus = "online" | "unstable" | "offline";
+export type AgentStatus = "running" | "queued" | "idle" | "offline";
+export type DaemonStatus = "online" | "offline";
 
 /** The union of both vocabularies, for the shared colour maps. */
 export type StatusTone = AgentStatus | DaemonStatus;
-
-/**
- * A daemon heartbeats every 30s and the server batches the last_seen_at writes
- * every 60s, so a timestamp older than this means the 'online' flag is stale
- * rather than live (a daemon that died without the socket closing).
- */
-export const DAEMON_STALE_MS = 3 * 60 * 1000;
-
-function isFresh(lastSeenAt: string | null | undefined, now: number): boolean {
-  if (!lastSeenAt) return false;
-  return now - new Date(lastSeenAt).getTime() <= DAEMON_STALE_MS;
-}
-
-export function daemonStatus(
-  daemon: { status: string; last_seen_at: string | null },
-  now: number = Date.now(),
-): DaemonStatus {
-  if (daemon.status !== "online") return "offline";
-  return isFresh(daemon.last_seen_at, now) ? "online" : "unstable";
-}
 
 /** The slice of an agent this module needs — lets the daemon page reuse it. */
 export interface AgentLiveness {
@@ -38,28 +23,15 @@ export interface AgentLiveness {
   queued_count: number;
   runtime?: {
     daemon_id?: string | null;
-    daemon_status?: string;
-    last_seen_at?: string | null;
+    daemon_status?: DaemonStatus | string;
   } | null;
 }
 
-export function agentStatus(
-  agent: AgentLiveness,
-  now: number = Date.now(),
-): AgentStatus {
+export function agentStatus(agent: AgentLiveness): AgentStatus {
   const runtime = agent.runtime;
   if (!runtime?.daemon_id) return "offline";
 
-  return agentStatusWithDaemon(
-    daemonStatus(
-      {
-        status: runtime.daemon_status ?? "",
-        last_seen_at: runtime.last_seen_at ?? null,
-      },
-      now,
-    ),
-    agent,
-  );
+  return agentStatusWithDaemon(daemonStatusOf(runtime.daemon_status), agent);
 }
 
 /**
@@ -72,25 +44,29 @@ export function agentStatusWithDaemon(
   workload: { running_count: number; queued_count: number },
 ): AgentStatus {
   if (daemon === "offline") return "offline";
-  // A daemon that claims to be online but has gone silent outranks any task
-  // count: work attributed to it is most likely stuck, not progressing.
-  if (daemon === "unstable") return "unstable";
   if (workload.running_count > 0) return "running";
   if (workload.queued_count > 0) return "queued";
   return "idle";
+}
+
+/**
+ * Narrows a status the wire types as a plain string. Anything the server does
+ * not call "online" is offline: failing towards "this machine is not reachable"
+ * is the safe reading, and it is the only value the server sends.
+ */
+export function daemonStatusOf(status: string | null | undefined): DaemonStatus {
+  return status === "online" ? "online" : "offline";
 }
 
 export const AGENT_STATUS_LABEL: Record<AgentStatus, string> = {
   running: "Running",
   queued: "Queued",
   idle: "Idle",
-  unstable: "Unstable",
   offline: "Offline",
 };
 
 export const DAEMON_STATUS_LABEL: Record<DaemonStatus, string> = {
   online: "Online",
-  unstable: "Unstable",
   offline: "Offline",
 };
 
@@ -102,7 +78,6 @@ export const STATUS_DOT: Record<StatusTone, string> = {
   running: "bg-success",
   queued: "bg-warning",
   idle: "bg-cyan-deep",
-  unstable: "bg-warning-deep",
   online: "bg-success",
   offline: "bg-hairline-strong",
 };
@@ -112,7 +87,6 @@ export const STATUS_TEXT: Record<StatusTone, string> = {
   running: "text-ink",
   queued: "text-body",
   idle: "text-body",
-  unstable: "text-warning-deep",
   online: "text-body",
   offline: "text-mute",
 };

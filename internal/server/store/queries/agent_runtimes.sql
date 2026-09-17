@@ -6,7 +6,10 @@ ON CONFLICT (workspace_id, daemon_id, provider) DO UPDATE SET
 RETURNING *;
 
 -- name: ListAgentRuntimesByWorkspace :many
-SELECT ar.*, d.name AS daemon_name, d.status AS daemon_status
+-- The daemon's last_seen_at comes along so the service can resolve liveness
+-- before the client sees it; see service.liveStatus.
+SELECT ar.*, d.name AS daemon_name, d.status AS daemon_status,
+       d.last_seen_at AS daemon_last_seen_at
 FROM agent_runtimes ar
 LEFT JOIN daemons d ON d.id = ar.daemon_id
 WHERE ar.workspace_id = $1

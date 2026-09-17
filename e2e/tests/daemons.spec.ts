@@ -116,11 +116,12 @@ test.describe("Daemons", () => {
     expect(stored.name).toBe(renamed);
   });
 
-  test("reports an online daemon that stopped heartbeating as unstable", async ({
+  test("reports an online daemon that stopped heartbeating as offline", async ({
     page,
   }) => {
-    // Online but silent for well past the freshness window: the row survived a
-    // crash, so claiming "Online" would be a lie.
+    // Online but silent past the freshness window: the row survived a crash, so
+    // repeating its 'online' flag would be a claim the heartbeats no longer
+    // support. The server resolves this before the client ever sees it.
     const stale = await api.seedDaemon({
       name: `E2E Stale ${suffix}`,
       lastSeenMsAgo: 10 * 60 * 1000,
@@ -129,8 +130,8 @@ test.describe("Daemons", () => {
     await loginAsE2E(page, api);
     await page.goto(`/daemons/${stale.id}`, { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByText("Unstable", { exact: true })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(
+      page.locator("header").getByText("Offline", { exact: true }),
+    ).toBeVisible({ timeout: 20_000 });
   });
 });

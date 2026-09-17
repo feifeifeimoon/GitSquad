@@ -13,7 +13,7 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *;
 -- list cannot apply to a row that never existed.
 -- name: ListAgentsByWorkspace :many
 SELECT a.*, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
-       ar.status AS runtime_status, d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
+       d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
        d.last_seen_at AS runtime_daemon_last_seen_at,
        workload.running_count, workload.queued_count, workload.total_runs,
        coalesce(cur.issue_prefix, '') AS issue_prefix,
@@ -42,7 +42,7 @@ ORDER BY a.created_at ASC;
 
 -- name: GetAgent :one
 SELECT a.*, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
-       ar.status AS runtime_status, d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
+       d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
        d.last_seen_at AS runtime_daemon_last_seen_at,
        workload.running_count, workload.queued_count, workload.total_runs,
        coalesce(cur.issue_prefix, '') AS issue_prefix,
@@ -80,7 +80,7 @@ SELECT name FROM agents WHERE workspace_id = $1 AND enabled = true ORDER BY name
 
 -- name: ListAgentsByDaemon :many
 SELECT a.*, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
-       ar.status AS runtime_status, d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
+       d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
        d.last_seen_at AS runtime_daemon_last_seen_at,
        w.name AS workspace_name, w.slug AS workspace_slug,
        workload.running_count, workload.queued_count, workload.total_runs,

@@ -15,6 +15,33 @@ import (
 	"github.com/google/uuid"
 )
 
+// daemonLiveWindow is how long a daemon may stay silent before its stored
+// 'online' flag stops counting as liveness. A daemon heartbeats every 30s and
+// the server batches the last_seen_at writes every 60s, so the window has to
+// clear that batch lag.
+//
+// The hub evicts a silent connection at 60s, which flips the row offline
+// through OnDisconnect. This window exists for the case that path cannot see:
+// a server restart drops every connection with the process, so OnDisconnect
+// never runs and a row can keep 'online' with a frozen timestamp forever.
+const daemonLiveWindow = 3 * time.Minute
+
+// liveStatus resolves a daemon's stored status against its last heartbeat.
+//
+// Liveness is decided here, on the server, because it is a fact about the
+// machine rather than a way of presenting one: every surface must agree. Both
+// terms come from the server clock, so a skewed browser cannot move the
+// boundary.
+func liveStatus(status string, lastSeenAt *time.Time) string {
+	if status != "online" {
+		return "offline"
+	}
+	if lastSeenAt == nil || time.Since(*lastSeenAt) > daemonLiveWindow {
+		return "offline"
+	}
+	return "online"
+}
+
 type DaemonService struct {
 	store *store.Store
 	// hasPending reports whether a daemon has queued tasks; wired to the
@@ -464,7 +491,7 @@ func toDaemon(d *db.Daemon) *v1.Daemon {
 		OS:            d.Os,
 		Arch:          d.Arch,
 		DaemonVersion: d.DaemonVersion,
-		Status:        d.Status,
+		Status:        liveStatus(d.Status, d.LastSeenAt),
 		LastSeenAt:    d.LastSeenAt,
 		ConnectedAt:   d.ConnectedAt,
 		RegisteredAt:  d.RegisteredAt,
@@ -480,7 +507,7 @@ func toDaemonFromRow(row db.ListDaemonsByUserRow) *v1.Daemon {
 		OS:            row.Os,
 		Arch:          row.Arch,
 		DaemonVersion: row.DaemonVersion,
-		Status:        row.Status,
+		Status:        liveStatus(row.Status, row.LastSeenAt),
 		LastSeenAt:    row.LastSeenAt,
 		ConnectedAt:   row.ConnectedAt,
 		RegisteredAt:  row.RegisteredAt,
