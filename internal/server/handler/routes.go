@@ -58,10 +58,16 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	taskSvc.SetPublisher(appHub)
 
 	// Daemon channel: stale connections (untouched for 2 heartbeat cycles) are
-	// evicted, which flips the daemon offline and fails its in-flight tasks.
+	// evicted, which flips the daemon offline. Its tasks are released separately,
+	// on a heartbeat clock that a reconnect resets.
+	//
+	// A disconnect is held for a short grace before it is reported, so the redial
+	// that follows a dropped socket — a NAT rebind, a resumed laptop — is not
+	// mistaken for the daemon going away.
+	//
 	// The task dispatcher shares this hub so it can wake a daemon the moment a
 	// task is queued.
-	daemonHub := ws.NewHub(60 * time.Second)
+	daemonHub := ws.NewHub(60*time.Second, ws.WithDisconnectGrace(5*time.Second))
 	taskSvc.SetWaker(daemonHub)
 
 	r.GET("/healthz", func(c *gin.Context) {

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
@@ -265,12 +266,17 @@ func (s *TaskService) recordUsage(ctx context.Context, taskID uuid.UUID, usage [
 	})
 }
 
-// FailDaemonTasks marks a daemon's in-flight tasks failed when it goes
-// offline, and writes a system comment back to each issue.
-func (s *TaskService) FailDaemonTasks(ctx context.Context, daemonID uuid.UUID) error {
-	failed, err := s.store.FailDaemonTasks(ctx, &daemonID)
+// FailSilentDaemonTasks fails the in-flight tasks of daemons that have not
+// heartbeated for longer than grace, and writes a system comment back to each
+// issue.
+//
+// This is deliberately the only path that fails work on a daemon's behalf, and
+// it is driven by a heartbeat clock rather than by a socket event — see the
+// query for why loss of contact is not evidence that the work is gone.
+func (s *TaskService) FailSilentDaemonTasks(ctx context.Context, grace time.Duration) error {
+	failed, err := s.store.FailTasksOfSilentDaemons(ctx, grace.Seconds())
 	if err != nil {
-		return fmt.Errorf("fail daemon tasks: %w", err)
+		return fmt.Errorf("fail silent daemon tasks: %w", err)
 	}
 	for _, task := range failed {
 		full, err := taskContext(task)

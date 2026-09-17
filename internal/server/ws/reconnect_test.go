@@ -32,18 +32,7 @@ func TestReconnectSurvivesLateCleanupOfThePreviousSocket(t *testing.T) {
 	}
 
 	daemonID := uuid.New().String()
-
-	// Stand-in for the real auth handler: same publish order, no database.
-	disp := NewDispatcher()
-	disp.On(TypeAuth, func(conn *Conn, hub *Hub, frame Frame) *Frame {
-		conn.DaemonID = daemonID
-		conn.Authenticated = true
-		hub.Register(conn)
-		return &Frame{Type: TypeAuthAck}
-	})
-
-	srv := httptest.NewServer(Upgrade(hub, disp))
-	defer srv.Close()
+	srv := newDaemonServer(t, hub, daemonID)
 
 	first := dialDaemon(t, srv.URL, daemonID)
 	_ = first
@@ -82,6 +71,103 @@ func TestReconnectSurvivesLateCleanupOfThePreviousSocket(t *testing.T) {
 	if frame.Type != TypeTaskWake {
 		t.Fatalf("frame type = %q, want %q", frame.Type, TypeTaskWake)
 	}
+}
+
+// A daemon that drops its socket and redials straight away must not be reported
+// as disconnected.
+//
+// This is the shape of a NAT rebind or a laptop resuming from sleep: the old
+// socket ends, the daemon is back sub-second later, and it never stopped running
+// its task. Reporting the drop would mark a live daemon offline and fail work it
+// is still executing, so the hub holds the report back and cancels it.
+func TestDropThenImmediateRedialIsNotADisconnect(t *testing.T) {
+	hub := NewHub(0, WithDisconnectGrace(500*time.Millisecond))
+	defer hub.Close()
+
+	var mu sync.Mutex
+	var disconnects []string
+	hub.OnDisconnect = func(id string) {
+		mu.Lock()
+		disconnects = append(disconnects, id)
+		mu.Unlock()
+	}
+
+	daemonID := uuid.New().String()
+	srv := newDaemonServer(t, hub, daemonID)
+
+	first := dialDaemon(t, srv.URL, daemonID)
+	_ = first.Close() // the socket dies
+	second := dialDaemon(t, srv.URL, daemonID)
+
+	// Wait comfortably past the grace window.
+	time.Sleep(900 * time.Millisecond)
+
+	mu.Lock()
+	got := append([]string(nil), disconnects...)
+	mu.Unlock()
+	if len(got) != 0 {
+		t.Fatalf("a redial inside the grace window must not report a disconnect, got %v", got)
+	}
+
+	// The live socket is the one the hub holds, so a wake still reaches it.
+	hub.Wake(uuid.MustParse(daemonID))
+	if err := second.SetReadDeadline(time.Now().Add(3 * time.Second)); err != nil {
+		t.Fatalf("set read deadline: %v", err)
+	}
+	_, msg, err := second.ReadMessage()
+	if err != nil {
+		t.Fatalf("the live connection received no wake: %v", err)
+	}
+	var frame Frame
+	if err := json.Unmarshal(msg, &frame); err != nil {
+		t.Fatalf("unmarshal wake frame: %v", err)
+	}
+	if frame.Type != TypeTaskWake {
+		t.Fatalf("frame type = %q, want %q", frame.Type, TypeTaskWake)
+	}
+}
+
+// The other half of the same rule: a daemon that does not come back must still
+// be reported, or the grace would just be a way to never notice a dead daemon.
+func TestDropWithNoRedialIsReported(t *testing.T) {
+	hub := NewHub(0, WithDisconnectGrace(100*time.Millisecond))
+	defer hub.Close()
+
+	notified := make(chan string, 4)
+	hub.OnDisconnect = func(id string) { notified <- id }
+
+	daemonID := uuid.New().String()
+	srv := newDaemonServer(t, hub, daemonID)
+
+	first := dialDaemon(t, srv.URL, daemonID)
+	_ = first.Close()
+
+	select {
+	case id := <-notified:
+		if id != daemonID {
+			t.Fatalf("notified %q, want %q", id, daemonID)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("a daemon that never came back was never reported as disconnected")
+	}
+}
+
+// newDaemonServer serves the daemon WS endpoint with a stand-in auth handler:
+// the same publish order as the real one, no database.
+func newDaemonServer(t *testing.T, hub *Hub, daemonID string) *httptest.Server {
+	t.Helper()
+
+	disp := NewDispatcher()
+	disp.On(TypeAuth, func(conn *Conn, hub *Hub, frame Frame) *Frame {
+		conn.DaemonID = daemonID
+		conn.Authenticated = true
+		hub.Register(conn)
+		return &Frame{Type: TypeAuthAck}
+	})
+
+	srv := httptest.NewServer(Upgrade(hub, disp))
+	t.Cleanup(srv.Close)
+	return srv
 }
 
 // dialDaemon opens a daemon socket, authenticates it, and waits for the ack.

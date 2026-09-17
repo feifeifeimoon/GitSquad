@@ -39,23 +39,55 @@ type Hub struct {
 	conns        map[string]*Conn // daemon_id → the current conn
 	OnDisconnect func(daemonID string)
 
+	// disconnectGrace is how long a disconnect is held back before OnDisconnect
+	// fires. See Unregister for why a socket event is not evidence on its own.
+	disconnectGrace time.Duration
+	pending         map[string]*pendingDisconnect
+
 	staleTimeout time.Duration
 	staleTick    time.Duration
 	ctx          context.Context
 	cancel       context.CancelFunc
 }
 
+// pendingDisconnect is a disconnect that has been observed but not yet believed.
+// It carries the exact connection that left, so a timer that outlives its
+// connection cannot report on the successor's behalf.
+type pendingDisconnect struct {
+	conn  *Conn
+	timer *time.Timer
+}
+
+// HubOption configures a Hub at construction.
+type HubOption func(*Hub)
+
+// WithDisconnectGrace delays OnDisconnect by d. A daemon that reconnects inside
+// that window is never reported as having gone away, which is what keeps a
+// dropped socket followed by a fast redial from marking a live daemon offline
+// and failing the tasks it is still running. Zero (the default) reports a
+// disconnect as soon as it is seen.
+//
+// The delay only applies to the notification. A disconnected connection leaves
+// the pool immediately, so wakes addressed to it are not queued at a dead socket.
+func WithDisconnectGrace(d time.Duration) HubOption {
+	return func(h *Hub) { h.disconnectGrace = d }
+}
+
 // NewHub creates a Hub and, if staleTimeout > 0, starts a built-in stale
 // detection goroutine. Call Hub.Close() when the Hub is no longer needed
 // to stop the goroutine.
-func NewHub(staleTimeout time.Duration) *Hub {
+func NewHub(staleTimeout time.Duration, opts ...HubOption) *Hub {
 	ctx, cancel := context.WithCancel(context.Background())
 	h := &Hub{
 		conns:        make(map[string]*Conn),
+		pending:      make(map[string]*pendingDisconnect),
 		staleTimeout: staleTimeout,
 		staleTick:    staleCheckInterval(staleTimeout),
 		ctx:          ctx,
 		cancel:       cancel,
+	}
+	for _, opt := range opts {
+		opt(h)
 	}
 	if staleTimeout > 0 {
 		go h.runStaleDetection()
@@ -75,8 +107,28 @@ func staleCheckInterval(staleTimeout time.Duration) time.Duration {
 
 // Close stops the built-in stale detector. The Hub remains usable for
 // in-flight operations but stale connections will no longer be evicted.
+//
+// Disconnects still waiting out their grace window are reported rather than
+// dropped, so a hub that is going away does not leave its daemons looking
+// connected. The notifications run synchronously here.
 func (h *Hub) Close() {
 	h.cancel()
+
+	h.mu.Lock()
+	pending := h.pending
+	h.pending = make(map[string]*pendingDisconnect)
+	notify := h.OnDisconnect
+	h.mu.Unlock()
+
+	for _, p := range pending {
+		p.timer.Stop()
+	}
+	if notify == nil {
+		return
+	}
+	for daemonID := range pending {
+		notify(daemonID)
+	}
 }
 
 // Register publishes conn as the current connection for conn.DaemonID,
@@ -94,6 +146,18 @@ func (h *Hub) Register(conn *Conn) {
 	h.mu.Lock()
 	previous := h.conns[conn.DaemonID]
 	h.conns[conn.DaemonID] = conn
+	// Cancel a disconnect that is still inside its grace window: the daemon came
+	// back, so it was never away. Doing this under the same lock that publishes
+	// the connection is what makes it airtight — a timer that has already fired
+	// either finds no pending entry once it gets the lock, or notified before
+	// this point, in which case the caller's MarkOnline lands after it (see
+	// authHandler) and the status still ends up correct.
+	returnedInsideGrace := false
+	if p, ok := h.pending[conn.DaemonID]; ok {
+		p.timer.Stop()
+		delete(h.pending, conn.DaemonID)
+		returnedInsideGrace = true
+	}
 	h.mu.Unlock()
 
 	if previous != nil && previous != conn {
@@ -101,24 +165,23 @@ func (h *Hub) Register(conn *Conn) {
 		// blocked until its read deadline. A socket that lingers for minutes
 		// is what used to queue a stale cleanup behind the new connection.
 		previous.Close()
-		slog.Info("WS daemon reconnected", "daemon_id", conn.DaemonID)
+		slog.Info("WS daemon reconnected", "daemon_id", conn.DaemonID, "inside_grace", returnedInsideGrace)
 		return
 	}
 	slog.Info("WS daemon connected", "daemon_id", conn.DaemonID)
 }
 
-// Unregister removes conn from the hub and notifies OnDisconnect — but only if
+// Unregister removes conn from the hub and reports the disconnect — but only if
 // conn is still the current connection for its daemon.
 //
 // That identity check is the point: a read loop whose socket died *after* the
 // daemon reconnected runs its cleanup late, and without the check it would
 // evict the live connection, mark a connected daemon offline and fail its
 // running tasks.
+//
+// The pool entry goes immediately; only the report waits out the grace window
+// (see WithDisconnectGrace), so a wake is never queued at a dead socket.
 func (h *Hub) Unregister(conn *Conn) {
-	h.unregister(conn, true)
-}
-
-func (h *Hub) unregister(conn *Conn, notify bool) {
 	if conn.DaemonID == "" {
 		return
 	}
@@ -130,11 +193,57 @@ func (h *Hub) unregister(conn *Conn, notify bool) {
 		return
 	}
 	delete(h.conns, conn.DaemonID)
+
+	// A socket ending is not by itself evidence that the daemon is gone. A NAT
+	// rebind, a suspended laptop or a server-side read deadline all drop the
+	// socket while the daemon keeps running its task, and a redial lands
+	// sub-second later. Reporting the disconnect straight away would mark a live
+	// daemon offline and fail work it is still executing, so the notification
+	// waits out the grace window and is cancelled outright if the daemon
+	// reconnects inside it.
+	notifyFn := h.OnDisconnect
+	grace := h.disconnectGrace
+	immediate := notifyFn != nil && grace <= 0
+	if notifyFn != nil && !immediate {
+		p := &pendingDisconnect{conn: conn}
+		p.timer = time.AfterFunc(grace, func() {
+			h.fireDisconnect(conn.DaemonID, conn)
+		})
+		h.pending[conn.DaemonID] = p
+	}
 	h.mu.Unlock()
 
-	slog.Info("WS daemon disconnected", "daemon_id", conn.DaemonID)
-	if notify && h.OnDisconnect != nil {
-		h.OnDisconnect(conn.DaemonID)
+	// The two cases are logged differently on purpose: "socket closed" is what
+	// the daemon's end of the wire did, "disconnected" is the hub's conclusion.
+	// Losing that distinction is what made a live daemon's console say offline
+	// while its own log said healthy.
+	if immediate {
+		slog.Info("WS daemon disconnected", "daemon_id", conn.DaemonID)
+		notifyFn(conn.DaemonID)
+		return
+	}
+	slog.Info("WS daemon socket closed; holding the disconnect",
+		"daemon_id", conn.DaemonID, "grace", grace)
+}
+
+// fireDisconnect reports a disconnect whose grace window has elapsed. It
+// re-checks the pending entry by connection identity: Register may have
+// consumed it, and an id-only lookup could otherwise report a daemon that is
+// connected again.
+func (h *Hub) fireDisconnect(daemonID string, conn *Conn) {
+	h.mu.Lock()
+	p, ok := h.pending[daemonID]
+	if !ok || p.conn != conn {
+		h.mu.Unlock()
+		return
+	}
+	delete(h.pending, daemonID)
+	notify := h.OnDisconnect
+	h.mu.Unlock()
+
+	slog.Info("WS daemon disconnected", "daemon_id", daemonID)
+	if notify != nil {
+		notify(daemonID)
 	}
 }
 

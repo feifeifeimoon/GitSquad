@@ -8,6 +8,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/database"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
@@ -209,14 +210,35 @@ func TestTaskLifecycleQueries(t *testing.T) {
 		t.Fatalf("second MarkTaskFailed err = %v, want pgx.ErrNoRows", err)
 	}
 
-	// 6. FailDaemonTasks marks in-flight tasks failed (runtime_offline).
+	// 6. FailTasksOfSilentDaemons releases in-flight work — but only from a daemon
+	// that has actually stopped checking in. Losing the socket is not evidence
+	// that the daemon stopped working, so the gate is the heartbeat, not the
+	// socket, and this pins both directions of it.
+	const grace = 300 * time.Second
 	task2 := f.createTask(t, ctx, s)
 	if _, err := s.ClaimNextTask(ctx, &f.daemon.ID); err != nil {
 		t.Fatalf("claim task2: %v", err)
 	}
-	failed, err := s.FailDaemonTasks(ctx, &f.daemon.ID)
+
+	failed, err := s.FailTasksOfSilentDaemons(ctx, grace.Seconds())
+	if err != nil {
+		t.Fatalf("FailTasksOfSilentDaemons: %v", err)
+	}
+	if len(failed) != 0 {
+		t.Fatalf("a daemon that is still reporting in must keep its work, got %d failed", len(failed))
+	}
+
+	// Backdate the heartbeat past the grace; the same call must now take it.
+	if _, err := pool.Exec(ctx,
+		"UPDATE daemons SET last_seen_at = now() - interval '10 minutes' WHERE id = $1",
+		f.daemon.ID,
+	); err != nil {
+		t.Fatalf("backdate heartbeat: %v", err)
+	}
+
+	failed, err = s.FailTasksOfSilentDaemons(ctx, grace.Seconds())
 	if err != nil || len(failed) != 1 {
-		t.Fatalf("FailDaemonTasks: %v (n=%d)", err, len(failed))
+		t.Fatalf("FailTasksOfSilentDaemons: %v (n=%d)", err, len(failed))
 	}
 	if failed[0].ID != task2.ID || *failed[0].FailureReason != "runtime_offline" {
 		t.Fatalf("failed task = %+v", failed[0])
