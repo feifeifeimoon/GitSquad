@@ -14,7 +14,6 @@ import {
 import { daemonApi, type DaemonAgent, type DaemonDetail, type DaemonRuntimeDetail } from "@/lib/api";
 import {
   agentStatusWithDaemon,
-  daemonStatus,
   workloadDetail,
   type DaemonStatus,
 } from "@/lib/agent-status";
@@ -42,22 +41,24 @@ export default function DaemonDetailPage() {
       daemonApi
         .get(id)
         .then(setDaemon)
-        .catch(() => router.push(paths.daemons()))
         .finally(() => setLoading(false)),
-    [id, router],
+    [id],
   );
 
+  // A daemon that no longer exists (or is no longer ours) is worth leaving the
+  // page for; a blip on the poll below is not.
   useEffect(() => {
-    load();
-  }, [load]);
+    load().catch(() => router.push(paths.daemons()));
+  }, [load, router]);
 
-  // Daemon liveness is derived from heartbeats, so the page has to re-derive it
-  // as time passes; without a tick a daemon that goes quiet stays "Online".
-  const [, setTick] = useState(0);
+  // Liveness is decided by the server, so this page has to keep asking it — the
+  // answer changes on the machine's schedule, not on the render's.
   useEffect(() => {
-    const interval = setInterval(() => setTick((t) => t + 1), 15_000);
+    const interval = setInterval(() => {
+      load().catch(() => {});
+    }, 15_000);
     return () => clearInterval(interval);
-  }, []);
+  }, [load]);
 
   if (loading || !daemon) {
     return (
@@ -85,7 +86,7 @@ export default function DaemonDetailPage() {
     );
   }
 
-  const status = daemonStatus(daemon);
+  const status = daemon.status;
   const agentCount = daemon.runtimes.reduce((n, r) => n + r.agents.length, 0);
 
   return (

@@ -13,7 +13,8 @@ import (
 )
 
 const listAgentRuntimesByWorkspace = `-- name: ListAgentRuntimesByWorkspace :many
-SELECT ar.id, ar.workspace_id, ar.daemon_id, ar.name, ar.runtime_mode, ar.provider, ar.status, ar.device_info, ar.metadata, ar.last_seen_at, ar.created_at, ar.updated_at, d.name AS daemon_name, d.status AS daemon_status
+SELECT ar.id, ar.workspace_id, ar.daemon_id, ar.name, ar.runtime_mode, ar.provider, ar.device_info, ar.metadata, ar.created_at, ar.updated_at, d.name AS daemon_name, d.status AS daemon_status,
+       d.last_seen_at AS daemon_last_seen_at
 FROM agent_runtimes ar
 LEFT JOIN daemons d ON d.id = ar.daemon_id
 WHERE ar.workspace_id = $1
@@ -21,22 +22,23 @@ ORDER BY ar.created_at ASC
 `
 
 type ListAgentRuntimesByWorkspaceRow struct {
-	ID           uuid.UUID  `json:"id"`
-	WorkspaceID  uuid.UUID  `json:"workspace_id"`
-	DaemonID     *uuid.UUID `json:"daemon_id"`
-	Name         string     `json:"name"`
-	RuntimeMode  string     `json:"runtime_mode"`
-	Provider     string     `json:"provider"`
-	Status       string     `json:"status"`
-	DeviceInfo   string     `json:"device_info"`
-	Metadata     []byte     `json:"metadata"`
-	LastSeenAt   *time.Time `json:"last_seen_at"`
-	CreatedAt    time.Time  `json:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at"`
-	DaemonName   *string    `json:"daemon_name"`
-	DaemonStatus *string    `json:"daemon_status"`
+	ID               uuid.UUID  `json:"id"`
+	WorkspaceID      uuid.UUID  `json:"workspace_id"`
+	DaemonID         *uuid.UUID `json:"daemon_id"`
+	Name             string     `json:"name"`
+	RuntimeMode      string     `json:"runtime_mode"`
+	Provider         string     `json:"provider"`
+	DeviceInfo       string     `json:"device_info"`
+	Metadata         []byte     `json:"metadata"`
+	CreatedAt        time.Time  `json:"created_at"`
+	UpdatedAt        time.Time  `json:"updated_at"`
+	DaemonName       *string    `json:"daemon_name"`
+	DaemonStatus     *string    `json:"daemon_status"`
+	DaemonLastSeenAt *time.Time `json:"daemon_last_seen_at"`
 }
 
+// The daemon's last_seen_at comes along so the service can resolve liveness
+// before the client sees it; see service.liveStatus.
 func (q *Queries) ListAgentRuntimesByWorkspace(ctx context.Context, workspaceID uuid.UUID) ([]ListAgentRuntimesByWorkspaceRow, error) {
 	rows, err := q.db.Query(ctx, listAgentRuntimesByWorkspace, workspaceID)
 	if err != nil {
@@ -53,14 +55,13 @@ func (q *Queries) ListAgentRuntimesByWorkspace(ctx context.Context, workspaceID 
 			&i.Name,
 			&i.RuntimeMode,
 			&i.Provider,
-			&i.Status,
 			&i.DeviceInfo,
 			&i.Metadata,
-			&i.LastSeenAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DaemonName,
 			&i.DaemonStatus,
+			&i.DaemonLastSeenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -77,7 +78,7 @@ INSERT INTO agent_runtimes (workspace_id, daemon_id, name, runtime_mode, provide
 VALUES ($1, $2, $3, $4, $5)
 ON CONFLICT (workspace_id, daemon_id, provider) DO UPDATE SET
     name = EXCLUDED.name, updated_at = now()
-RETURNING id, workspace_id, daemon_id, name, runtime_mode, provider, status, device_info, metadata, last_seen_at, created_at, updated_at
+RETURNING id, workspace_id, daemon_id, name, runtime_mode, provider, device_info, metadata, created_at, updated_at
 `
 
 type UpsertAgentRuntimeParams struct {
@@ -104,10 +105,8 @@ func (q *Queries) UpsertAgentRuntime(ctx context.Context, arg UpsertAgentRuntime
 		&i.Name,
 		&i.RuntimeMode,
 		&i.Provider,
-		&i.Status,
 		&i.DeviceInfo,
 		&i.Metadata,
-		&i.LastSeenAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
 	)

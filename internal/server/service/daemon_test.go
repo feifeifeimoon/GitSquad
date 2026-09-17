@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/database"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
@@ -23,6 +24,36 @@ func TestRuntimeStatus(t *testing.T) {
 	}
 	if got := runtimeStatus("available"); got != "available" {
 		t.Errorf("runtimeStatus(\"available\") = %q, want available", got)
+	}
+}
+
+// TestLiveStatus pins the single rule that decides daemon liveness. A silent
+// 'online' row is the only case that needs the timestamp: an explicitly
+// offline row stays offline, and a recent heartbeat is not asked to be
+// anything other than online.
+func TestLiveStatus(t *testing.T) {
+	fresh := time.Now().Add(-30 * time.Second)
+	stale := time.Now().Add(-daemonLiveWindow - time.Second)
+
+	cases := []struct {
+		name       string
+		status     string
+		lastSeenAt *time.Time
+		want       string
+	}{
+		{"online and heartbeating", "online", &fresh, "online"},
+		{"online but silent past the window", "online", &stale, "offline"},
+		{"online with no heartbeat at all", "online", nil, "offline"},
+		{"already offline", "offline", &fresh, "offline"},
+		{"offline and silent", "offline", &stale, "offline"},
+		{"offline with no heartbeat", "offline", nil, "offline"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := liveStatus(tc.status, tc.lastSeenAt); got != tc.want {
+				t.Errorf("liveStatus(%q, %v) = %q, want %q", tc.status, tc.lastSeenAt, got, tc.want)
+			}
+		})
 	}
 }
 

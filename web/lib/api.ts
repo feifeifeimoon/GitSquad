@@ -1,3 +1,5 @@
+import type { DaemonStatus } from "@/lib/agent-status";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
 class ApiError extends Error {
@@ -166,11 +168,9 @@ export interface AgentRuntime {
   name: string;
   runtime_mode: "local" | "cloud";
   provider: string;
-  status: "online" | "offline";
   daemon_name?: string;
-  daemon_status?: string;
-  /** Backing daemon's last heartbeat — see lib/agent-status.ts. */
-  last_seen_at?: string | null;
+  /** Already resolved server-side against the daemon's heartbeat. */
+  daemon_status?: DaemonStatus;
   created_at: string;
   updated_at: string;
 }
@@ -200,8 +200,6 @@ export interface Agent {
   runtime_id: string;
   enabled: boolean;
   avatar_url?: string;
-  /** Always 0 — the column is never incremented. Use total_runs instead. */
-  run_count: number;
   running_count: number;
   queued_count: number;
   total_runs: number;
@@ -230,7 +228,8 @@ export interface DaemonRuntime {
 export interface Daemon {
   id: string;
   name: string;
-  status: string;
+  /** Already resolved server-side against last_seen_at — see lib/agent-status.ts. */
+  status: DaemonStatus;
   os: string;
   arch: string;
   daemon_version: string;

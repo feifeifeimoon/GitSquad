@@ -129,10 +129,8 @@ CREATE TABLE agent_runtimes (
     name TEXT NOT NULL,
     runtime_mode TEXT NOT NULL DEFAULT 'local' CHECK (runtime_mode IN ('local','cloud')),
     provider TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'offline' CHECK (status IN ('online','offline')),
     device_info TEXT NOT NULL DEFAULT '',
     metadata JSONB NOT NULL DEFAULT '{}',
-    last_seen_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (workspace_id, daemon_id, provider)
@@ -148,7 +146,6 @@ CREATE TABLE agents (
     runtime_id UUID NOT NULL REFERENCES agent_runtimes(id) ON DELETE RESTRICT,
     enabled BOOLEAN NOT NULL DEFAULT true,
     avatar_url TEXT NOT NULL DEFAULT '',
-    run_count INT NOT NULL DEFAULT 0,
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),

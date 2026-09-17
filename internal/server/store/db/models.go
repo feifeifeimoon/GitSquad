@@ -20,7 +20,6 @@ type Agent struct {
 	RuntimeID    uuid.UUID  `json:"runtime_id"`
 	Enabled      bool       `json:"enabled"`
 	AvatarUrl    string     `json:"avatar_url"`
-	RunCount     int32      `json:"run_count"`
 	CreatedBy    *uuid.UUID `json:"created_by"`
 	CreatedAt    time.Time  `json:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at"`
@@ -33,10 +32,8 @@ type AgentRuntime struct {
 	Name        string     `json:"name"`
 	RuntimeMode string     `json:"runtime_mode"`
 	Provider    string     `json:"provider"`
-	Status      string     `json:"status"`
 	DeviceInfo  string     `json:"device_info"`
 	Metadata    []byte     `json:"metadata"`
-	LastSeenAt  *time.Time `json:"last_seen_at"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
 }

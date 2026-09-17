@@ -132,12 +132,13 @@ export class TestApiClient {
   }
 
   /**
-   * Seed an "online" daemon with one runtime per `kind` so the agents page
-   * shows it in the daemon/provider selectors. Returns the daemon id.
+   * Seed a daemon with one runtime per `kind` so the agents page shows it in
+   * the daemon/provider selectors. Returns the daemon id.
    *
-   * last_seen_at is set for an online daemon because the UI derives liveness
-   * from the heartbeat: an online row with no timestamp reads as "unstable"
-   * (see web/lib/agent-status.ts). Pass lastSeenMsAgo to seed that stale state.
+   * Pass lastSeenMsAgo to write the row a crashed server leaves behind: status
+   * still 'online' with a heartbeat old enough that the server resolves it to
+   * offline (see service.liveStatus). The row goes in verbatim on purpose — the
+   * normalisation under test is the server's, not the seed's.
    */
   async seedDaemon(opts: {
     name?: string;
