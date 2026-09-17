@@ -25,7 +25,6 @@
 
 ```
 .
-├── .codex/                    # Agent skill definitions (openspec-* workflow)
 ├── .github/
 │   ├── workflows/
 │   │   ├── ci.yml             # CI: gofmt + vet + Staticcheck + go test/coverage + govulncheck + bun test/lint/build + Playwright E2E
@@ -121,10 +120,10 @@
 │   ├── helpers.ts             # localStorage token injection, page-wait helpers
 │   ├── env.ts                 # E2E env contract (API / frontend / database URLs)
 │   └── playwright.config.ts   # Chromium; serial in CI; trace/screenshot on failure
-├── docs/                      # Documentation assets + superpowers plans/specs
-├── openspec/                  # OpenSpec changes (proposals + specs + tasks)
+├── docs/                      # Screenshots and brand assets (docs/assets/)
 ├── scripts/                   # CLI install scripts (install.sh / install.ps1) + e2e.sh orchestrator
-├── agent.md                   # This file — agent instructions
+├── AGENTS.md                  # This file — agent instructions
+├── CLAUDE.md                  # Claude Code entrypoint (includes AGENTS.md)
 ├── Makefile                   # Go build/test/run/release + e2e/e2e-db targets
 ├── go.mod / go.sum            # Go module definition
 ├── sqlc.yaml                  # sqlc code-gen config
