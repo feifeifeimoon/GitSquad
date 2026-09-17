@@ -6,14 +6,35 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"sync"
+	"time"
 
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gorilla/websocket"
 )
 
+const (
+	// wsReadWait bounds how long the daemon waits for inbound traffic before
+	// treating the socket as dead. The server answers every heartbeat with a
+	// heartbeat_ack (30s interval), so reaching this means at least two acks
+	// went missing. Without a read deadline a half-open socket reads as
+	// connected forever — writes to a dropped TCP connection keep succeeding —
+	// so the daemon never reconnects and no wake frame can reach it.
+	wsReadWait = 75 * time.Second
+
+	// wsWriteTimeout caps a single frame write so a stalled peer cannot block
+	// the heartbeat loop indefinitely.
+	wsWriteTimeout = 10 * time.Second
+)
+
 // WSConn wraps a WebSocket connection with daemon-specific framing helpers.
 type WSConn struct {
 	conn *websocket.Conn
+
+	// writeMu serialises writers: gorilla/websocket permits one writer at a
+	// time, and two goroutines write here — the heartbeat loop, and the frame
+	// handler that acks runtime_gone from the read loop.
+	writeMu sync.Mutex
 }
 
 // ConnectWS dials the daemon WebSocket endpoint, sends an auth frame with
@@ -32,6 +53,13 @@ func (c *Client) ConnectWS(ctx context.Context, daemonID string) (*WSConn, error
 	}
 
 	ws := &WSConn{conn: conn}
+
+	// Arm liveness before the first read. A pong extends the deadline, and so
+	// does any inbound frame (see ReadFrame).
+	_ = conn.SetReadDeadline(time.Now().Add(wsReadWait))
+	conn.SetPongHandler(func(string) error {
+		return conn.SetReadDeadline(time.Now().Add(wsReadWait))
+	})
 
 	// Send auth frame — server validates both daemon_id and token.
 	authPayload, _ := json.Marshal(v1.WSAuthPayload{DaemonID: daemonID, Token: c.Token})
@@ -56,8 +84,12 @@ func (c *Client) ConnectWS(ctx context.Context, daemonID string) (*WSConn, error
 	return ws, nil
 }
 
-// ReadFrame reads the next text frame from the WebSocket.
+// ReadFrame reads the next text frame from the WebSocket. It re-arms the read
+// deadline first so a silent connection surfaces as an error rather than
+// blocking the read loop forever.
 func (ws *WSConn) ReadFrame() (v1.Frame, error) {
+	_ = ws.conn.SetReadDeadline(time.Now().Add(wsReadWait))
+
 	_, msg, err := ws.conn.ReadMessage()
 	if err != nil {
 		return v1.Frame{}, err
@@ -71,23 +103,37 @@ func (ws *WSConn) ReadFrame() (v1.Frame, error) {
 
 // WriteFrame writes a text frame to the WebSocket.
 func (ws *WSConn) WriteFrame(f v1.Frame) error {
-	data, err := json.Marshal(f)
-	if err != nil {
-		return err
-	}
-	return ws.conn.WriteMessage(websocket.TextMessage, data)
+	return ws.writeFrame(f, time.Time{})
 }
 
 // SendHeartbeat sends a heartbeat frame with the given payload.
 func (ws *WSConn) SendHeartbeat(ctx context.Context, payload any) error {
-	if deadline, ok := ctx.Deadline(); ok {
-		ws.conn.SetWriteDeadline(deadline)
-	}
 	b, err := json.Marshal(payload)
 	if err != nil {
 		return err
 	}
-	return ws.WriteFrame(v1.Frame{Type: v1.FrameTypeHeartbeat, Payload: b})
+	var deadline time.Time
+	if d, ok := ctx.Deadline(); ok {
+		deadline = d
+	}
+	return ws.writeFrame(v1.Frame{Type: v1.FrameTypeHeartbeat, Payload: b}, deadline)
+}
+
+// writeFrame marshals and writes a frame. Marshalling happens outside the lock
+// because it needs no access to the socket.
+func (ws *WSConn) writeFrame(f v1.Frame, deadline time.Time) error {
+	data, err := json.Marshal(f)
+	if err != nil {
+		return err
+	}
+	if deadline.IsZero() {
+		deadline = time.Now().Add(wsWriteTimeout)
+	}
+
+	ws.writeMu.Lock()
+	defer ws.writeMu.Unlock()
+	_ = ws.conn.SetWriteDeadline(deadline)
+	return ws.conn.WriteMessage(websocket.TextMessage, data)
 }
 
 // Close closes the underlying WebSocket connection.

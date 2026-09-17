@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"math/rand/v2"
 	"net"
 	"os"
 	"sync"
@@ -22,9 +23,13 @@ import (
 type Daemon struct {
 	cfg         daemonconfig.Config
 	client      *client.Client
-	ws          *client.WSConn
 	registry    *Registry
 	lastRuntime []v1.Runtime
+
+	// wsMu guards ws. serve installs and clears it; the heartbeat loop, the
+	// runtime-gone handler and the shutdown path read it from other goroutines.
+	wsMu sync.RWMutex
+	ws   *client.WSConn
 
 	// Lifecycle control.
 	cancelFunc context.CancelFunc // called by /shutdown or SIGINT
@@ -100,67 +105,115 @@ func (d *Daemon) Run(ctx context.Context) error {
 	return d.serve(ctx)
 }
 
+// Connection retry bounds. The delay grows geometrically from the floor to the
+// ceiling; a connection that stayed up for a while resets it to the floor.
+const (
+	minReconnectDelay = time.Second
+	maxReconnectDelay = time.Minute
+)
+
+// wsConn returns the current connection, or nil while offline.
+func (d *Daemon) wsConn() *client.WSConn {
+	d.wsMu.RLock()
+	defer d.wsMu.RUnlock()
+	return d.ws
+}
+
+func (d *Daemon) setWSConn(ws *client.WSConn) {
+	d.wsMu.Lock()
+	d.ws = ws
+	d.wsMu.Unlock()
+}
+
 // gracefulShutdown performs best-effort cleanup when the daemon exits.
 func (d *Daemon) gracefulShutdown() {
 	clearDaemonState()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if d.ws != nil {
-		d.ws.Close()
+	if ws := d.wsConn(); ws != nil {
+		_ = ws.Close()
 	}
 	slog.Info("daemon stopped")
-	_ = ctx // reserved for future Deregister API call
 }
 
-// serve is the main connection loop: dials the WebSocket, uploads runtimes,
-// and enters readLoop. On disconnect it retries every 5s until ctx is cancelled.
+// nextBackoff grows the reconnect delay geometrically up to the ceiling.
+func nextBackoff(current time.Duration) time.Duration {
+	if current <= 0 {
+		return minReconnectDelay
+	}
+	return min(current*2, maxReconnectDelay)
+}
+
+// withJitter spreads a delay by up to ±25% so a fleet of daemons does not
+// reconnect in lockstep after a server restart.
+func withJitter(d time.Duration) time.Duration {
+	delta := int64(d) / 4
+	if delta <= 0 {
+		return d
+	}
+	return d - time.Duration(delta) + time.Duration(rand.Int64N(2*delta))
+}
+
+// serve is the main connection loop: dials the WebSocket, then reads frames
+// until the connection drops, redialing with capped exponential backoff until
+// ctx is cancelled.
 func (d *Daemon) serve(ctx context.Context) error {
-	const reconnectInterval = 5 * time.Second
+	backoff := time.Duration(0) // no delay before the first attempt
 
 	for {
 		if ctx.Err() != nil {
 			return nil
+		}
+		if backoff > 0 {
+			if sleepCtx(ctx, withJitter(backoff)) != nil {
+				return nil
+			}
 		}
 
 		slog.Info("connecting", "url", d.cfg.APIURL)
 		ws, err := d.client.ConnectWS(ctx, d.cfg.ID)
 		if err != nil {
-			slog.Warn("connect failed, retrying", "error", err)
-			if sleepCtx(ctx, reconnectInterval) != nil {
-				return nil
-			}
+			backoff = nextBackoff(backoff)
+			slog.Warn("connect failed, retrying", "error", err, "in", backoff)
 			continue
 		}
 
-		d.ws = ws
+		d.setWSConn(ws)
+		connectedAt := time.Now()
 		slog.Info("daemon online")
 
-		// Close the connection when ctx is cancelled so readLoop unblocks.
+		// One context per connection, so the watcher exits with the connection
+		// it owns instead of leaking until the daemon stops.
+		gen, endGen := context.WithCancel(ctx)
 		go func() {
-			<-ctx.Done()
-			ws.Close()
+			<-gen.Done()
+			_ = ws.Close()
 		}()
 
-		// readLoop blocks until the connection drops or ctx is cancelled.
-		err = d.readLoop(ctx)
+		// readLoop blocks until the connection drops or gen is cancelled.
+		err = d.readLoop(gen, ws)
 
-		d.ws.Close()
-		d.ws = nil
+		endGen()
+		_ = ws.Close()
+		d.setWSConn(nil)
 
 		if ctx.Err() != nil {
 			return nil
 		}
-		slog.Warn("connection lost, reconnecting", "error", err)
+
+		if time.Since(connectedAt) > time.Minute {
+			// It was healthy, so this is a fresh break: redial promptly.
+			backoff = 0
+		} else {
+			backoff = nextBackoff(backoff)
+		}
+		slog.Warn("connection lost, reconnecting", "error", err, "in", backoff)
 	}
 }
 
 // readLoop reads WebSocket frames in a loop and dispatches each one.
 // It returns on any read error (connection drop) or ctx cancellation.
-func (d *Daemon) readLoop(ctx context.Context) error {
+func (d *Daemon) readLoop(ctx context.Context, ws *client.WSConn) error {
 	for {
-		f, err := d.ws.ReadFrame()
+		f, err := ws.ReadFrame()
 		if err != nil {
 			return err
 		}
@@ -237,14 +290,15 @@ func (d *Daemon) handleTaskWake(ctx context.Context, f v1.Frame) {
 
 // sendHeartbeat sends a heartbeat frame to the server.
 func (d *Daemon) sendHeartbeat(ctx context.Context) {
-	if d.ws == nil {
+	ws := d.wsConn()
+	if ws == nil {
 		return
 	}
 	payload := v1.WSHeartbeatPayload{
 		DaemonVersion: d.cfg.DaemonVersion,
 		ActiveTasks:   d.activeTasks(),
 	}
-	if err := d.ws.SendHeartbeat(ctx, payload); err != nil {
+	if err := ws.SendHeartbeat(ctx, payload); err != nil {
 		slog.Warn("heartbeat error", "error", err)
 	}
 }
@@ -355,8 +409,8 @@ func (d *Daemon) handleRuntimeGone(_ context.Context, f v1.Frame) {
 	if cancel != nil {
 		cancel()
 	}
-	if d.ws != nil {
-		_ = d.ws.WriteFrame(v1.Frame{Type: v1.FrameTypeRuntimeGoneAck, Payload: f.Payload})
+	if ws := d.wsConn(); ws != nil {
+		_ = ws.WriteFrame(v1.Frame{Type: v1.FrameTypeRuntimeGoneAck, Payload: f.Payload})
 	}
 }
 
