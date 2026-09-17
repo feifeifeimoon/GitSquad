@@ -13,8 +13,10 @@ func TestHubWakeSendsTaskWake(t *testing.T) {
 	defer hub.Close()
 
 	daemonID := uuid.New()
-	conn := &Conn{send: make(chan []byte, 4)}
-	hub.Register(daemonID.String(), conn)
+	conn := newConn(nil, hub, nil)
+	conn.DaemonID = daemonID.String()
+	conn.Authenticated = true
+	hub.Register(conn)
 
 	hub.Wake(daemonID)
 

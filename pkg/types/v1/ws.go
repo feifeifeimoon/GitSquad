@@ -20,9 +20,6 @@ const (
 	FrameTypeTaskWakeAck    = "task_wake_ack"
 	FrameTypeRuntimeGone    = "runtime_gone"
 	FrameTypeRuntimeGoneAck = "runtime_gone_ack"
-	FrameTypeStatusUpdate   = "status_update"
-	FrameTypeStatusAck      = "status_ack"
-	FrameTypeServerShutdown = "server_shutdown"
 	FrameTypeError          = "error"
 )
 
