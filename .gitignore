@@ -10,8 +10,10 @@ build
 .env*
 !.env.example
 
-# test coverage
+# test coverage (make cover writes both)
 coverage
+coverage.out
+coverage.txt
 
 # build output
 bin/
@@ -21,7 +23,7 @@ dist/
 .idea/
 .vscode/
 
-# generated Windows resource
+# Vercel local project state
 .vercel
 
 # local agent tooling
