@@ -3,7 +3,6 @@ package ws
 import (
 	"encoding/json"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -38,7 +37,7 @@ type Conn struct {
 	// lastHeartbeat is UnixNano of the last frame received. Atomic because
 	// touch() runs on the read loop while stale detection reads it from the
 	// hub's ticker.
-	lastHeartbeat atomic.Int64
+	lastHeartbeat time.Time
 
 	ws         *websocket.Conn
 	hub        *Hub
@@ -173,10 +172,10 @@ func (c *Conn) writeMessage(messageType int, data []byte) error {
 // received frame — any inbound traffic proves the daemon is still alive — and
 // once at construction, so a freshly registered conn is never instantly stale.
 func (c *Conn) touch() {
-	c.lastHeartbeat.Store(time.Now().UnixNano())
+	c.lastHeartbeat = time.Now()
 }
 
 // lastActivity returns the time of the last frame received.
 func (c *Conn) lastActivity() time.Time {
-	return time.Unix(0, c.lastHeartbeat.Load())
+	return c.lastHeartbeat
 }
