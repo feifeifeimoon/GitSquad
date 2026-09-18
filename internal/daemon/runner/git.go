@@ -23,6 +23,10 @@ type GitOps interface {
 	// ResetToDefault puts a reused checkout back on the default branch at
 	// origin's tip, discarding whatever a previous task left behind.
 	ResetToDefault(ctx context.Context, dst, defaultBranch string) error
+	// ResetToBranch checks out branch at origin's tip — the starting point for a
+	// task that continues the issue's live line of work, where the branch
+	// already exists and carries commits the agent must see.
+	ResetToBranch(ctx context.Context, dst, branch string) error
 	// CreateBranch creates or resets branch at the current HEAD. It runs before
 	// the agent starts, so a commit the agent makes on its own lands on the
 	// task's branch instead of the default branch.
@@ -132,6 +136,18 @@ func (g *GitCLI) ResetToDefault(ctx context.Context, dst, defaultBranch string) 
 		return err
 	}
 	if _, err := g.Exec(ctx, dst, nil, "reset", "--hard", "origin/"+defaultBranch); err != nil {
+		return err
+	}
+	_, err := g.Exec(ctx, dst, nil, "clean", "-fd")
+	return err
+}
+
+// ResetToBranch checks out branch at origin's tip. A task continuing the issue's
+// pull request must start from the PR's branch, not from the default branch —
+// using -B against origin/<branch> both creates it and picks up whatever the
+// previous task pushed.
+func (g *GitCLI) ResetToBranch(ctx context.Context, dst, branch string) error {
+	if _, err := g.Exec(ctx, dst, nil, "checkout", "-B", branch, "origin/"+branch); err != nil {
 		return err
 	}
 	_, err := g.Exec(ctx, dst, nil, "clean", "-fd")
