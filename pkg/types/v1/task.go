@@ -45,6 +45,14 @@ type TaskRepoContext struct {
 	Owner         string `json:"owner"`
 	Name          string `json:"name"`
 	DefaultBranch string `json:"default_branch"`
+	// Branch is the issue's live line of work, when it has one: the head branch
+	// of its active pull request. Empty means this task starts a new line on a
+	// fresh branch. The server decides this at claim time — the daemon has no
+	// way to look it up.
+	Branch string `json:"branch,omitempty"`
+	// PullRequestNumber is the PR Branch belongs to, for the record. Zero when
+	// the task starts a new line.
+	PullRequestNumber int `json:"pull_request_number,omitempty"`
 }
 
 // TaskAgentContext is the agent persona + runtime binding snapshot.

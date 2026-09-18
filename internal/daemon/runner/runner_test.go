@@ -22,12 +22,20 @@ type fakeGit struct {
 	originHead string
 	// missing lists branches the checkout does not have.
 	missing []string
+	// resetToDefault / resetToBranch record which starting point the task used.
+	resetToDefault bool
+	resetToBranch  string
 }
 
 func (f *fakeGit) CloneOrFetch(_ context.Context, _ string, _ string, _ Credential) error {
 	return f.cloneErr
 }
 func (f *fakeGit) ResetToDefault(_ context.Context, _ string, _ string) error {
+	f.resetToDefault = true
+	return nil
+}
+func (f *fakeGit) ResetToBranch(_ context.Context, _ string, branch string) error {
+	f.resetToBranch = branch
 	return nil
 }
 func (f *fakeGit) DefaultBranch(_ context.Context, _ string) (string, error) {
@@ -208,6 +216,56 @@ func TestRunnerResolvesDefaultBranchFromTheCheckout(t *testing.T) {
 				t.Errorf("reported base = %+v, want %q", last.Summary, tc.expect)
 			}
 		})
+	}
+}
+
+// A task that continues the issue's live line of work starts from that PR's
+// branch, at its remote tip — the agent has to see the work already on it — and
+// reports the same branch so the platform can tell it already has a pull
+// request.
+func TestRunnerContinuesTheGivenBranch(t *testing.T) {
+	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n"}
+	rep := &fakeReporter{}
+	r := New(git, &fakeBackend{res: provider.Result{Status: "completed", Output: "done"}}, rep, t.TempDir())
+
+	task := testTask()
+	task.Repo.Branch = "gitsquad/GTS-42/earlier-task"
+	task.Repo.PullRequestNumber = 7
+
+	if err := r.Run(context.Background(), task); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if git.resetToBranch != "gitsquad/GTS-42/earlier-task" {
+		t.Errorf("resetToBranch = %q, want the PR's branch", git.resetToBranch)
+	}
+	if git.resetToDefault || git.branch != "" {
+		t.Errorf("a continued line must not reset to default (default=%v) or create a branch (%q)",
+			git.resetToDefault, git.branch)
+	}
+	last := rep.reports[len(rep.reports)-1]
+	if last.Summary == nil || last.Summary.Branch != "gitsquad/GTS-42/earlier-task" {
+		t.Errorf("reported branch = %+v, want the continued branch", last.Summary)
+	}
+	if !git.pushed {
+		t.Error("want the branch pushed: that is what updates the pull request")
+	}
+}
+
+// With no branch from the server, the task starts a new line exactly as before.
+func TestRunnerStartsANewLineWithoutAGivenBranch(t *testing.T) {
+	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n"}
+	rep := &fakeReporter{}
+	r := New(git, &fakeBackend{res: provider.Result{Status: "completed", Output: "done"}}, rep, t.TempDir())
+
+	task := testTask()
+	if err := r.Run(context.Background(), task); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !git.resetToDefault || git.resetToBranch != "" {
+		t.Errorf("want a fresh line (default=%v, branch=%q)", git.resetToDefault, git.resetToBranch)
+	}
+	if git.branch != "gitsquad/GTS-42/"+task.ID.String() {
+		t.Errorf("branch = %q, want the task's own branch", git.branch)
 	}
 }
 

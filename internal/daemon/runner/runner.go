@@ -55,14 +55,30 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	if err != nil {
 		return r.fail(ctx, task, nil, fmt.Errorf("resolve default branch: %w", err))
 	}
-	if err := r.git.ResetToDefault(ctx, wsDir, defaultBranch); err != nil {
-		return r.fail(ctx, task, nil, fmt.Errorf("reset checkout: %w", err))
-	}
-	// The branch exists before the agent starts, so a commit the agent makes on
-	// its own — which the previous brief asked for — lands here rather than on
-	// the default branch, and every agent behaviour converges on one branch.
-	if err := r.git.CreateBranch(ctx, wsDir, branch); err != nil {
-		return r.fail(ctx, task, nil, fmt.Errorf("create branch: %w", err))
+
+	// A task either continues the issue's live line of work or starts a new one.
+	// Continuing starts from the PR's branch at its remote tip, so the agent
+	// sees the work already on it; the platform then only pushes, because the PR
+	// already exists. Starting fresh puts the branch in place before the agent
+	// runs, so a commit the agent makes on its own — which the previous brief
+	// asked for — lands here rather than on the default branch.
+	continued := task.Repo.Branch != ""
+	changeBase := "origin/" + defaultBranch
+	if continued {
+		branch = task.Repo.Branch
+		if err := r.git.ResetToBranch(ctx, wsDir, branch); err != nil {
+			return r.fail(ctx, task, nil, fmt.Errorf("checkout branch %s: %w", branch, err))
+		}
+		// Changes are measured against the branch the PR is on: its commits are
+		// already the issue's work, so only what this run adds counts.
+		changeBase = "origin/" + branch
+	} else {
+		if err := r.git.ResetToDefault(ctx, wsDir, defaultBranch); err != nil {
+			return r.fail(ctx, task, nil, fmt.Errorf("reset checkout: %w", err))
+		}
+		if err := r.git.CreateBranch(ctx, wsDir, branch); err != nil {
+			return r.fail(ctx, task, nil, fmt.Errorf("create branch: %w", err))
+		}
 	}
 
 	if _, err := execenv.Prepare(wsDir, execenv.PrepareParams{
@@ -110,7 +126,7 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		return r.fail(ctx, task, usage, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
 
-	changed, err := r.git.HasChanges(ctx, wsDir, "origin/"+defaultBranch)
+	changed, err := r.git.HasChanges(ctx, wsDir, changeBase)
 	if err != nil {
 		return r.fail(ctx, task, usage, fmt.Errorf("check changes: %w", err))
 	}
@@ -118,10 +134,15 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	// No code change is a normal outcome (analysis / design / review work), not
 	// a failure — the agent's output is the deliverable either way.
 	if !changed {
-		if err := r.git.DiscardBranch(ctx, wsDir, branch, defaultBranch); err != nil {
-			// The next task resets the checkout anyway, so a leftover branch is
-			// not worth failing an otherwise successful run over.
-			slog.Warn("discard empty branch", "branch", branch, "error", err)
+		// Only a branch this task created is dropped. A continued line belongs
+		// to an existing pull request; deleting its local copy would be churn on
+		// a branch the issue still tracks.
+		if !continued {
+			if err := r.git.DiscardBranch(ctx, wsDir, branch, defaultBranch); err != nil {
+				// The next task resets the checkout anyway, so a leftover branch
+				// is not worth failing an otherwise successful run over.
+				slog.Warn("discard empty branch", "branch", branch, "error", err)
+			}
 		}
 		return r.reporter.Report(ctx, task.ID, v1.TaskReport{
 			Status:  v1.TaskReportSucceeded,
