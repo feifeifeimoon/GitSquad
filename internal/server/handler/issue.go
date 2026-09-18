@@ -9,12 +9,19 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 )
 
 type IssueHandler struct {
 	issues     *service.IssueService
 	workspaces *service.WorkspaceService
+	prs        *service.PullRequestService
 }
+
+// SetPullRequests wires the issue ↔ PR relationship in, for the manual link
+// entry. Nil disables it — the automatic entries are unaffected.
+func (h *IssueHandler) SetPullRequests(p *service.PullRequestService) { h.prs = p }
 
 func NewIssueHandler(issues *service.IssueService, workspaces *service.WorkspaceService) *IssueHandler {
 	return &IssueHandler{issues: issues, workspaces: workspaces}
@@ -202,4 +209,115 @@ func (h *IssueHandler) AddComment(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, v1.SuccessResponse(comment, 0))
+}
+
+// ── Pull request links (entry ④) ────────────────────────────────────────
+//
+// The other three entries are automatic. These are the human's: link a PR the
+// platform did not open, unlink one it should not have, or restore one that was
+// unlinked by mistake. An unlink leaves a tombstone, so no automation links the
+// PR back afterwards.
+
+// LinkPullRequest handles POST /workspaces/:id/issues/:issueId/pull-requests.
+func (h *IssueHandler) LinkPullRequest(c *gin.Context) {
+	workspace, ok := h.requireWorkspaceOwner(c)
+	if !ok {
+		return
+	}
+	prs := h.prs
+	if prs == nil {
+		c.JSON(http.StatusServiceUnavailable, v1.ErrorResponse("pull request linking is unavailable"))
+		return
+	}
+	issueID, ok := h.resolveIssue(c, workspace.ID)
+	if !ok {
+		return
+	}
+	var req LinkPullRequestRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid request body"))
+		return
+	}
+	row, err := prs.LinkManual(c.Request.Context(), workspace.ID, issueID, req.Ref)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrPullRequestSlotTaken):
+			// Not a server error: the human has a decision to make.
+			c.JSON(http.StatusConflict, v1.ErrorResponse("该 issue 已有活跃 PR，请先关掉或解绑它"))
+		default:
+			slog.Warn("link pull request", "error", err)
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse(err.Error()))
+		}
+		return
+	}
+	c.JSON(http.StatusCreated, v1.SuccessResponse(service.PullRequestResponse(row), 0))
+}
+
+// UnlinkPullRequest handles DELETE /workspaces/:id/issues/:issueId/pull-requests/:prId.
+func (h *IssueHandler) UnlinkPullRequest(c *gin.Context) {
+	h.setPullRequestLink(c, func(prs *service.PullRequestService, workspaceID, issueID, prID uuid.UUID) error {
+		return prs.Suppress(c.Request.Context(), workspaceID, issueID, prID)
+	})
+}
+
+// RestorePullRequest handles POST /workspaces/:id/issues/:issueId/pull-requests/:prId/restore.
+func (h *IssueHandler) RestorePullRequest(c *gin.Context) {
+	h.setPullRequestLink(c, func(prs *service.PullRequestService, workspaceID, issueID, prID uuid.UUID) error {
+		return prs.Restore(c.Request.Context(), workspaceID, issueID, prID)
+	})
+}
+
+func (h *IssueHandler) setPullRequestLink(c *gin.Context, apply func(*service.PullRequestService, uuid.UUID, uuid.UUID, uuid.UUID) error) {
+	workspace, ok := h.requireWorkspaceOwner(c)
+	if !ok {
+		return
+	}
+	prs := h.prs
+	if prs == nil {
+		c.JSON(http.StatusServiceUnavailable, v1.ErrorResponse("pull request linking is unavailable"))
+		return
+	}
+	issueID, ok := h.resolveIssue(c, workspace.ID)
+	if !ok {
+		return
+	}
+	prID, err := uuid.Parse(c.Param("prId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid pull request id"))
+		return
+	}
+	if err := apply(prs, workspace.ID, issueID, prID); err != nil {
+		switch {
+		case errors.Is(err, service.ErrPullRequestSlotTaken):
+			c.JSON(http.StatusConflict, v1.ErrorResponse("该 issue 已有活跃 PR，请先关掉或解绑它"))
+		case errors.Is(err, pgx.ErrNoRows):
+			c.JSON(http.StatusNotFound, v1.ErrorResponse("pull request not found"))
+		default:
+			slog.Warn("update pull request link", "error", err)
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse(err.Error()))
+		}
+		return
+	}
+	c.JSON(http.StatusOK, v1.SuccessResponse(nil, 0))
+}
+
+// resolveIssue resolves the path's issue reference, writing the error response
+// itself so callers only branch on ok.
+func (h *IssueHandler) resolveIssue(c *gin.Context, workspaceID uuid.UUID) (uuid.UUID, bool) {
+	issueID, err := h.issues.ResolveIssueID(c.Request.Context(), workspaceID, c.Param("issueId"))
+	if err != nil {
+		if errors.Is(err, service.ErrIssueNotFound) {
+			c.JSON(http.StatusNotFound, v1.ErrorResponse("issue not found"))
+			return uuid.Nil, false
+		}
+		slog.Error("resolve issue", "error", err)
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to resolve issue"))
+		return uuid.Nil, false
+	}
+	return issueID, true
+}
+
+// LinkPullRequestRequest carries what a human pastes: a PR URL, or its number.
+type LinkPullRequestRequest struct {
+	Ref string `json:"ref" binding:"required"`
 }

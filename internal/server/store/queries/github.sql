@@ -25,10 +25,11 @@ SELECT * FROM github_installations WHERE user_id = $1 AND status != 'revoked' OR
 UPDATE github_installations SET status = $2, updated_at = now() WHERE installation_id = $1;
 
 -- name: UpsertRepo :exec
-INSERT INTO github_repos (installation_id, github_repo_id, owner, name, full_name, private)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO github_repos (installation_id, github_repo_id, owner, name, full_name, private, default_branch)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (installation_id, github_repo_id)
-DO UPDATE SET owner = EXCLUDED.owner, name = EXCLUDED.name, full_name = EXCLUDED.full_name, private = EXCLUDED.private;
+DO UPDATE SET owner = EXCLUDED.owner, name = EXCLUDED.name, full_name = EXCLUDED.full_name,
+              private = EXCLUDED.private, default_branch = EXCLUDED.default_branch;
 
 -- name: DeleteReposNotInList :exec
 DELETE FROM github_repos

@@ -62,6 +62,9 @@ CREATE TABLE github_repos (
     name TEXT NOT NULL,
     full_name TEXT NOT NULL,
     private BOOLEAN NOT NULL DEFAULT false,
+    -- Empty means "not known yet"; the daemon resolves origin/HEAD from the
+    -- checkout when the value is empty.
+    default_branch TEXT NOT NULL DEFAULT '',
     UNIQUE(installation_id, github_repo_id)
 );
 
@@ -105,7 +108,6 @@ CREATE TABLE issues (
         CHECK (status IN ('backlog','todo','in_progress','in_review','done','blocked','cancelled')),
     creator_user_id UUID REFERENCES users(id),
     assigned_agents TEXT[] NOT NULL DEFAULT '{}',
-    linked_prs TEXT[] NOT NULL DEFAULT '{}',
     source_upstream_issue TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -214,6 +216,41 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_agent
 
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_issue ON tasks(issue_id);
+
+-- The issue ↔ pull request relationship. One issue has at most one active PR at
+-- a time — the one that declares closing intent — and keeps the older ones as
+-- history, so the issue page can show how the issue got here. Unrelated PRs are
+-- not mirrored; suppressed_at is a tombstone so an explicit unlink survives.
+CREATE TABLE pull_requests (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    repo_owner TEXT NOT NULL,
+    repo_name TEXT NOT NULL,
+    number INT NOT NULL,
+    title TEXT NOT NULL DEFAULT '',
+    url TEXT NOT NULL DEFAULT '',
+    state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','merged','closed')),
+    draft BOOLEAN NOT NULL DEFAULT false,
+    head_branch TEXT NOT NULL DEFAULT '',
+    base_branch TEXT NOT NULL DEFAULT '',
+    author TEXT NOT NULL DEFAULT '',
+    source TEXT NOT NULL DEFAULT 'platform'
+        CHECK (source IN ('platform','branch','body','manual')),
+    close_intent BOOLEAN NOT NULL DEFAULT false,
+    suppressed_at TIMESTAMPTZ,
+    merged_at TIMESTAMPTZ,
+    github_updated_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (workspace_id, repo_owner, repo_name, number)
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_closing_pr_per_issue
+    ON pull_requests(issue_id)
+    WHERE state = 'open' AND close_intent AND suppressed_at IS NULL;
+
+CREATE INDEX IF NOT EXISTS idx_pull_requests_issue ON pull_requests(issue_id, created_at DESC);
 
 CREATE TABLE task_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

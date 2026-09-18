@@ -120,3 +120,27 @@ func TestPreparePreservesUserContent(t *testing.T) {
 		t.Errorf("brief not injected: %s", s)
 	}
 }
+
+// The platform owns git: commit, push and the pull request. Telling the agent
+// to push as well made the two owners collide — an agent that followed the
+// brief left nothing for the platform to commit, and its `git commit` failed
+// the task.
+func TestBriefLeavesGitToThePlatform(t *testing.T) {
+	brief := renderBrief(PrepareParams{
+		Agent:  v1.TaskAgentContext{Name: "coder"},
+		Issue:  v1.TaskIssueContext{Key: "GTS-42", Title: "login null pointer"},
+		Branch: "gitsquad/GTS-42/task-1",
+	})
+	if !strings.Contains(brief, "gitsquad/GTS-42/task-1") {
+		t.Error("the brief must name the branch the platform will push")
+	}
+	// The exact phrasings that made the two owners collide.
+	for _, old := range []string{"then `git commit`", "`git push` your branch"} {
+		if strings.Contains(brief, old) {
+			t.Errorf("the brief still carries the old instruction %q:\n%s", old, brief)
+		}
+	}
+	if !strings.Contains(brief, "do not run `git commit` or `git push`") {
+		t.Errorf("the brief must say explicitly that the platform owns git:\n%s", brief)
+	}
+}

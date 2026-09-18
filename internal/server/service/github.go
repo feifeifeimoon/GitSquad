@@ -30,7 +30,13 @@ type GitHubAppService struct {
 	store   *store.Store
 	cfg     config.Config
 	pending *memory.PendingInstallationStore
+	// pullRequests receives pull_request webhooks; nil disables the sync.
+	pullRequests *PullRequestService
 }
+
+// SetPullRequests wires the issue ↔ PR relationship in. The webhook is one of
+// its entries, so the GitHub service is how GitHub's events reach it.
+func (s *GitHubAppService) SetPullRequests(p *PullRequestService) { s.pullRequests = p }
 
 func NewGitHubAppService(s *store.Store, cfg config.Config, pending *memory.PendingInstallationStore) *GitHubAppService {
 	return &GitHubAppService{store: s, cfg: cfg, pending: pending}
@@ -174,6 +180,48 @@ func (s *GitHubAppService) GetInstallationToken(ctx context.Context, installatio
 	return token.GetToken(), expires, nil
 }
 
+// FetchPullRequest reads one pull request, for the manual link entry: the
+// platform did not create this PR, so the only way to fill in its title, branch
+// and state is to ask GitHub.
+func (s *GitHubAppService) FetchPullRequest(ctx context.Context, installationDBID uuid.UUID, owner, repo string, number int32) (FetchedPullRequest, error) {
+	inst, err := s.store.GetInstallationByDBID(ctx, installationDBID)
+	if err != nil {
+		return FetchedPullRequest{}, fmt.Errorf("get installation: %w", err)
+	}
+	client, err := s.newInstallationClient(ctx, inst.InstallationID)
+	if err != nil {
+		return FetchedPullRequest{}, err
+	}
+	pr, _, err := client.PullRequests.Get(ctx, owner, repo, int(number))
+	if err != nil {
+		return FetchedPullRequest{}, err
+	}
+
+	state := "open"
+	if pr.GetMerged() {
+		state = "merged"
+	} else if pr.GetState() == "closed" {
+		state = "closed"
+	}
+	var mergedAt *time.Time
+	if pr.MergedAt != nil {
+		t := pr.GetMergedAt().Time
+		mergedAt = &t
+	}
+	return FetchedPullRequest{
+		Number:     int32(pr.GetNumber()),
+		Title:      pr.GetTitle(),
+		URL:        pr.GetHTMLURL(),
+		State:      state,
+		Draft:      pr.GetDraft(),
+		HeadBranch: pr.GetHead().GetRef(),
+		BaseBranch: pr.GetBase().GetRef(),
+		Author:     pr.GetUser().GetLogin(),
+		MergedAt:   mergedAt,
+		UpdatedAt:  pr.GetUpdatedAt().Time,
+	}, nil
+}
+
 // CreatePullRequest opens a PR on the installation's repo and returns its number.
 func (s *GitHubAppService) CreatePullRequest(ctx context.Context, installationDBID uuid.UUID, owner, repo, head, base, title, body string) (int, error) {
 	inst, err := s.store.GetInstallationByDBID(ctx, installationDBID)
@@ -263,11 +311,60 @@ func (s *GitHubAppService) ProcessWebhook(ctx context.Context, deliveryID, event
 	case "installation_repositories":
 		slog.Info("handling installation_repositories", "delivery_id", deliveryID)
 		s.handleInstallationReposChanged(ctx, payload)
+	case "pull_request":
+		s.handlePullRequest(ctx, payload)
 	default:
 		slog.Info("webhook event stored, no side effects", "event", eventType)
 	}
 
 	return nil
+}
+
+// handlePullRequest feeds one pull_request event to the issue ↔ PR relationship:
+// it is what makes a PR opened by a human, or one whose state changed on
+// GitHub, show up on the issue and move its status.
+func (s *GitHubAppService) handlePullRequest(ctx context.Context, payload []byte) {
+	var ev github.PullRequestEvent
+	if err := json.Unmarshal(payload, &ev); err != nil {
+		slog.Warn("parse pull_request", "error", err)
+		return
+	}
+	if s.pullRequests == nil {
+		return
+	}
+	// go-github names this field Repo (json: repository) for pull_request events.
+	pr, repo := ev.GetPullRequest(), ev.GetRepo()
+	if pr == nil || repo == nil {
+		slog.Warn("pull_request payload missing pull_request/repository")
+		return
+	}
+	var installationID int64
+	if inst := ev.GetInstallation(); inst != nil {
+		installationID = inst.GetID()
+	}
+
+	err := s.pullRequests.SyncFromWebhook(ctx, GitHubPullRequestEvent{
+		Action:         ev.GetAction(),
+		InstallationID: installationID,
+		RepoOwner:      repo.GetOwner().GetLogin(),
+		RepoName:       repo.GetName(),
+		Number:         int32(ev.GetNumber()),
+		Title:          pr.GetTitle(),
+		Body:           pr.GetBody(),
+		State:          pr.GetState(),
+		Merged:         pr.GetMerged(),
+		Draft:          pr.GetDraft(),
+		HeadBranch:     pr.GetHead().GetRef(),
+		BaseBranch:     pr.GetBase().GetRef(),
+		Author:         pr.GetUser().GetLogin(),
+		HTMLURL:        pr.GetHTMLURL(),
+		UpdatedAt:      pr.GetUpdatedAt().Time,
+	})
+	if err != nil {
+		// The event is already persisted in webhook_events, so a failure here
+		// is recoverable by replaying it — never silent.
+		slog.Error("sync pull request", "number", ev.GetNumber(), "action", ev.GetAction(), "error", err)
+	}
 }
 
 // ── Repository synchronization ────────────────────────────────────────────
@@ -317,6 +414,9 @@ func (s *GitHubAppService) syncRepos(ctx context.Context, client *github.Client,
 			Name:           repo.GetName(),
 			FullName:       repo.GetFullName(),
 			Private:        repo.GetPrivate(),
+			// Task dispatch resets the checkout to this branch, so it has to be
+			// the repository's own answer rather than an assumed "main".
+			DefaultBranch: repo.GetDefaultBranch(),
 		}); err != nil {
 			slog.Warn("upsert repo", "repo", repo.GetFullName(), "error", err)
 		}

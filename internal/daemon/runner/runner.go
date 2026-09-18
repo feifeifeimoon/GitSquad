@@ -3,9 +3,9 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"path/filepath"
 	"sort"
-	"strings"
 	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon/execenv"
@@ -46,14 +46,39 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		return fmt.Errorf("report started: %w", err)
 	}
 
-	remoteURL := GitHubCloneURL(task.Repo.Owner, task.Repo.Name, task.InstallationToken)
-	if err := r.git.CloneOrFetch(ctx, wsDir, remoteURL); err != nil {
+	remoteURL := GitHubCloneURL(task.Repo.Owner, task.Repo.Name)
+	cred := Credential{Token: task.InstallationToken}
+	if err := r.git.CloneOrFetch(ctx, wsDir, remoteURL, cred); err != nil {
 		return r.fail(ctx, task, nil, fmt.Errorf("checkout: %w", err))
 	}
-	// No branch yet: a task that only reads the repo (analysis, design, review)
-	// must not leave one behind. The branch is created at commit time below.
-	if err := r.git.ResetToDefault(ctx, wsDir, task.Repo.DefaultBranch); err != nil {
-		return r.fail(ctx, task, nil, fmt.Errorf("reset checkout: %w", err))
+	defaultBranch, err := r.resolveDefaultBranch(ctx, wsDir, task.Repo.DefaultBranch)
+	if err != nil {
+		return r.fail(ctx, task, nil, fmt.Errorf("resolve default branch: %w", err))
+	}
+
+	// A task either continues the issue's live line of work or starts a new one.
+	// Continuing starts from the PR's branch at its remote tip, so the agent
+	// sees the work already on it; the platform then only pushes, because the PR
+	// already exists. Starting fresh puts the branch in place before the agent
+	// runs, so a commit the agent makes on its own — which the previous brief
+	// asked for — lands here rather than on the default branch.
+	continued := task.Repo.Branch != ""
+	changeBase := "origin/" + defaultBranch
+	if continued {
+		branch = task.Repo.Branch
+		if err := r.git.ResetToBranch(ctx, wsDir, branch); err != nil {
+			return r.fail(ctx, task, nil, fmt.Errorf("checkout branch %s: %w", branch, err))
+		}
+		// Changes are measured against the branch the PR is on: its commits are
+		// already the issue's work, so only what this run adds counts.
+		changeBase = "origin/" + branch
+	} else {
+		if err := r.git.ResetToDefault(ctx, wsDir, defaultBranch); err != nil {
+			return r.fail(ctx, task, nil, fmt.Errorf("reset checkout: %w", err))
+		}
+		if err := r.git.CreateBranch(ctx, wsDir, branch); err != nil {
+			return r.fail(ctx, task, nil, fmt.Errorf("create branch: %w", err))
+		}
 	}
 
 	if _, err := execenv.Prepare(wsDir, execenv.PrepareParams{
@@ -61,16 +86,20 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		TaskID:      task.ID.String(),
 		AgentName:   task.Agent.Name,
 		Provider:    task.Agent.Provider,
+		Branch:      branch,
 		Issue:       task.Issue,
 		Agent:       task.Agent,
 	}); err != nil {
 		return r.fail(ctx, task, nil, fmt.Errorf("prepare env: %w", err))
 	}
 
+	// The provider gets the same credential: agents routinely run read-only git
+	// commands (git log origin/main, git diff) and those would fail without it.
 	sess, err := r.backend.Execute(ctx, triggerPrompt(task), provider.ExecOptions{
 		Cwd:     wsDir,
 		Model:   task.Agent.Model,
 		Timeout: r.timeout,
+		Env:     cred.Env(),
 	})
 	if err != nil {
 		return r.fail(ctx, task, nil, fmt.Errorf("execute: %w", err))
@@ -97,14 +126,24 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		return r.fail(ctx, task, usage, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
 
-	diff, err := r.git.Diff(ctx, wsDir, "origin/"+task.Repo.DefaultBranch)
+	changed, err := r.git.HasChanges(ctx, wsDir, changeBase)
 	if err != nil {
-		return r.fail(ctx, task, usage, fmt.Errorf("diff: %w", err))
+		return r.fail(ctx, task, usage, fmt.Errorf("check changes: %w", err))
 	}
 
 	// No code change is a normal outcome (analysis / design / review work), not
 	// a failure — the agent's output is the deliverable either way.
-	if strings.TrimSpace(diff) == "" {
+	if !changed {
+		// Only a branch this task created is dropped. A continued line belongs
+		// to an existing pull request; deleting its local copy would be churn on
+		// a branch the issue still tracks.
+		if !continued {
+			if err := r.git.DiscardBranch(ctx, wsDir, branch, defaultBranch); err != nil {
+				// The next task resets the checkout anyway, so a leftover branch
+				// is not worth failing an otherwise successful run over.
+				slog.Warn("discard empty branch", "branch", branch, "error", err)
+			}
+		}
 		return r.reporter.Report(ctx, task.ID, v1.TaskReport{
 			Status:  v1.TaskReportSucceeded,
 			Summary: &v1.TaskSummary{Output: res.Output},
@@ -112,25 +151,52 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		})
 	}
 
-	if err := r.git.CreateBranch(ctx, wsDir, branch); err != nil {
-		return r.fail(ctx, task, usage, fmt.Errorf("create branch: %w", err))
-	}
 	if err := r.git.Commit(ctx, wsDir, commitMessage(task)); err != nil {
 		return r.fail(ctx, task, usage, fmt.Errorf("commit: %w", err))
 	}
-	if err := r.git.Push(ctx, wsDir, branch); err != nil {
+	// Diff after the commit so work the agent left uncommitted is included.
+	diff, err := r.git.Diff(ctx, wsDir, "origin/"+defaultBranch)
+	if err != nil {
+		return r.fail(ctx, task, usage, fmt.Errorf("diff: %w", err))
+	}
+	if err := r.git.Push(ctx, wsDir, branch, cred); err != nil {
 		return r.fail(ctx, task, usage, fmt.Errorf("push: %w", err))
 	}
 
 	return r.reporter.Report(ctx, task.ID, v1.TaskReport{
 		Status: v1.TaskReportSucceeded,
 		Summary: &v1.TaskSummary{
-			Output:   res.Output,
-			Branch:   branch,
-			DiffStat: diffStat(diff),
+			Output:     res.Output,
+			Branch:     branch,
+			BaseBranch: defaultBranch,
+			DiffStat:   diffStat(diff),
 		},
 		Usage: usage,
 	})
+}
+
+// resolveDefaultBranch prefers the branch the server sent and falls back to the
+// checkout's own origin/HEAD when that branch does not exist. The server's value
+// is a snapshot taken during repo sync, so a repository that renamed its default
+// branch would otherwise fail every task at checkout.
+func (r *Runner) resolveDefaultBranch(ctx context.Context, dir, want string) (string, error) {
+	got, gotErr := r.git.DefaultBranch(ctx, dir)
+	if want == "" {
+		if gotErr != nil {
+			return "", gotErr
+		}
+		return got, nil
+	}
+	if err := r.git.HasBranch(ctx, dir, want); err == nil {
+		return want, nil
+	}
+	if gotErr != nil || got == "" {
+		// Neither branch resolves: keep the server's value so the checkout
+		// failure names the branch the server believed in.
+		return want, nil
+	}
+	slog.Warn("default branch from the task does not exist, using origin/HEAD", "task_branch", want, "resolved", got)
+	return got, nil
 }
 
 // fail reports a failed terminal state and returns the error. usage is nil for

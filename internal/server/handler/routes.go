@@ -35,7 +35,14 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	userHandler := NewUserHandler()
 
 	githubSvc := service.NewGitHubAppService(s, cfg, memory.NewPendingInstallationStore())
+	prSvc := service.NewPullRequestService(s)
 	taskSvc := service.NewTaskService(s, githubSvc)
+	// One relationship, three writers: the task lifecycle records the PR it
+	// opens, the webhook syncs the ones GitHub reports, and the console will
+	// link and unlink by hand.
+	taskSvc.SetPullRequests(prSvc)
+	githubSvc.SetPullRequests(prSvc)
+	prSvc.SetFetcher(githubSvc)
 	workspaceSvc := service.NewWorkspaceService(s, githubSvc)
 	githubHandler := NewGitHubHandler(cfg, githubSvc)
 	workspaceHandler := NewWorkspaceHandler(workspaceSvc)
@@ -169,6 +176,13 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.GET("/workspaces/:id/issues/:issueId", issueHandler.Get)
 			protected.PATCH("/workspaces/:id/issues/:issueId", issueHandler.Update)
 			protected.POST("/workspaces/:id/issues/:issueId/comments", issueHandler.AddComment)
+
+			// The issue ↔ PR relationship, by hand: the automatic entries
+			// (the platform's own PR, the webhook) need nothing here.
+			issueHandler.SetPullRequests(prSvc)
+			protected.POST("/workspaces/:id/issues/:issueId/pull-requests", issueHandler.LinkPullRequest)
+			protected.DELETE("/workspaces/:id/issues/:issueId/pull-requests/:prId", issueHandler.UnlinkPullRequest)
+			protected.POST("/workspaces/:id/issues/:issueId/pull-requests/:prId/restore", issueHandler.RestorePullRequest)
 
 			// Agent configuration
 			protected.GET("/workspaces/:id/agents", agentHandler.List)

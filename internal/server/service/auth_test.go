@@ -41,10 +41,7 @@ func TestAuthServiceE2ELoginIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("E2ELogin() error = %v", err)
 	}
-	t.Cleanup(func() {
-		_, _ = pool.Exec(ctx, "DELETE FROM user_identities WHERE user_id = $1", first.User.ID)
-		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", first.User.ID)
-	})
+	t.Cleanup(func() { cleanupUserRows(t, ctx, pool, first.User.ID) })
 
 	if first.Token == "" {
 		t.Fatal("E2ELogin() returned an empty token")

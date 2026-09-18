@@ -95,11 +95,41 @@ export interface Issue {
   description: string;
   status: IssueStatus;
   assigned_agents: string[];
-  linked_prs: string[];
+  /** Only populated on the issue detail endpoint, newest first. */
+  pull_requests?: PullRequest[];
+  /** The active PR's number, or 0/absent when the issue has none. */
+  active_pr_number?: number;
   creator_name: string;
   comments_count: number;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * A pull request linked to an issue.
+ *
+ * `active` is the one the issue currently tracks — at most one at a time — and
+ * the rest are the history of how the issue got here.
+ */
+export interface PullRequest {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  state: "open" | "merged" | "closed";
+  draft: boolean;
+  head_branch: string;
+  base_branch: string;
+  author: string;
+  repo_full_name: string;
+  /** How the link was made: platform | branch | body | manual. */
+  source: "platform" | "branch" | "body" | "manual";
+  close_intent: boolean;
+  /** Unlinked by a human; kept so the history stays complete. */
+  suppressed: boolean;
+  active: boolean;
+  merged_at?: string;
+  created_at: string;
 }
 
 export interface IssueComment {
@@ -139,6 +169,11 @@ export const issueApi = {
     api.patch<Issue>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`, body),
   addComment: (workspaceId: string, issueId: string, content: string) =>
     api.post<IssueComment>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/comments`, { content }),
+  linkPullRequest: (workspaceId: string, issueId: string, ref: string) =>
+    api.post<PullRequest>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests`, { ref }),
+  unlinkPullRequest: (workspaceId: string, issueId: string, prId: string) =>
+    api.delete(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests/${prId}`),  restorePullRequest: (workspaceId: string, issueId: string, prId: string) =>
+    api.post(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests/${prId}/restore`, {}),
 };
 
 // ── Workspaces ─────────────────────────────────────────────────────────

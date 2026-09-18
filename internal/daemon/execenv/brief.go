@@ -53,14 +53,18 @@ func renderBrief(p PrepareParams) string {
 
 	// Deliberately outcome-neutral: analysis, design and review tasks are as
 	// valid as implementation ones, so nothing here may assume a code change.
+	// The commit, the push and the pull request are the platform's — an agent
+	// that did them too left nothing for the platform to commit, and the task
+	// failed on the second attempt at the same commit.
 	b.WriteString("## Working Instructions\n\n")
 	b.WriteString("1. Do the work described in the issue above.\n")
 	b.WriteString("2. Finish with your conclusion in your final output — it is posted to the issue as a comment. State what you found or did, and anything the user needs to decide.\n")
-	b.WriteString("3. If — and only if — the task requires code changes: make them in this directory, run the tests, then `git commit`")
-	if p.Issue.Key != "" {
-		fmt.Fprintf(&b, " referencing %s", p.Issue.Key)
+	b.WriteString("3. If — and only if — the work requires code changes: make them in this directory and run the tests. Leave the changes in the working tree and do not run `git commit` or `git push`")
+	if p.Branch != "" {
+		fmt.Fprintf(&b, " — the platform commits them to `%s` and opens the pull request for you.\n", p.Branch)
+	} else {
+		b.WriteString(" — the platform commits them and opens the pull request for you.\n")
 	}
-	b.WriteString(" and `git push` your branch. The platform opens the pull request for you, so you do not need to.\n")
 
 	return b.String()
 }

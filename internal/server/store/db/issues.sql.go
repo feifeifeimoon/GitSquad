@@ -66,7 +66,7 @@ func (q *Queries) CreateComment(ctx context.Context, arg CreateCommentParams) (I
 
 const createIssue = `-- name: CreateIssue :one
 INSERT INTO issues (workspace_id, number, title, description, status, creator_user_id, assigned_agents, source_upstream_issue)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, workspace_id, number, title, description, status, creator_user_id, assigned_agents, linked_prs, source_upstream_issue, created_at, updated_at
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, workspace_id, number, title, description, status, creator_user_id, assigned_agents, source_upstream_issue, created_at, updated_at
 `
 
 type CreateIssueParams struct {
@@ -101,7 +101,6 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 		&i.Status,
 		&i.CreatorUserID,
 		&i.AssignedAgents,
-		&i.LinkedPrs,
 		&i.SourceUpstreamIssue,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -110,7 +109,7 @@ func (q *Queries) CreateIssue(ctx context.Context, arg CreateIssueParams) (Issue
 }
 
 const getIssue = `-- name: GetIssue :one
-SELECT i.id, i.workspace_id, i.number, i.title, i.description, i.status, i.creator_user_id, i.assigned_agents, i.linked_prs, i.source_upstream_issue, i.created_at, i.updated_at, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
+SELECT i.id, i.workspace_id, i.number, i.title, i.description, i.status, i.creator_user_id, i.assigned_agents, i.source_upstream_issue, i.created_at, i.updated_at, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
        (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count
 FROM issues i
 JOIN workspaces w ON w.id = i.workspace_id
@@ -132,7 +131,6 @@ type GetIssueRow struct {
 	Status              string     `json:"status"`
 	CreatorUserID       *uuid.UUID `json:"creator_user_id"`
 	AssignedAgents      []string   `json:"assigned_agents"`
-	LinkedPrs           []string   `json:"linked_prs"`
 	SourceUpstreamIssue *string    `json:"source_upstream_issue"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
@@ -153,7 +151,6 @@ func (q *Queries) GetIssue(ctx context.Context, arg GetIssueParams) (GetIssueRow
 		&i.Status,
 		&i.CreatorUserID,
 		&i.AssignedAgents,
-		&i.LinkedPrs,
 		&i.SourceUpstreamIssue,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -165,7 +162,7 @@ func (q *Queries) GetIssue(ctx context.Context, arg GetIssueParams) (GetIssueRow
 }
 
 const getIssueByNumber = `-- name: GetIssueByNumber :one
-SELECT i.id, i.workspace_id, i.number, i.title, i.description, i.status, i.creator_user_id, i.assigned_agents, i.linked_prs, i.source_upstream_issue, i.created_at, i.updated_at, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
+SELECT i.id, i.workspace_id, i.number, i.title, i.description, i.status, i.creator_user_id, i.assigned_agents, i.source_upstream_issue, i.created_at, i.updated_at, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
        (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count
 FROM issues i
 JOIN workspaces w ON w.id = i.workspace_id
@@ -187,7 +184,6 @@ type GetIssueByNumberRow struct {
 	Status              string     `json:"status"`
 	CreatorUserID       *uuid.UUID `json:"creator_user_id"`
 	AssignedAgents      []string   `json:"assigned_agents"`
-	LinkedPrs           []string   `json:"linked_prs"`
 	SourceUpstreamIssue *string    `json:"source_upstream_issue"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
@@ -208,7 +204,6 @@ func (q *Queries) GetIssueByNumber(ctx context.Context, arg GetIssueByNumberPara
 		&i.Status,
 		&i.CreatorUserID,
 		&i.AssignedAgents,
-		&i.LinkedPrs,
 		&i.SourceUpstreamIssue,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -275,8 +270,12 @@ func (q *Queries) ListCommentsByIssue(ctx context.Context, issueID uuid.UUID) ([
 }
 
 const listIssuesByWorkspace = `-- name: ListIssuesByWorkspace :many
-SELECT i.id, i.workspace_id, i.number, i.title, i.description, i.status, i.creator_user_id, i.assigned_agents, i.linked_prs, i.source_upstream_issue, i.created_at, i.updated_at, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
-       (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count
+SELECT i.id, i.workspace_id, i.number, i.title, i.description, i.status, i.creator_user_id, i.assigned_agents, i.source_upstream_issue, i.created_at, i.updated_at, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
+       (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count,
+       COALESCE((SELECT pr.number FROM pull_requests pr
+                 WHERE pr.issue_id = i.id AND pr.state = 'open' AND pr.close_intent
+                   AND pr.suppressed_at IS NULL
+                 ORDER BY pr.created_at DESC LIMIT 1), 0)::int AS active_pr_number
 FROM issues i
 JOIN workspaces w ON w.id = i.workspace_id
 LEFT JOIN users u ON u.id = i.creator_user_id
@@ -293,13 +292,13 @@ type ListIssuesByWorkspaceRow struct {
 	Status              string     `json:"status"`
 	CreatorUserID       *uuid.UUID `json:"creator_user_id"`
 	AssignedAgents      []string   `json:"assigned_agents"`
-	LinkedPrs           []string   `json:"linked_prs"`
 	SourceUpstreamIssue *string    `json:"source_upstream_issue"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
 	IssuePrefix         string     `json:"issue_prefix"`
 	CreatorName         string     `json:"creator_name"`
 	CommentsCount       int64      `json:"comments_count"`
+	ActivePrNumber      int32      `json:"active_pr_number"`
 }
 
 func (q *Queries) ListIssuesByWorkspace(ctx context.Context, workspaceID uuid.UUID) ([]ListIssuesByWorkspaceRow, error) {
@@ -320,13 +319,13 @@ func (q *Queries) ListIssuesByWorkspace(ctx context.Context, workspaceID uuid.UU
 			&i.Status,
 			&i.CreatorUserID,
 			&i.AssignedAgents,
-			&i.LinkedPrs,
 			&i.SourceUpstreamIssue,
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.IssuePrefix,
 			&i.CreatorName,
 			&i.CommentsCount,
+			&i.ActivePrNumber,
 		); err != nil {
 			return nil, err
 		}
@@ -339,7 +338,7 @@ func (q *Queries) ListIssuesByWorkspace(ctx context.Context, workspaceID uuid.UU
 }
 
 const updateIssueStatus = `-- name: UpdateIssueStatus :one
-UPDATE issues SET status = $3, updated_at = now() WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, number, title, description, status, creator_user_id, assigned_agents, linked_prs, source_upstream_issue, created_at, updated_at
+UPDATE issues SET status = $3, updated_at = now() WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, number, title, description, status, creator_user_id, assigned_agents, source_upstream_issue, created_at, updated_at
 `
 
 type UpdateIssueStatusParams struct {
@@ -360,7 +359,6 @@ func (q *Queries) UpdateIssueStatus(ctx context.Context, arg UpdateIssueStatusPa
 		&i.Status,
 		&i.CreatorUserID,
 		&i.AssignedAgents,
-		&i.LinkedPrs,
 		&i.SourceUpstreamIssue,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -369,7 +367,7 @@ func (q *Queries) UpdateIssueStatus(ctx context.Context, arg UpdateIssueStatusPa
 }
 
 const updateIssueTitleDescription = `-- name: UpdateIssueTitleDescription :one
-UPDATE issues SET title = $3, description = $4, updated_at = now() WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, number, title, description, status, creator_user_id, assigned_agents, linked_prs, source_upstream_issue, created_at, updated_at
+UPDATE issues SET title = $3, description = $4, updated_at = now() WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, number, title, description, status, creator_user_id, assigned_agents, source_upstream_issue, created_at, updated_at
 `
 
 type UpdateIssueTitleDescriptionParams struct {
@@ -396,7 +394,6 @@ func (q *Queries) UpdateIssueTitleDescription(ctx context.Context, arg UpdateIss
 		&i.Status,
 		&i.CreatorUserID,
 		&i.AssignedAgents,
-		&i.LinkedPrs,
 		&i.SourceUpstreamIssue,
 		&i.CreatedAt,
 		&i.UpdatedAt,

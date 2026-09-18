@@ -26,17 +26,37 @@ type TaskDispatcher interface {
 	Dispatch(ctx context.Context, workspaceID, issueID uuid.UUID, agentName string) error
 }
 
+// GitHubGateway is the slice of the GitHub App service the task lifecycle
+// needs: minting the daemon's installation token at claim time, and opening the
+// pull request for a task that produced code changes. It is an interface so the
+// lifecycle can be exercised without calling GitHub.
+type GitHubGateway interface {
+	GetInstallationToken(ctx context.Context, installationID int64) (string, time.Time, error)
+	CreatePullRequest(ctx context.Context, installationDBID uuid.UUID, owner, repo, head, base, title, body string) (int, error)
+}
+
 // TaskService persists tasks to the `tasks` table and drives the task
 // lifecycle state machine (queued → dispatched → running → completed/failed).
 type TaskService struct {
-	store     *store.Store
-	github    *GitHubAppService
-	publisher EventPublisher
-	waker     DaemonWaker
+	store        *store.Store
+	github       GitHubGateway
+	publisher    EventPublisher
+	waker        DaemonWaker
+	pullRequests *PullRequestService
 }
 
-func NewTaskService(s *store.Store, github *GitHubAppService) *TaskService {
+func NewTaskService(s *store.Store, github GitHubGateway) *TaskService {
 	return &TaskService{store: s, github: github}
+}
+
+// SetPullRequests wires the issue ↔ PR relationship in; nil disables it.
+func (s *TaskService) SetPullRequests(p *PullRequestService) { s.pullRequests = p }
+
+// pullRequestURL is GitHub's own URL shape. Building it beats threading a second
+// return value through the GitHub client for something the number already
+// determines.
+func pullRequestURL(owner, repo string, number int) string {
+	return fmt.Sprintf("https://github.com/%s/%s/pull/%d", owner, repo, number)
 }
 
 // SetPublisher wires the realtime publisher in; nil disables realtime.
@@ -98,7 +118,9 @@ func (s *TaskService) Dispatch(ctx context.Context, workspaceID, issueID uuid.UU
 	contextTask := v1.Task{
 		WorkspaceID: workspaceID,
 		Issue:       buildTaskIssue(issue, comments),
-		Repo:        v1.TaskRepoContext{Owner: ws.RepoOwner, Name: ws.RepoName, DefaultBranch: "main"},
+		// The repository's own default branch, not an assumed "main": the daemon
+		// resets the checkout to it and diffs against it.
+		Repo: v1.TaskRepoContext{Owner: ws.RepoOwner, Name: ws.RepoName, DefaultBranch: ws.RepoDefaultBranch},
 		Agent: v1.TaskAgentContext{
 			Name:         agent.Name,
 			Instructions: agent.Instructions,
@@ -186,6 +208,21 @@ func (s *TaskService) buildClaim(ctx context.Context, task db.Task) (*v1.Task, e
 	}
 	full.ID = task.ID
 	full.InstallationToken = token
+
+	// Where should this task's work land? If the issue already has a live line
+	// of work, the answer is that PR's branch: the agent sees the work already
+	// done on it and pushing to it updates the PR in place. The decision is made
+	// here, at claim time, because the daemon is stateless — it cannot look up
+	// the issue's PRs, and by the time it could, the agent would already have
+	// started from the wrong base.
+	if s.pullRequests != nil {
+		if pr, err := s.pullRequests.ContinuablePullRequest(ctx, full.Issue.ID); err != nil {
+			slog.Warn("resolve active pull request", "issue", full.Issue.ID, "error", err)
+		} else if pr.ID != uuid.Nil && pr.HeadBranch != "" {
+			full.Repo.Branch = pr.HeadBranch
+			full.Repo.PullRequestNumber = int(pr.Number)
+		}
+	}
 	return &full, nil
 }
 
@@ -356,10 +393,11 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 	}
 
 	summary := report.Summary
-	output, branch := "", ""
+	output, branch, base := "", "", ""
 	if summary != nil {
 		output = strings.TrimSpace(summary.Output)
 		branch = summary.Branch
+		base = summary.BaseBranch
 	}
 
 	// The agent's own output is the deliverable: it is what an analysis, design
@@ -376,9 +414,29 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		if err != nil {
 			return err
 		}
+		// The daemon's answer wins over the dispatch-time snapshot: it is the
+		// branch the checkout was actually reset to.
+		if base == "" {
+			base = full.Repo.DefaultBranch
+		}
+
+		// A task that continued the issue's live line of work pushed to the
+		// branch its pull request is already on: the PR exists, so opening
+		// another one would be wrong. All that is left is to say where the work
+		// went; the PR's own state keeps flowing in through the webhook.
+		if existing := s.activePullRequestOnBranch(ctx, full.Issue.ID, branch); existing.ID != uuid.Nil {
+			if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
+				fmt.Sprintf("已推送到 PR #%d：%s", existing.Number,
+					pullRequestURL(ws.RepoOwner, ws.RepoName, int(existing.Number)))); err != nil {
+				return err
+			}
+			result["pr_number"] = existing.Number
+			return s.finishCompleted(ctx, task, full, result)
+		}
+
 		title := full.Issue.Key + ": changes by " + full.Agent.Name
 		body := fmt.Sprintf("Closes %s\n\nAutomated changes by %s.", full.Issue.Key, full.Agent.Name)
-		prNum, err := s.github.CreatePullRequest(ctx, ws.InstallationID, ws.RepoOwner, ws.RepoName, branch, full.Repo.DefaultBranch, title, body)
+		prNum, err := s.github.CreatePullRequest(ctx, ws.InstallationID, ws.RepoOwner, ws.RepoName, branch, base, title, body)
 		if err != nil {
 			// The task is already terminal; surface the write-back failure
 			// rather than losing it silently.
@@ -387,8 +445,18 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 			return err
 		}
 		result["pr_number"] = prNum
+		// Entry ① of the issue ↔ PR relationship: the platform opened it, so
+		// the link is certain and is written now rather than waiting for a
+		// webhook that may be delayed, missing, or never configured. A failure
+		// here is worth a log, not failing a task that already succeeded.
+		if s.pullRequests != nil {
+			if err := s.pullRequests.LinkCreated(ctx, task, full, prNum,
+				pullRequestURL(ws.RepoOwner, ws.RepoName, prNum), branch, base); err != nil {
+				slog.Warn("record created pull request", "task", task.ID, "pr", prNum, "error", err)
+			}
+		}
 		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
-			fmt.Sprintf("已提 PR #%d。", prNum)); err != nil {
+			fmt.Sprintf("已提 PR #%d：%s", prNum, pullRequestURL(ws.RepoOwner, ws.RepoName, prNum))); err != nil {
 			return err
 		}
 	} else if output == "" {
@@ -401,6 +469,13 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 
 	// The agent is done; a human should look at whatever it produced — a pull
 	// request or an analysis. This transition is not specific to code changes.
+	return s.finishCompleted(ctx, task, full, result)
+}
+
+// finishCompleted closes out a task that succeeded: the issue waits for a human,
+// and the task's result is stored. Shared by both endings of a code task — a new
+// pull request, or work pushed onto the one the issue already had.
+func (s *TaskService) finishCompleted(ctx context.Context, task db.Task, full v1.Task, result map[string]any) error {
 	if _, err := s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
 		ID:          task.IssueID,
 		WorkspaceID: task.WorkspaceID,
@@ -412,6 +487,24 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 
 	raw, _ := json.Marshal(result)
 	return s.store.SetTaskResult(ctx, db.SetTaskResultParams{ID: task.ID, Result: raw})
+}
+
+// activePullRequestOnBranch returns the issue's active PR when it is the one the
+// task pushed to, and a zero value otherwise. Matching the branch is what tells
+// "the work continued this PR" apart from "the work needs a new one".
+func (s *TaskService) activePullRequestOnBranch(ctx context.Context, issueID uuid.UUID, branch string) db.PullRequest {
+	if s.pullRequests == nil || branch == "" {
+		return db.PullRequest{}
+	}
+	pr, err := s.pullRequests.ActivePullRequest(ctx, issueID)
+	if err != nil {
+		slog.Warn("resolve active pull request", "issue", issueID, "error", err)
+		return db.PullRequest{}
+	}
+	if pr.HeadBranch != branch {
+		return db.PullRequest{}
+	}
+	return pr
 }
 
 func (s *TaskService) handleFailed(ctx context.Context, task db.Task, report v1.TaskReport) error {
@@ -447,18 +540,7 @@ func taskContext(task db.Task) (v1.Task, error) {
 
 // appendComment writes an issue comment and notifies connected browsers.
 func (s *TaskService) appendComment(ctx context.Context, workspaceID, issueID uuid.UUID, authorType, authorName, content string) error {
-	_, err := s.store.CreateComment(ctx, db.CreateCommentParams{
-		IssueID:    issueID,
-		AuthorType: authorType,
-		AuthorName: authorName,
-		Type:       "comment",
-		Content:    content,
-	})
-	if err != nil {
-		return err
-	}
-	s.publish(v1.AppEventCommentCreated, workspaceID, issueID)
-	return nil
+	return appendIssueComment(ctx, s.store, s.publisher, workspaceID, issueID, authorType, authorName, content)
 }
 
 func buildTaskIssue(issue db.GetIssueRow, comments []db.IssueComment) v1.TaskIssueContext {

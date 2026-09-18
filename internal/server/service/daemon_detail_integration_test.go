@@ -50,14 +50,7 @@ func TestDaemonDetailAndAgentStatusIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	t.Cleanup(func() {
-		_, _ = pool.Exec(ctx, "DELETE FROM workspaces WHERE user_id = $1", user.ID)
-		_, _ = pool.Exec(ctx, "DELETE FROM github_repos WHERE installation_id IN (SELECT id FROM github_installations WHERE user_id = $1)", user.ID)
-		_, _ = pool.Exec(ctx, "DELETE FROM github_installations WHERE user_id = $1", user.ID)
-		_, _ = pool.Exec(ctx, "DELETE FROM runtimes WHERE daemon_id IN (SELECT id FROM daemons WHERE user_id = $1)", user.ID)
-		_, _ = pool.Exec(ctx, "DELETE FROM daemons WHERE user_id = $1", user.ID)
-		_, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", user.ID)
-	})
+	t.Cleanup(func() { cleanupUserRows(t, ctx, pool, user.ID) })
 
 	ws := createWorkspaceForTest(ctx, t, s, user.ID, "ITD", fmt.Sprintf("itd-%s", uuid.NewString()[:8]))
 

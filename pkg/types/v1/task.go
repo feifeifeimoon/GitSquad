@@ -45,6 +45,14 @@ type TaskRepoContext struct {
 	Owner         string `json:"owner"`
 	Name          string `json:"name"`
 	DefaultBranch string `json:"default_branch"`
+	// Branch is the issue's live line of work, when it has one: the head branch
+	// of its active pull request. Empty means this task starts a new line on a
+	// fresh branch. The server decides this at claim time — the daemon has no
+	// way to look it up.
+	Branch string `json:"branch,omitempty"`
+	// PullRequestNumber is the PR Branch belongs to, for the record. Zero when
+	// the task starts a new line.
+	PullRequestNumber int `json:"pull_request_number,omitempty"`
 }
 
 // TaskAgentContext is the agent persona + runtime binding snapshot.
@@ -122,8 +130,14 @@ type TaskProgress struct {
 // agent's summary. Every other field describes the code change, which is
 // optional — a task that changes no code is a normal outcome, not a failure.
 type TaskSummary struct {
-	Output      string `json:"output,omitempty"`
-	Branch      string `json:"branch,omitempty"`
+	Output string `json:"output,omitempty"`
+	Branch string `json:"branch,omitempty"`
+	// BaseBranch is the branch the daemon actually reset the checkout to and
+	// diffed against. It is the authority for the pull request's base: the
+	// value in the task context is a snapshot taken at dispatch time, so a
+	// repository that renamed its default branch in between would otherwise
+	// produce a PR against a branch that no longer exists.
+	BaseBranch  string `json:"base_branch,omitempty"`
 	CommitSHA   string `json:"commit_sha,omitempty"`
 	DiffStat    string `json:"diff_stat,omitempty"`
 	TestResults string `json:"test_results,omitempty"`

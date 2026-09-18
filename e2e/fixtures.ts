@@ -299,6 +299,61 @@ export class TestApiClient {
     });
   }
 
+  /**
+   * Seed a pull request row directly.
+   *
+   * The issue ↔ PR relationship has four entries; the ones a browser test can
+   * reach without GitHub are the platform's own (a task finishing, which needs a
+   * daemon) and the manual link (which would call GitHub). Seeding the row gets
+   * the UI under test without either.
+   *
+   * `suppressed` seeds an unlinked row: the tombstone a human leaves behind, and
+   * the only way this fixture can put a PR in the history without an active one
+   * holding the slot.
+   */
+  async seedPullRequest(
+    workspaceId: string,
+    issueId: string,
+    opts: {
+      number?: number;
+      title?: string;
+      state?: string;
+      owner?: string;
+      repo?: string;
+      suppressed?: boolean;
+    } = {},
+  ): Promise<void> {
+    const owner = opts.owner ?? "e2e-owner";
+    const repo = opts.repo ?? "e2e-repo";
+    const number = opts.number ?? 42;
+    const client = new pg.Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      await client.query(
+        `INSERT INTO pull_requests
+           (workspace_id, issue_id, repo_owner, repo_name, number, title, url,
+            state, head_branch, base_branch, author, source, close_intent,
+            suppressed_at, github_updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'main', 'gitsquad[bot]', 'platform', true,
+                 CASE WHEN $10 THEN now() ELSE NULL END, now())`,
+        [
+          workspaceId,
+          issueId,
+          owner,
+          repo,
+          number,
+          opts.title ?? "E2E pull request",
+          `https://github.com/${owner}/${repo}/pull/${number}`,
+          opts.state ?? "open",
+          `gitsquad/E2E-1/${number}`,
+          opts.suppressed ?? false,
+        ],
+      );
+    } finally {
+      await client.end();
+    }
+  }
+
   /** Create a skill via the real API. */
   async createSkill(
     workspaceId: string,
