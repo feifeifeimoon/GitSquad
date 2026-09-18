@@ -122,8 +122,14 @@ type TaskProgress struct {
 // agent's summary. Every other field describes the code change, which is
 // optional — a task that changes no code is a normal outcome, not a failure.
 type TaskSummary struct {
-	Output      string `json:"output,omitempty"`
-	Branch      string `json:"branch,omitempty"`
+	Output string `json:"output,omitempty"`
+	Branch string `json:"branch,omitempty"`
+	// BaseBranch is the branch the daemon actually reset the checkout to and
+	// diffed against. It is the authority for the pull request's base: the
+	// value in the task context is a snapshot taken at dispatch time, so a
+	// repository that renamed its default branch in between would otherwise
+	// produce a PR against a branch that no longer exists.
+	BaseBranch  string `json:"base_branch,omitempty"`
 	CommitSHA   string `json:"commit_sha,omitempty"`
 	DiffStat    string `json:"diff_stat,omitempty"`
 	TestResults string `json:"test_results,omitempty"`

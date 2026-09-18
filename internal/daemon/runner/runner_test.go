@@ -13,14 +13,43 @@ import (
 type fakeGit struct {
 	cloneErr, branchErr, commitErr, pushErr error
 	diff                                    string
-	committed, pushed                       bool
-	branch                                  string
+	// dirty = uncommitted work in the tree; ahead = commits the agent made.
+	dirty, ahead            bool
+	committed, pushed       bool
+	discarded               bool
+	branch, discardedBranch string
+	// originHead is what the checkout's origin/HEAD resolves to ("" → "main").
+	originHead string
+	// missing lists branches the checkout does not have.
+	missing []string
 }
 
-func (f *fakeGit) CloneOrFetch(_ context.Context, _ string, _ string) error {
+func (f *fakeGit) CloneOrFetch(_ context.Context, _ string, _ string, _ Credential) error {
 	return f.cloneErr
 }
 func (f *fakeGit) ResetToDefault(_ context.Context, _ string, _ string) error {
+	return nil
+}
+func (f *fakeGit) DefaultBranch(_ context.Context, _ string) (string, error) {
+	if f.originHead == "" {
+		return "main", nil
+	}
+	return f.originHead, nil
+}
+func (f *fakeGit) HasBranch(_ context.Context, _ string, branch string) error {
+	for _, m := range f.missing {
+		if m == branch {
+			return errors.New("no such branch")
+		}
+	}
+	return nil
+}
+func (f *fakeGit) HasChanges(_ context.Context, _ string, _ string) (bool, error) {
+	return f.dirty || f.ahead, nil
+}
+func (f *fakeGit) DiscardBranch(_ context.Context, _ string, branch, _ string) error {
+	f.discarded = true
+	f.discardedBranch = branch
 	return nil
 }
 func (f *fakeGit) CreateBranch(_ context.Context, _ string, branch string) error {
@@ -31,7 +60,7 @@ func (f *fakeGit) Commit(_ context.Context, _ string, _ string) error {
 	f.committed = true
 	return f.commitErr
 }
-func (f *fakeGit) Push(_ context.Context, _ string, _ string) error {
+func (f *fakeGit) Push(_ context.Context, _ string, _ string, _ Credential) error {
 	f.pushed = true
 	return f.pushErr
 }
@@ -86,8 +115,104 @@ func testTask() v1.Task {
 	}
 }
 
+// Every agent behaviour must converge on the same outcome: one branch, pushed.
+// The agent is told to leave its work in the tree, but it may also commit — the
+// old brief told it to — and either way the platform owns the commit step.
+func TestRunnerRunConvergesOnEveryAgentBehaviour(t *testing.T) {
+	cases := []struct {
+		name         string
+		dirty, ahead bool
+	}{
+		{name: "agent left changes uncommitted", dirty: true},
+		{name: "agent committed everything", ahead: true},
+		{name: "agent committed and left more", dirty: true, ahead: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			git := &fakeGit{dirty: tc.dirty, ahead: tc.ahead, diff: "diff --git a/x b/x\n+x\n"}
+			rep := &fakeReporter{}
+			r := New(git, &fakeBackend{res: provider.Result{Status: "completed", Output: "done"}}, rep, t.TempDir())
+
+			if err := r.Run(context.Background(), testTask()); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			if git.branch == "" {
+				t.Error("the branch must exist before the agent runs")
+			}
+			if !git.committed {
+				t.Error("the commit step belongs to the platform on every path")
+			}
+			if !git.pushed {
+				t.Error("want the branch pushed")
+			}
+			last := rep.reports[len(rep.reports)-1]
+			if last.Status != v1.TaskReportSucceeded || last.Summary == nil || last.Summary.Branch == "" {
+				t.Errorf("last report = %+v, want succeeded with a branch", last)
+			}
+		})
+	}
+}
+
+// Nothing to deliver: the empty branch is dropped so a reused checkout does not
+// accumulate one per read-only task, and the agent's text is the deliverable.
+func TestRunnerRunNoChangesDiscardsBranch(t *testing.T) {
+	git := &fakeGit{}
+	rep := &fakeReporter{}
+	r := New(git, &fakeBackend{res: provider.Result{Status: "completed", Output: "analysis"}}, rep, t.TempDir())
+
+	if err := r.Run(context.Background(), testTask()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	if !git.discarded || git.discardedBranch == "" {
+		t.Errorf("want the empty branch discarded, got discarded=%v branch=%q", git.discarded, git.discardedBranch)
+	}
+	if git.committed || git.pushed {
+		t.Error("nothing to deliver: must not commit or push")
+	}
+	last := rep.reports[len(rep.reports)-1]
+	if last.Status != v1.TaskReportSucceeded || last.Summary == nil || last.Summary.Output != "analysis" {
+		t.Errorf("last report = %+v, want succeeded with the agent output", last)
+	}
+}
+
+// The server's value is a snapshot from repo sync, so the checkout is the
+// authority when it disagrees: an empty value (sync has not landed) or a value
+// the clone does not have (the default branch was renamed) both resolve to
+// origin/HEAD rather than failing the task at checkout.
+func TestRunnerResolvesDefaultBranchFromTheCheckout(t *testing.T) {
+	cases := []struct {
+		name, want, originHead string
+		missing                []string
+		expect                 string
+	}{
+		{name: "server value wins when the clone has it", want: "develop", originHead: "main", expect: "develop"},
+		{name: "empty falls back to origin/HEAD", originHead: "trunk", expect: "trunk"},
+		{name: "stale value falls back to origin/HEAD", want: "main", originHead: "trunk", missing: []string{"main"}, expect: "trunk"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			git := &fakeGit{originHead: tc.originHead, missing: tc.missing}
+			rep := &fakeReporter{}
+			r := New(git, &fakeBackend{res: provider.Result{Status: "completed", Output: "done"}}, rep, t.TempDir())
+
+			task := testTask()
+			task.Repo.DefaultBranch = tc.want
+			git.dirty = true
+			git.diff = "diff --git a/x b/x\n+x\n"
+
+			if err := r.Run(context.Background(), task); err != nil {
+				t.Fatalf("Run() error = %v", err)
+			}
+			last := rep.reports[len(rep.reports)-1]
+			if last.Summary == nil || last.Summary.BaseBranch != tc.expect {
+				t.Errorf("reported base = %+v, want %q", last.Summary, tc.expect)
+			}
+		})
+	}
+}
+
 func TestRunnerRunSuccess(t *testing.T) {
-	git := &fakeGit{diff: "diff --git a/x b/x\n+x\n"}
+	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n"}
 	backend := &fakeBackend{
 		msgs: []provider.Message{{Type: provider.MessageText, Content: "working"}},
 		res:  provider.Result{Status: "completed", Output: "done"},
@@ -116,7 +241,7 @@ func TestRunnerRunSuccess(t *testing.T) {
 }
 
 func TestRunnerRunProviderFailed(t *testing.T) {
-	git := &fakeGit{diff: "diff"}
+	git := &fakeGit{dirty: true, diff: "diff"}
 	backend := &fakeBackend{res: provider.Result{Status: "failed", Error: "boom"}}
 	rep := &fakeReporter{}
 	r := New(git, backend, rep, t.TempDir())
@@ -144,10 +269,12 @@ func TestRunnerRunNoChanges(t *testing.T) {
 		t.Fatalf("Run() error = %v", err)
 	}
 	if git.committed || git.pushed {
-		t.Errorf("should not commit/push when diff is empty")
+		t.Errorf("should not commit/push when nothing changed")
 	}
-	if git.branch != "" {
-		t.Errorf("branch should not be created for a read-only task, got %q", git.branch)
+	// The branch is created before the agent runs, so the no-change path has to
+	// take it back — otherwise a reused checkout accumulates one per task.
+	if !git.discarded {
+		t.Errorf("branch %q should be discarded for a read-only task", git.branch)
 	}
 	last := rep.reports[len(rep.reports)-1]
 	if last.Status != v1.TaskReportSucceeded {
@@ -179,7 +306,7 @@ func TestRunnerRunCheckoutError(t *testing.T) {
 // commits and pushes, one that fails after the agent finished, and one whose
 // provider timed out mid-stream.
 func TestRunnerReportsUsageOnSuccess(t *testing.T) {
-	git := &fakeGit{diff: "diff --git a/x b/x\n+x\n"}
+	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n"}
 	backend := &fakeBackend{res: provider.Result{
 		Status: "completed",
 		Output: "done",
@@ -239,7 +366,7 @@ func TestRunnerReportsUsageWhenProviderFails(t *testing.T) {
 // A failure after the agent finished — the push — still carries the tokens it
 // spent producing the work.
 func TestRunnerReportsUsageWhenPushFails(t *testing.T) {
-	git := &fakeGit{diff: "diff --git a/x b/x\n+x\n", pushErr: errors.New("push failed")}
+	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n", pushErr: errors.New("push failed")}
 	backend := &fakeBackend{res: provider.Result{
 		Status: "completed",
 		Usage:  map[string]provider.TokenUsage{"claude-sonnet-4-5": {OutputTokens: 99}},

@@ -54,7 +54,7 @@ func TestGitCLIFullFlow(t *testing.T) {
 
 	// Clone, then reset to a clean default branch (what a task start does).
 	dst := filepath.Join(t.TempDir(), "work")
-	if err := g.CloneOrFetch(ctx, dst, remote); err != nil {
+	if err := g.CloneOrFetch(ctx, dst, remote, Credential{}); err != nil {
 		t.Fatalf("CloneOrFetch: %v", err)
 	}
 	if err := g.ResetToDefault(ctx, dst, defBranch); err != nil {
@@ -93,20 +93,143 @@ func TestGitCLIFullFlow(t *testing.T) {
 	}
 
 	// Push.
-	if err := g.Push(ctx, dst, branch); err != nil {
+	if err := g.Push(ctx, dst, branch, Credential{}); err != nil {
 		t.Fatalf("Push: %v", err)
 	}
 
 	// Idempotent CloneOrFetch on an existing checkout.
-	if err := g.CloneOrFetch(ctx, dst, remote); err != nil {
+	if err := g.CloneOrFetch(ctx, dst, remote, Credential{}); err != nil {
 		t.Fatalf("CloneOrFetch (fetch): %v", err)
 	}
 }
 
 func TestGitHubCloneURL(t *testing.T) {
-	got := GitHubCloneURL("feifeifeimoon", "demo", "ghs_secret")
-	want := "https://x-access-token:ghs_secret@github.com/feifeifeimoon/demo.git"
+	got := GitHubCloneURL("feifeifeimoon", "demo")
+	want := "https://github.com/feifeifeimoon/demo.git"
 	if got != want {
 		t.Errorf("GitHubCloneURL = %q, want %q", got, want)
+	}
+}
+
+// The platform owns the commit. That only works if Commit tolerates an agent
+// that already committed everything — the old brief told it to, and the old
+// Commit failed with "nothing to commit", failing a task that had done its job.
+func TestGitCLICommitIsIdempotentAndHasChangesSeesTheWorktree(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	ctx := context.Background()
+
+	src := t.TempDir()
+	initRepo(t, src)
+	if err := os.WriteFile(filepath.Join(src, "a.txt"), []byte("hi\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, src, "add", "-A")
+	runGit(t, src, "commit", "-q", "-m", "init")
+	defBranch := strings.TrimSpace(runGit(t, src, "branch", "--show-current"))
+
+	remote := filepath.Join(t.TempDir(), "repo.git")
+	runGit(t, t.TempDir(), "init", "-q", "--bare", remote)
+	runGit(t, src, "remote", "add", "origin", remote)
+	runGit(t, src, "push", "-q", "-u", "origin", defBranch)
+
+	g := NewGitCLI()
+	dst := filepath.Join(t.TempDir(), "work")
+	if err := g.CloneOrFetch(ctx, dst, remote, Credential{}); err != nil {
+		t.Fatalf("CloneOrFetch: %v", err)
+	}
+	if err := g.ResetToDefault(ctx, dst, defBranch); err != nil {
+		t.Fatalf("ResetToDefault: %v", err)
+	}
+	branch := "gitsquad/GTS-42/task-1"
+	if err := g.CreateBranch(ctx, dst, branch); err != nil {
+		t.Fatalf("CreateBranch: %v", err)
+	}
+	base := "origin/" + defBranch
+
+	// Nothing changed yet.
+	if changed, err := g.HasChanges(ctx, dst, base); err != nil || changed {
+		t.Fatalf("HasChanges = %v, %v; want false, nil on a fresh branch", changed, err)
+	}
+
+	// The agent leaves its work in the working tree (what the brief now asks).
+	if err := os.WriteFile(filepath.Join(dst, "a.txt"), []byte("changed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	changed, err := g.HasChanges(ctx, dst, base)
+	if err != nil || !changed {
+		t.Fatalf("HasChanges = %v, %v; want true for uncommitted work", changed, err)
+	}
+	if err := g.Commit(ctx, dst, "GTS-42: changes by coder"); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+	// Committing twice must not fail: the second call has nothing to stage.
+	if err := g.Commit(ctx, dst, "GTS-42: changes by coder"); err != nil {
+		t.Fatalf("second Commit: %v", err)
+	}
+
+	// The agent committed on its own instead (the behaviour the old brief
+	// asked for): the tree is clean, HEAD is ahead of base, and the platform's
+	// commit must still be a no-op rather than a failure.
+	if err := os.WriteFile(filepath.Join(dst, "b.txt"), []byte("agent wrote this\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, dst, "add", "-A")
+	runGit(t, dst, "commit", "-q", "-m", "agent's own commit")
+	changed, err = g.HasChanges(ctx, dst, base)
+	if err != nil || !changed {
+		t.Fatalf("HasChanges = %v, %v; want true for a commit on top of base", changed, err)
+	}
+	if err := g.Commit(ctx, dst, "GTS-42: changes by coder"); err != nil {
+		t.Fatalf("Commit after an agent commit: %v", err)
+	}
+	if err := g.Push(ctx, dst, branch, Credential{}); err != nil {
+		t.Fatalf("Push: %v", err)
+	}
+}
+
+// Discarding an empty branch keeps a reused checkout from accumulating one
+// branch per read-only task.
+func TestGitCLIDiscardBranch(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	ctx := context.Background()
+
+	src := t.TempDir()
+	initRepo(t, src)
+	if err := os.WriteFile(filepath.Join(src, "a.txt"), []byte("hi\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runGit(t, src, "add", "-A")
+	runGit(t, src, "commit", "-q", "-m", "init")
+	defBranch := strings.TrimSpace(runGit(t, src, "branch", "--show-current"))
+
+	remote := filepath.Join(t.TempDir(), "repo.git")
+	runGit(t, t.TempDir(), "init", "-q", "--bare", remote)
+	runGit(t, src, "remote", "add", "origin", remote)
+	runGit(t, src, "push", "-q", "-u", "origin", defBranch)
+
+	g := NewGitCLI()
+	dst := filepath.Join(t.TempDir(), "work")
+	if err := g.CloneOrFetch(ctx, dst, remote, Credential{}); err != nil {
+		t.Fatalf("CloneOrFetch: %v", err)
+	}
+	if err := g.ResetToDefault(ctx, dst, defBranch); err != nil {
+		t.Fatalf("ResetToDefault: %v", err)
+	}
+	branch := "gitsquad/GTS-42/task-1"
+	if err := g.CreateBranch(ctx, dst, branch); err != nil {
+		t.Fatalf("CreateBranch: %v", err)
+	}
+	if err := g.DiscardBranch(ctx, dst, branch, defBranch); err != nil {
+		t.Fatalf("DiscardBranch: %v", err)
+	}
+	if out := runGit(t, dst, "branch", "--list", branch); strings.TrimSpace(out) != "" {
+		t.Errorf("branch %q still exists", branch)
+	}
+	if cur := strings.TrimSpace(runGit(t, dst, "branch", "--show-current")); cur != defBranch {
+		t.Errorf("current branch = %q, want %q", cur, defBranch)
 	}
 }

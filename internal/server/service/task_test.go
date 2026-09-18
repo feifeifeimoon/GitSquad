@@ -76,6 +76,14 @@ type taskFixture struct {
 // user → installation → repo → workspace → daemon → runtime → agent → issue.
 func seedTaskFixture(t *testing.T, ctx context.Context, s *store.Store, pool *pgxpool.Pool) taskFixture {
 	t.Helper()
+	return seedTaskFixtureOnBranch(t, ctx, s, pool, "main")
+}
+
+// seedTaskFixtureOnBranch is seedTaskFixture with the repository's default
+// branch under test control: task dispatch used to hardcode "main", so every
+// task on a repo whose default is master/trunk/develop failed at checkout.
+func seedTaskFixtureOnBranch(t *testing.T, ctx context.Context, s *store.Store, pool *pgxpool.Pool, defaultBranch string) taskFixture {
+	t.Helper()
 
 	user, err := s.CreateUser(ctx, db.CreateUserParams{Login: fmt.Sprintf("tk-user-%s", uuid.NewString()[:8])})
 	if err != nil {
@@ -93,6 +101,7 @@ func seedTaskFixture(t *testing.T, ctx context.Context, s *store.Store, pool *pg
 	if err := s.UpsertRepo(ctx, db.UpsertRepoParams{
 		InstallationID: installation.ID, GithubRepoID: int64(uuid.New().ID() % 1000000),
 		Owner: "tk-owner", Name: "tk-repo", FullName: "tk-owner/tk-repo",
+		DefaultBranch: defaultBranch,
 	}); err != nil {
 		t.Fatalf("upsert repo: %v", err)
 	}
@@ -290,6 +299,90 @@ func TestTaskServiceDispatchWakesDaemon(t *testing.T) {
 type fakeWaker struct{ woken []uuid.UUID }
 
 func (f *fakeWaker) Wake(id uuid.UUID) { f.woken = append(f.woken, id) }
+
+// fakeGitHub records what the task lifecycle asked GitHub to do.
+type fakeGitHub struct {
+	token   string
+	prCalls []prCall
+}
+
+type prCall struct{ head, base string }
+
+func (f *fakeGitHub) GetInstallationToken(context.Context, int64) (string, time.Time, error) {
+	return f.token, time.Now().Add(time.Hour), nil
+}
+
+func (f *fakeGitHub) CreatePullRequest(_ context.Context, _ uuid.UUID, _, _, head, base, _, _ string) (int, error) {
+	f.prCalls = append(f.prCalls, prCall{head: head, base: base})
+	return 7, nil
+}
+
+// The pull request's base is the branch the daemon actually used, not the value
+// snapshotted at dispatch: a repository that renamed its default branch between
+// the two would otherwise get a PR against a branch that does not exist.
+func TestHandleCompletedUsesReportedBaseBranch(t *testing.T) {
+	s, pool := openTestStore(t)
+	ctx := context.Background()
+	f := seedTaskFixture(t, ctx, s, pool)
+	task := f.createTask(t, ctx, s)
+	if _, err := s.ClaimNextTask(ctx, &f.daemon.ID); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+
+	gh := &fakeGitHub{token: "ghs_token"}
+	svc := NewTaskService(s, gh)
+
+	if err := svc.Report(ctx, f.daemon.ID, task.ID, v1.TaskReport{Status: v1.TaskReportStarted}); err != nil {
+		t.Fatalf("report started: %v", err)
+	}
+	if err := svc.Report(ctx, f.daemon.ID, task.ID, v1.TaskReport{
+		Status: v1.TaskReportSucceeded,
+		Summary: &v1.TaskSummary{
+			Output:     "done",
+			Branch:     "gitsquad/TKW-1/task-1",
+			BaseBranch: "trunk",
+		},
+	}); err != nil {
+		t.Fatalf("report succeeded: %v", err)
+	}
+
+	if len(gh.prCalls) != 1 {
+		t.Fatalf("CreatePullRequest calls = %d, want 1", len(gh.prCalls))
+	}
+	if gh.prCalls[0].base != "trunk" {
+		t.Errorf("PR base = %q, want the branch the daemon reported (trunk)", gh.prCalls[0].base)
+	}
+	if gh.prCalls[0].head != "gitsquad/TKW-1/task-1" {
+		t.Errorf("PR head = %q, want the task branch", gh.prCalls[0].head)
+	}
+}
+
+// Dispatch must carry the repository's real default branch: the daemon resets
+// the checkout to it and diffs against it, so a hardcoded "main" fails every
+// task on a repo that calls its default something else.
+func TestDispatchCarriesTheRepositoryDefaultBranch(t *testing.T) {
+	s, pool := openTestStore(t)
+	ctx := context.Background()
+	f := seedTaskFixtureOnBranch(t, ctx, s, pool, "trunk")
+
+	svc := NewTaskService(s, nil)
+	svc.SetWaker(&fakeWaker{})
+	if err := svc.Dispatch(ctx, f.workspace.ID, f.issue.ID, "coder"); err != nil {
+		t.Fatalf("Dispatch: %v", err)
+	}
+
+	claimed, err := s.ClaimNextTask(ctx, &f.daemon.ID)
+	if err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	full, err := taskContext(claimed)
+	if err != nil {
+		t.Fatalf("taskContext: %v", err)
+	}
+	if full.Repo.DefaultBranch != "trunk" {
+		t.Errorf("task default branch = %q, want the repo's own \"trunk\"", full.Repo.DefaultBranch)
+	}
+}
 
 // TestTaskServicePostsAgentOutput pins the artifact contract: a finished task's
 // agent output becomes an issue comment — the deliverable for analysis / design

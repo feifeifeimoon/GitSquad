@@ -23,7 +23,8 @@ SELECT * FROM workspaces WHERE user_id = $1 AND slug = $2 AND status != 'archive
 -- name: GetWorkspaceWithRepo :one
 SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at, w.slug,
        w.avatar_url,
-       r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private
+       r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private,
+       r.default_branch AS repo_default_branch
 FROM workspaces w
 JOIN github_repos r ON r.id = w.github_repo_id
 WHERE w.id = $1;

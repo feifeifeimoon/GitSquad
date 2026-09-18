@@ -62,6 +62,9 @@ CREATE TABLE github_repos (
     name TEXT NOT NULL,
     full_name TEXT NOT NULL,
     private BOOLEAN NOT NULL DEFAULT false,
+    -- Empty means "not known yet"; the daemon resolves origin/HEAD from the
+    -- checkout when the value is empty.
+    default_branch TEXT NOT NULL DEFAULT '',
     UNIQUE(installation_id, github_repo_id)
 );
 

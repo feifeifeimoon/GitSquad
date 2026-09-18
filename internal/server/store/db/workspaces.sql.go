@@ -118,27 +118,29 @@ func (q *Queries) GetWorkspaceBySlug(ctx context.Context, arg GetWorkspaceBySlug
 const getWorkspaceWithRepo = `-- name: GetWorkspaceWithRepo :one
 SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at, w.slug,
        w.avatar_url,
-       r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private
+       r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private,
+       r.default_branch AS repo_default_branch
 FROM workspaces w
 JOIN github_repos r ON r.id = w.github_repo_id
 WHERE w.id = $1
 `
 
 type GetWorkspaceWithRepoRow struct {
-	ID             uuid.UUID `json:"id"`
-	UserID         uuid.UUID `json:"user_id"`
-	InstallationID uuid.UUID `json:"installation_id"`
-	GithubRepoID   uuid.UUID `json:"github_repo_id"`
-	Name           string    `json:"name"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	Slug           string    `json:"slug"`
-	AvatarUrl      string    `json:"avatar_url"`
-	RepoFullName   string    `json:"repo_full_name"`
-	RepoOwner      string    `json:"repo_owner"`
-	RepoName       string    `json:"repo_name"`
-	RepoPrivate    bool      `json:"repo_private"`
+	ID                uuid.UUID `json:"id"`
+	UserID            uuid.UUID `json:"user_id"`
+	InstallationID    uuid.UUID `json:"installation_id"`
+	GithubRepoID      uuid.UUID `json:"github_repo_id"`
+	Name              string    `json:"name"`
+	Status            string    `json:"status"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
+	Slug              string    `json:"slug"`
+	AvatarUrl         string    `json:"avatar_url"`
+	RepoFullName      string    `json:"repo_full_name"`
+	RepoOwner         string    `json:"repo_owner"`
+	RepoName          string    `json:"repo_name"`
+	RepoPrivate       bool      `json:"repo_private"`
+	RepoDefaultBranch string    `json:"repo_default_branch"`
 }
 
 func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWorkspaceWithRepoRow, error) {
@@ -159,6 +161,7 @@ func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWo
 		&i.RepoOwner,
 		&i.RepoName,
 		&i.RepoPrivate,
+		&i.RepoDefaultBranch,
 	)
 	return i, err
 }
