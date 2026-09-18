@@ -172,11 +172,16 @@ func TestGitCLICommitIsIdempotentAndHasChangesSeesTheWorktree(t *testing.T) {
 	// The agent committed on its own instead (the behaviour the old brief
 	// asked for): the tree is clean, HEAD is ahead of base, and the platform's
 	// commit must still be a no-op rather than a failure.
+	//
+	// The identity is explicit because a clone does not inherit the source
+	// repository's config. Without it this commit depends on the machine having
+	// a global git identity, and a clean CI runner does not have one.
 	if err := os.WriteFile(filepath.Join(dst, "b.txt"), []byte("agent wrote this\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	runGit(t, dst, "add", "-A")
-	runGit(t, dst, "commit", "-q", "-m", "agent's own commit")
+	runGit(t, dst, "-c", "user.name=E2E Agent", "-c", "user.email=agent@example.com",
+		"commit", "-q", "-m", "agent's own commit")
 	changed, err = g.HasChanges(ctx, dst, base)
 	if err != nil || !changed {
 		t.Fatalf("HasChanges = %v, %v; want true for a commit on top of base", changed, err)
