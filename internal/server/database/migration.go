@@ -302,6 +302,13 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 						CHECK (status IN ('active','revoked')) NOT VALID;
 				END IF;
 			END $$`},
+		// The default branch of the repository a workspace is bound to, as
+		// reported by the GitHub API during repo sync. Task dispatch used to
+		// hardcode "main", which failed every task at checkout on a repo whose
+		// default is master/trunk/develop. Empty means "not known yet": the
+		// daemon resolves origin/HEAD from the checkout itself.
+		{name: "042_github_repos_default_branch", sql: `ALTER TABLE github_repos
+			ADD COLUMN IF NOT EXISTS default_branch TEXT NOT NULL DEFAULT ''`},
 	}
 
 	for _, m := range migrations {

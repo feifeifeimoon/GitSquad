@@ -172,7 +172,7 @@ func (q *Queries) ListInstallationsByUser(ctx context.Context, userID uuid.UUID)
 }
 
 const listReposByInstallation = `-- name: ListReposByInstallation :many
-SELECT id, installation_id, github_repo_id, owner, name, full_name, private FROM github_repos WHERE installation_id = $1 ORDER BY full_name
+SELECT id, installation_id, github_repo_id, owner, name, full_name, private, default_branch FROM github_repos WHERE installation_id = $1 ORDER BY full_name
 `
 
 func (q *Queries) ListReposByInstallation(ctx context.Context, installationID uuid.UUID) ([]GithubRepo, error) {
@@ -192,6 +192,7 @@ func (q *Queries) ListReposByInstallation(ctx context.Context, installationID uu
 			&i.Name,
 			&i.FullName,
 			&i.Private,
+			&i.DefaultBranch,
 		); err != nil {
 			return nil, err
 		}
@@ -218,10 +219,11 @@ func (q *Queries) UpdateInstallationStatus(ctx context.Context, arg UpdateInstal
 }
 
 const upsertRepo = `-- name: UpsertRepo :exec
-INSERT INTO github_repos (installation_id, github_repo_id, owner, name, full_name, private)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO github_repos (installation_id, github_repo_id, owner, name, full_name, private, default_branch)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (installation_id, github_repo_id)
-DO UPDATE SET owner = EXCLUDED.owner, name = EXCLUDED.name, full_name = EXCLUDED.full_name, private = EXCLUDED.private
+DO UPDATE SET owner = EXCLUDED.owner, name = EXCLUDED.name, full_name = EXCLUDED.full_name,
+              private = EXCLUDED.private, default_branch = EXCLUDED.default_branch
 `
 
 type UpsertRepoParams struct {
@@ -231,6 +233,7 @@ type UpsertRepoParams struct {
 	Name           string    `json:"name"`
 	FullName       string    `json:"full_name"`
 	Private        bool      `json:"private"`
+	DefaultBranch  string    `json:"default_branch"`
 }
 
 func (q *Queries) UpsertRepo(ctx context.Context, arg UpsertRepoParams) error {
@@ -241,6 +244,7 @@ func (q *Queries) UpsertRepo(ctx context.Context, arg UpsertRepoParams) error {
 		arg.Name,
 		arg.FullName,
 		arg.Private,
+		arg.DefaultBranch,
 	)
 	return err
 }

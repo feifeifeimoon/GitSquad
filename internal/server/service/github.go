@@ -317,6 +317,9 @@ func (s *GitHubAppService) syncRepos(ctx context.Context, client *github.Client,
 			Name:           repo.GetName(),
 			FullName:       repo.GetFullName(),
 			Private:        repo.GetPrivate(),
+			// Task dispatch resets the checkout to this branch, so it has to be
+			// the repository's own answer rather than an assumed "main".
+			DefaultBranch: repo.GetDefaultBranch(),
 		}); err != nil {
 			slog.Warn("upsert repo", "repo", repo.GetFullName(), "error", err)
 		}

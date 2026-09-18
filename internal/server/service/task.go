@@ -26,16 +26,25 @@ type TaskDispatcher interface {
 	Dispatch(ctx context.Context, workspaceID, issueID uuid.UUID, agentName string) error
 }
 
+// GitHubGateway is the slice of the GitHub App service the task lifecycle
+// needs: minting the daemon's installation token at claim time, and opening the
+// pull request for a task that produced code changes. It is an interface so the
+// lifecycle can be exercised without calling GitHub.
+type GitHubGateway interface {
+	GetInstallationToken(ctx context.Context, installationID int64) (string, time.Time, error)
+	CreatePullRequest(ctx context.Context, installationDBID uuid.UUID, owner, repo, head, base, title, body string) (int, error)
+}
+
 // TaskService persists tasks to the `tasks` table and drives the task
 // lifecycle state machine (queued → dispatched → running → completed/failed).
 type TaskService struct {
 	store     *store.Store
-	github    *GitHubAppService
+	github    GitHubGateway
 	publisher EventPublisher
 	waker     DaemonWaker
 }
 
-func NewTaskService(s *store.Store, github *GitHubAppService) *TaskService {
+func NewTaskService(s *store.Store, github GitHubGateway) *TaskService {
 	return &TaskService{store: s, github: github}
 }
 
@@ -98,7 +107,9 @@ func (s *TaskService) Dispatch(ctx context.Context, workspaceID, issueID uuid.UU
 	contextTask := v1.Task{
 		WorkspaceID: workspaceID,
 		Issue:       buildTaskIssue(issue, comments),
-		Repo:        v1.TaskRepoContext{Owner: ws.RepoOwner, Name: ws.RepoName, DefaultBranch: "main"},
+		// The repository's own default branch, not an assumed "main": the daemon
+		// resets the checkout to it and diffs against it.
+		Repo: v1.TaskRepoContext{Owner: ws.RepoOwner, Name: ws.RepoName, DefaultBranch: ws.RepoDefaultBranch},
 		Agent: v1.TaskAgentContext{
 			Name:         agent.Name,
 			Instructions: agent.Instructions,
@@ -356,10 +367,11 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 	}
 
 	summary := report.Summary
-	output, branch := "", ""
+	output, branch, base := "", "", ""
 	if summary != nil {
 		output = strings.TrimSpace(summary.Output)
 		branch = summary.Branch
+		base = summary.BaseBranch
 	}
 
 	// The agent's own output is the deliverable: it is what an analysis, design
@@ -376,9 +388,14 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		if err != nil {
 			return err
 		}
+		// The daemon's answer wins over the dispatch-time snapshot: it is the
+		// branch the checkout was actually reset to.
+		if base == "" {
+			base = full.Repo.DefaultBranch
+		}
 		title := full.Issue.Key + ": changes by " + full.Agent.Name
 		body := fmt.Sprintf("Closes %s\n\nAutomated changes by %s.", full.Issue.Key, full.Agent.Name)
-		prNum, err := s.github.CreatePullRequest(ctx, ws.InstallationID, ws.RepoOwner, ws.RepoName, branch, full.Repo.DefaultBranch, title, body)
+		prNum, err := s.github.CreatePullRequest(ctx, ws.InstallationID, ws.RepoOwner, ws.RepoName, branch, base, title, body)
 		if err != nil {
 			// The task is already terminal; surface the write-back failure
 			// rather than losing it silently.

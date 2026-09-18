@@ -95,6 +95,7 @@ type GithubRepo struct {
 	Name           string    `json:"name"`
 	FullName       string    `json:"full_name"`
 	Private        bool      `json:"private"`
+	DefaultBranch  string    `json:"default_branch"`
 }
 
 type Issue struct {

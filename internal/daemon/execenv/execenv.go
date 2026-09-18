@@ -28,8 +28,12 @@ type PrepareParams struct {
 	TaskID      string
 	AgentName   string
 	Provider    string // claude | codex
-	Issue       v1.TaskIssueContext
-	Agent       v1.TaskAgentContext
+	// Branch is the branch the platform will commit and push this task's work
+	// to. The brief names it so the agent knows where its work lands, and so it
+	// has no reason to run git itself.
+	Branch string
+	Issue  v1.TaskIssueContext
+	Agent  v1.TaskAgentContext
 }
 
 // Prepare writes the task context files (managed brief, issue context,
