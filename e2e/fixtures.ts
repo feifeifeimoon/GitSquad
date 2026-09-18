@@ -306,11 +306,22 @@ export class TestApiClient {
    * reach without GitHub are the platform's own (a task finishing, which needs a
    * daemon) and the manual link (which would call GitHub). Seeding the row gets
    * the UI under test without either.
+   *
+   * `suppressed` seeds an unlinked row: the tombstone a human leaves behind, and
+   * the only way this fixture can put a PR in the history without an active one
+   * holding the slot.
    */
   async seedPullRequest(
     workspaceId: string,
     issueId: string,
-    opts: { number?: number; title?: string; state?: string; owner?: string; repo?: string } = {},
+    opts: {
+      number?: number;
+      title?: string;
+      state?: string;
+      owner?: string;
+      repo?: string;
+      suppressed?: boolean;
+    } = {},
   ): Promise<void> {
     const owner = opts.owner ?? "e2e-owner";
     const repo = opts.repo ?? "e2e-repo";
@@ -321,8 +332,10 @@ export class TestApiClient {
       await client.query(
         `INSERT INTO pull_requests
            (workspace_id, issue_id, repo_owner, repo_name, number, title, url,
-            state, head_branch, base_branch, author, source, close_intent, github_updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'main', 'gitsquad[bot]', 'platform', true, now())`,
+            state, head_branch, base_branch, author, source, close_intent,
+            suppressed_at, github_updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'main', 'gitsquad[bot]', 'platform', true,
+                 CASE WHEN $10 THEN now() ELSE NULL END, now())`,
         [
           workspaceId,
           issueId,
@@ -333,6 +346,7 @@ export class TestApiClient {
           `https://github.com/${owner}/${repo}/pull/${number}`,
           opts.state ?? "open",
           `gitsquad/E2E-1/${number}`,
+          opts.suppressed ?? false,
         ],
       );
     } finally {
