@@ -8,7 +8,34 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// migrationLockKey serialises schema migrations across processes. Any constant
+// works as long as every process agrees on it; this one is "gitsquad".
+const migrationLockKey int64 = 0x6769747371756164
+
+// Migrate applies the schema migrations.
+//
+// It takes an advisory lock for the duration because DDL is not safe against
+// itself: two processes can reach it at once — a rolling deploy briefly running
+// two instances, or `go test` with packages in parallel against one database —
+// and `CREATE ... IF NOT EXISTS` still races on the object name, so one of the
+// two fails with a duplicate-name error rather than doing nothing.
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
+	// A session-scoped lock must be taken and released on the same connection,
+	// so hold one for the whole run instead of letting the pool pick.
+	conn, err := pool.Acquire(ctx)
+	if err != nil {
+		return fmt.Errorf("acquire connection: %w", err)
+	}
+	defer conn.Release()
+	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", migrationLockKey); err != nil {
+		return fmt.Errorf("lock migrations: %w", err)
+	}
+	defer func() {
+		// Unlocking after a cancelled context would fail; the lock goes with the
+		// connection either way, and the pool closes it on release.
+		_, _ = conn.Exec(context.WithoutCancel(ctx), "SELECT pg_advisory_unlock($1)", migrationLockKey)
+	}()
+
 	migrations := []struct {
 		name string
 		sql  string
@@ -355,7 +382,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 	}
 
 	for _, m := range migrations {
-		if _, err := pool.Exec(ctx, m.sql); err != nil {
+		if _, err := conn.Exec(ctx, m.sql); err != nil {
 			return fmt.Errorf("migration %s: %w", m.name, err)
 		}
 	}

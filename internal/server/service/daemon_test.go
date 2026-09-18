@@ -180,16 +180,30 @@ func TestDaemonHeartbeatRestoresOnlineStatus(t *testing.T) {
 // No foreign key referencing users(id) has ON DELETE CASCADE, so a bare
 // `DELETE FROM users` fails as soon as the user owns a daemon, workspace or
 // installation — and because the error used to be discarded, the rows leaked on
-// every run. Delete in dependency order and report failures.
+// every run. Those leftovers then perturb any test that asserts on a table-wide
+// query (the silent-daemon sweep, the usage aggregates), which is what made a
+// full `go test ./...` against the shared database flaky.
+//
+// Every fixture goes through this, so the order lives in exactly one place.
 func cleanupUserRows(t *testing.T, ctx context.Context, pool *pgxpool.Pool, userID uuid.UUID) {
 	t.Helper()
 	for _, stmt := range []string{
+		// Cascades to issues, tasks, pull_requests, comments, agents,
+		// agent_runtimes and skills.
+		"DELETE FROM workspaces WHERE user_id = $1",
+		"DELETE FROM github_repos WHERE installation_id IN (SELECT id FROM github_installations WHERE user_id = $1)",
+		"DELETE FROM github_installations WHERE user_id = $1",
 		"DELETE FROM runtimes WHERE daemon_id IN (SELECT id FROM daemons WHERE user_id = $1)",
+		// Before daemon_tokens: daemons.token_id references them.
 		"DELETE FROM daemons WHERE user_id = $1",
+		"DELETE FROM daemon_tokens WHERE user_id = $1",
 		"DELETE FROM user_identities WHERE user_id = $1",
 		"DELETE FROM users WHERE id = $1",
 	} {
 		if _, err := pool.Exec(ctx, stmt, userID); err != nil {
+			// Reported rather than swallowed: a failed cleanup is how the rows
+			// leaked in the first place, and the test that fails next is the one
+			// that will look inexplicable.
 			t.Errorf("cleanup %q: %v", stmt, err)
 		}
 	}
