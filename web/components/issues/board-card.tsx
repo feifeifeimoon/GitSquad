@@ -4,6 +4,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { MessageSquare } from "lucide-react";
 import type { Issue } from "@/lib/api";
 import { TimeAgo } from "@/components/time-ago";
+import { IssuePullRequestBadge } from "@/components/issues/issue-pull-requests";
 import { stripMarkdown } from "@/lib/utils";
 
 export function IssueCard({
@@ -23,12 +24,15 @@ export function IssueCard({
         <span className="font-mono text-xs tabular-nums text-mute">
           {issue.issue_key}
         </span>
-        {issue.comments_count > 0 && (
-          <span className="flex items-center gap-1 text-xs tabular-nums text-mute">
-            <MessageSquare className="size-3" />
-            {issue.comments_count}
-          </span>
-        )}
+        <span className="flex items-center gap-1.5">
+          <IssuePullRequestBadge issue={issue} />
+          {issue.comments_count > 0 && (
+            <span className="flex items-center gap-1 text-xs tabular-nums text-mute">
+              <MessageSquare className="size-3" />
+              {issue.comments_count}
+            </span>
+          )}
+        </span>
       </div>
       <p className="mt-1 line-clamp-2 text-sm font-medium text-ink">
         {issue.title}
