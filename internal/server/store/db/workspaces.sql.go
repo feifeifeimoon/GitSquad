@@ -86,6 +86,48 @@ func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, er
 	return i, err
 }
 
+const getWorkspaceByRepo = `-- name: GetWorkspaceByRepo :one
+SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status
+FROM workspaces w
+JOIN github_repos r ON r.id = w.github_repo_id
+JOIN github_installations i ON i.id = w.installation_id
+WHERE i.installation_id = $1 AND r.owner = $2 AND r.name = $3
+  AND w.status != 'archived'
+ORDER BY w.created_at ASC
+LIMIT 1
+`
+
+type GetWorkspaceByRepoParams struct {
+	InstallationID int64  `json:"installation_id"`
+	Owner          string `json:"owner"`
+	Name           string `json:"name"`
+}
+
+type GetWorkspaceByRepoRow struct {
+	ID             uuid.UUID `json:"id"`
+	UserID         uuid.UUID `json:"user_id"`
+	InstallationID uuid.UUID `json:"installation_id"`
+	GithubRepoID   uuid.UUID `json:"github_repo_id"`
+	Name           string    `json:"name"`
+	Status         string    `json:"status"`
+}
+
+// Resolves the workspace a webhook's repository belongs to. Excludes archived
+// workspaces: once a workspace is archived its repos stop driving issue state.
+func (q *Queries) GetWorkspaceByRepo(ctx context.Context, arg GetWorkspaceByRepoParams) (GetWorkspaceByRepoRow, error) {
+	row := q.db.QueryRow(ctx, getWorkspaceByRepo, arg.InstallationID, arg.Owner, arg.Name)
+	var i GetWorkspaceByRepoRow
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.InstallationID,
+		&i.GithubRepoID,
+		&i.Name,
+		&i.Status,
+	)
+	return i, err
+}
+
 const getWorkspaceBySlug = `-- name: GetWorkspaceBySlug :one
 SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug FROM workspaces WHERE user_id = $1 AND slug = $2 AND status != 'archived'
 `

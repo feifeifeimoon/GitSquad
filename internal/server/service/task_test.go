@@ -70,6 +70,9 @@ type taskFixture struct {
 	daemon    db.Daemon
 	agent     db.Agent
 	issue     db.Issue
+	// installationID is GitHub's numeric installation id (not the row id): the
+	// webhook path resolves a workspace from it, so tests need it too.
+	installationID int64
 }
 
 // seedTaskFixture creates the FK chain a task needs:
@@ -91,8 +94,9 @@ func seedTaskFixtureOnBranch(t *testing.T, ctx context.Context, s *store.Store, 
 	}
 	t.Cleanup(func() { _, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", user.ID) })
 
+	ghInstallationID := int64(uuid.New().ID() % 1000000)
 	installation, err := s.CreateInstallation(ctx, db.CreateInstallationParams{
-		UserID: user.ID, InstallationID: int64(uuid.New().ID() % 1000000),
+		UserID: user.ID, InstallationID: ghInstallationID,
 		AccountLogin: "tk-owner", AccountType: "User", RepositorySelection: "selected",
 	})
 	if err != nil {
@@ -144,7 +148,7 @@ func seedTaskFixtureOnBranch(t *testing.T, ctx context.Context, s *store.Store, 
 		t.Fatalf("create issue: %v", err)
 	}
 
-	return taskFixture{workspace: workspace, daemon: daemon, agent: agent, issue: issue}
+	return taskFixture{workspace: workspace, daemon: daemon, agent: agent, issue: issue, installationID: ghInstallationID}
 }
 
 func (f taskFixture) contextJSON() []byte {

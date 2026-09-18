@@ -4,7 +4,11 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *;
 
 -- name: ListIssuesByWorkspace :many
 SELECT i.*, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
-       (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count
+       (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count,
+       COALESCE((SELECT pr.number FROM pull_requests pr
+                 WHERE pr.issue_id = i.id AND pr.state = 'open' AND pr.close_intent
+                   AND pr.suppressed_at IS NULL
+                 ORDER BY pr.created_at DESC LIMIT 1), 0)::int AS active_pr_number
 FROM issues i
 JOIN workspaces w ON w.id = i.workspace_id
 LEFT JOIN users u ON u.id = i.creator_user_id
