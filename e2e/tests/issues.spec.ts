@@ -133,3 +133,66 @@ test.describe("Issue pull requests", () => {
     await expect(page.getByText(`#43`)).toBeVisible({ timeout: 20_000 });
   });
 });
+
+test.describe("Issue pull requests · link lifecycle", () => {
+  let api: TestApiClient;
+  let workspace: TestWorkspace;
+  let suffix: string;
+
+  test.beforeEach(async () => {
+    suffix = Date.now().toString(36);
+    api = new TestApiClient();
+    await api.login("E2E User");
+    workspace = await api.seedWorkspace({
+      name: `E2E PR Lifecycle ${suffix}`,
+      slug: `e2e-pr-life-${suffix}`,
+    });
+  });
+
+  test.afterEach(async () => {
+    await api.cleanup();
+  });
+
+  // Unlinking is a tombstone, so it must be reversible: restore puts the PR back
+  // as the issue's active one.
+  test("restores a pull request that was unlinked", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `E2E restore issue ${suffix}`);
+    await api.seedPullRequest(workspace.id, issue.id, { number: 51, title: `restore ${suffix}` });
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByText(`restore ${suffix}`)).toBeVisible({ timeout: 20_000 });
+
+    await page.getByRole("button", { name: "unlink" }).first().click();
+    await expect(page.getByText("unlinked").first()).toBeVisible({ timeout: 10_000 });
+
+    await page.getByRole("button", { name: "restore" }).first().click();
+    await expect(page.getByText("unlinked")).toHaveCount(0, { timeout: 10_000 });
+    await expect(page.getByRole("button", { name: "unlink" })).toBeVisible({ timeout: 10_000 });
+  });
+
+  // Re-linking needs the active slot back, so a restore that cannot have it says
+  // so plainly instead of failing as a server error.
+  test("explains a restore that cannot have the active slot", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `E2E conflict issue ${suffix}`);
+    await api.seedPullRequest(workspace.id, issue.id, { number: 52, title: `holding ${suffix}` });
+    await api.seedPullRequest(workspace.id, issue.id, {
+      number: 53,
+      title: `unlinked ${suffix}`,
+      suppressed: true,
+    });
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByText(`holding ${suffix}`)).toBeVisible({ timeout: 20_000 });
+
+    await page.getByRole("button", { name: "restore" }).first().click();
+    await expect(page.getByText("已有活跃 PR")).toBeVisible({ timeout: 10_000 });
+    // And the row it refused to restore is still unlinked.
+    await expect(page.getByText("unlinked").first()).toBeVisible({ timeout: 10_000 });
+  });
+});
