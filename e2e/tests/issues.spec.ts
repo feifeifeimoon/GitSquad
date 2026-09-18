@@ -76,3 +76,60 @@ test.describe("Issues", () => {
     await expect(statusSelect).toContainText("In Progress", { timeout: 10_000 });
   });
 });
+
+test.describe("Issue pull requests", () => {
+  let api: TestApiClient;
+  let workspace: TestWorkspace;
+  let suffix: string;
+
+  test.beforeEach(async () => {
+    suffix = Date.now().toString(36);
+    api = new TestApiClient();
+    await api.login("E2E User");
+    workspace = await api.seedWorkspace({
+      name: `E2E PR Workspace ${suffix}`,
+      slug: `e2e-pr-ws-${suffix}`,
+    });
+  });
+
+  test.afterEach(async () => {
+    await api.cleanup();
+  });
+
+  // The active PR is what a human looks for: which pull request is this issue's
+  // work, and the history of how it got here.
+  test("shows the active pull request and its history, and unlinks it", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `E2E PR issue ${suffix}`);
+    await api.seedPullRequest(workspace.id, issue.id, { number: 41, title: `active ${suffix}` });
+    await api.seedPullRequest(workspace.id, issue.id, {
+      number: 40,
+      title: `merged ${suffix}`,
+      state: "merged",
+    });
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(page.getByText(`active ${suffix}`)).toBeVisible({ timeout: 20_000 });
+    // The history is collapsed by default; opening it reveals the older PR.
+    await page.getByRole("button", { name: /历程/ }).click();
+    await expect(page.getByText(`merged ${suffix}`)).toBeVisible({ timeout: 10_000 });
+
+    // Unlinking leaves a tombstone: the row stays, marked unlinked, and the
+    // issue no longer counts it as active.
+    await page.getByRole("button", { name: "unlink" }).first().click();
+    await expect(page.getByText("unlinked").first()).toBeVisible({ timeout: 10_000 });
+  });
+
+  test("shows a pull request badge on the board card", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `E2E badge issue ${suffix}`);
+    await api.seedPullRequest(workspace.id, issue.id, { number: 43, title: `badge ${suffix}` });
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByText(`#43`)).toBeVisible({ timeout: 20_000 });
+  });
+});
