@@ -17,6 +17,7 @@ import {
 import { Markdown } from "@/components/markdown";
 import { MarkdownEditor } from "@/components/markdown-editor";
 import { StatusIconLabel } from "@/components/status-icon";
+import { IssuePullRequests } from "@/components/issues/issue-pull-requests";
 import { useWorkspaceEvents } from "@/lib/realtime";
 
 export default function IssueDetailPage() {
@@ -244,6 +245,8 @@ export default function IssueDetailPage() {
               <label className="mb-1.5 block text-xs text-mute">Creator</label>
               <p className="text-sm text-body">{issue.creator_name || "—"}</p>
             </div>
+
+            <IssuePullRequests slug={slug} issue={issue} onChange={load} />
 
             <div>
               <label className="mb-1.5 block text-xs text-mute">Created</label>
