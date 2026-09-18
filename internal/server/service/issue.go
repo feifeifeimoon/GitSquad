@@ -118,18 +118,18 @@ func (s *IssueService) ResolveIssueID(ctx context.Context, workspaceID uuid.UUID
 // listRowToResponse maps a ListIssuesByWorkspaceRow to the API shape.
 func listRowToResponse(row db.ListIssuesByWorkspaceRow) v1.Issue {
 	return v1.Issue{
-		ID:             row.ID,
-		Number:         row.Number,
-		IssueKey:       issueKey(row.IssuePrefix, row.Number),
-		Title:          row.Title,
-		Description:    row.Description,
-		Status:         row.Status,
-		AssignedAgents: row.AssignedAgents,
-		LinkedPRs:      row.LinkedPrs,
-		CreatorName:    row.CreatorName,
-		CommentsCount:  int(row.CommentsCount),
-		CreatedAt:      row.CreatedAt,
-		UpdatedAt:      row.UpdatedAt,
+		ID:                      row.ID,
+		Number:                  row.Number,
+		IssueKey:                issueKey(row.IssuePrefix, row.Number),
+		Title:                   row.Title,
+		Description:             row.Description,
+		Status:                  row.Status,
+		AssignedAgents:          row.AssignedAgents,
+		ActivePullRequestNumber: row.ActivePrNumber,
+		CreatorName:             row.CreatorName,
+		CommentsCount:           int(row.CommentsCount),
+		CreatedAt:               row.CreatedAt,
+		UpdatedAt:               row.UpdatedAt,
 	}
 }
 
@@ -143,7 +143,6 @@ func getRowToResponse(row db.GetIssueRow) v1.Issue {
 		Description:    row.Description,
 		Status:         row.Status,
 		AssignedAgents: row.AssignedAgents,
-		LinkedPRs:      row.LinkedPrs,
 		CreatorName:    row.CreatorName,
 		CommentsCount:  int(row.CommentsCount),
 		CreatedAt:      row.CreatedAt,
@@ -212,7 +211,6 @@ func (s *IssueService) CreateIssue(ctx context.Context, workspaceID, userID uuid
 			Description:    issue.Description,
 			Status:         issue.Status,
 			AssignedAgents: issue.AssignedAgents,
-			LinkedPRs:      issue.LinkedPrs,
 			CreatorName:    userLogin,
 			CreatedAt:      issue.CreatedAt,
 			UpdatedAt:      issue.UpdatedAt,
@@ -267,7 +265,31 @@ func (s *IssueService) GetIssue(ctx context.Context, workspaceID, issueID uuid.U
 			CreatedAt:  c.CreatedAt,
 		}
 	}
+
+	// The issue's pull requests ride along with the detail view, because that is
+	// where a human looks to see where the work stands: the active PR plus the
+	// history of how the issue got here. Best effort — a database hiccup here
+	// must not hide the issue itself.
+	prRows, err := s.store.ListPullRequestsByIssue(ctx, issueID)
+	if err != nil {
+		slog.Warn("list pull requests for issue", "issue", issueID, "error", err)
+	}
+	detail.Issue.PullRequests = pullRequestsToResponse(prRows)
+
 	return &detail, nil
+}
+
+// pullRequestsToResponse maps PR rows to the API shape, flagging which one is
+// the issue's active PR so clients do not have to re-derive the rule.
+func pullRequestsToResponse(rows []db.PullRequest) []v1.PullRequest {
+	if len(rows) == 0 {
+		return nil
+	}
+	out := make([]v1.PullRequest, 0, len(rows))
+	for _, r := range rows {
+		out = append(out, PullRequestResponse(r))
+	}
+	return out
 }
 
 // UpdateIssue applies the non-nil fields (status / title / description).

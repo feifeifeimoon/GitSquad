@@ -309,6 +309,49 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// daemon resolves origin/HEAD from the checkout itself.
 		{name: "042_github_repos_default_branch", sql: `ALTER TABLE github_repos
 			ADD COLUMN IF NOT EXISTS default_branch TEXT NOT NULL DEFAULT ''`},
+		// The issue ↔ pull request relationship. One issue has at most one
+		// active PR at a time — the one that declares closing intent — and keeps
+		// the older ones as history, so the issue page can show how it got here.
+		// The platform only ever writes rows it can bind (a PR created for a
+		// task, or one matched by the platform's branch convention or by a
+		// Closes/Fixes/Resolves keyword); unrelated PRs are not mirrored.
+		//
+		// suppressed_at is a tombstone rather than a delete: an explicit unlink
+		// must survive, or the next branch inference would link the same PR back.
+		{name: "043_create_pull_requests", sql: `CREATE TABLE IF NOT EXISTS pull_requests (
+			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+			workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+			issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+			repo_owner TEXT NOT NULL,
+			repo_name TEXT NOT NULL,
+			number INT NOT NULL,
+			title TEXT NOT NULL DEFAULT '',
+			url TEXT NOT NULL DEFAULT '',
+			state TEXT NOT NULL DEFAULT 'open' CHECK (state IN ('open','merged','closed')),
+			draft BOOLEAN NOT NULL DEFAULT false,
+			head_branch TEXT NOT NULL DEFAULT '',
+			base_branch TEXT NOT NULL DEFAULT '',
+			author TEXT NOT NULL DEFAULT '',
+			source TEXT NOT NULL DEFAULT 'platform'
+				CHECK (source IN ('platform','branch','body','manual')),
+			close_intent BOOLEAN NOT NULL DEFAULT false,
+			suppressed_at TIMESTAMPTZ,
+			merged_at TIMESTAMPTZ,
+			github_updated_at TIMESTAMPTZ,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+			UNIQUE (workspace_id, repo_owner, repo_name, number)
+		)`},
+		// 「一次一个」：同一 issue 同时只能有一个活跃的、带关闭意图的 PR。
+		{name: "044_one_active_closing_pr_per_issue", sql: `CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_closing_pr_per_issue
+			ON pull_requests(issue_id)
+			WHERE state = 'open' AND close_intent AND suppressed_at IS NULL`},
+		{name: "045_pull_requests_issue_idx", sql: `CREATE INDEX IF NOT EXISTS idx_pull_requests_issue
+			ON pull_requests(issue_id, created_at DESC)`},
+		// Never written by any code path: the console even derived the value
+		// client-side. PR relationships live in pull_requests now.
+		{name: "046_drop_issues_linked_prs", sql: `ALTER TABLE issues
+			DROP COLUMN IF EXISTS linked_prs`},
 	}
 
 	for _, m := range migrations {

@@ -107,7 +107,6 @@ type Issue struct {
 	Status              string     `json:"status"`
 	CreatorUserID       *uuid.UUID `json:"creator_user_id"`
 	AssignedAgents      []string   `json:"assigned_agents"`
-	LinkedPrs           []string   `json:"linked_prs"`
 	SourceUpstreamIssue *string    `json:"source_upstream_issue"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
@@ -122,6 +121,29 @@ type IssueComment struct {
 	Type       string     `json:"type"`
 	Content    string     `json:"content"`
 	CreatedAt  time.Time  `json:"created_at"`
+}
+
+type PullRequest struct {
+	ID              uuid.UUID  `json:"id"`
+	WorkspaceID     uuid.UUID  `json:"workspace_id"`
+	IssueID         uuid.UUID  `json:"issue_id"`
+	RepoOwner       string     `json:"repo_owner"`
+	RepoName        string     `json:"repo_name"`
+	Number          int32      `json:"number"`
+	Title           string     `json:"title"`
+	Url             string     `json:"url"`
+	State           string     `json:"state"`
+	Draft           bool       `json:"draft"`
+	HeadBranch      string     `json:"head_branch"`
+	BaseBranch      string     `json:"base_branch"`
+	Author          string     `json:"author"`
+	Source          string     `json:"source"`
+	CloseIntent     bool       `json:"close_intent"`
+	SuppressedAt    *time.Time `json:"suppressed_at"`
+	MergedAt        *time.Time `json:"merged_at"`
+	GithubUpdatedAt *time.Time `json:"github_updated_at"`
+	CreatedAt       time.Time  `json:"created_at"`
+	UpdatedAt       time.Time  `json:"updated_at"`
 }
 
 type Runtime struct {
