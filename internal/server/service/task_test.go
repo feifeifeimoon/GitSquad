@@ -92,7 +92,7 @@ func seedTaskFixtureOnBranch(t *testing.T, ctx context.Context, s *store.Store, 
 	if err != nil {
 		t.Fatalf("create user: %v", err)
 	}
-	t.Cleanup(func() { _, _ = pool.Exec(ctx, "DELETE FROM users WHERE id = $1", user.ID) })
+	t.Cleanup(func() { cleanupUserRows(t, ctx, pool, user.ID) })
 
 	ghInstallationID := int64(uuid.New().ID() % 1000000)
 	installation, err := s.CreateInstallation(ctx, db.CreateInstallationParams{
