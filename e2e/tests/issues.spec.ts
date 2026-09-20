@@ -114,7 +114,7 @@ test.describe("Issue pull requests", () => {
 
     await expect(page.getByText(`active ${suffix}`)).toBeVisible({ timeout: 20_000 });
     // The history is collapsed by default; opening it reveals the older PR.
-    await page.getByRole("button", { name: /历程/ }).click();
+    await page.getByRole("button", { name: /History/ }).click();
     await expect(page.getByText(`merged ${suffix}`)).toBeVisible({ timeout: 10_000 });
 
     // Unlinking leaves a tombstone: the row stays, marked unlinked, and the
@@ -194,5 +194,45 @@ test.describe("Issue pull requests · link lifecycle", () => {
     await expect(page.getByText("已有活跃 PR")).toBeVisible({ timeout: 10_000 });
     // And the row it refused to restore is still unlinked.
     await expect(page.getByText("unlinked").first()).toBeVisible({ timeout: 10_000 });
+  });
+});
+
+test.describe("Issue pull requests · link form", () => {
+  let api: TestApiClient;
+  let workspace: TestWorkspace;
+  let suffix: string;
+
+  test.beforeEach(async () => {
+    suffix = Date.now().toString(36);
+    api = new TestApiClient();
+    await api.login("E2E User");
+    workspace = await api.seedWorkspace({
+      name: `E2E PR Form ${suffix}`,
+      slug: `e2e-pr-form-${suffix}`,
+    });
+  });
+
+  test.afterEach(async () => {
+    await api.cleanup();
+  });
+
+  // A refused link must leave what the user typed where it was: the refusal is
+  // usually about the PR, not about the keystrokes.
+  test("keeps the pasted reference when the link is refused", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `E2E form issue ${suffix}`);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    const input = page.getByPlaceholder(/Link a pull request/);
+    await input.fill("not-a-pull-request");
+    await page.getByRole("button", { name: "Link", exact: true }).click();
+
+    await expect(page.getByText(/expected a pull request URL or number/)).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(input).toHaveValue("not-a-pull-request", { timeout: 10_000 });
   });
 });

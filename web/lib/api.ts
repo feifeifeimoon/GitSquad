@@ -172,7 +172,8 @@ export const issueApi = {
   linkPullRequest: (workspaceId: string, issueId: string, ref: string) =>
     api.post<PullRequest>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests`, { ref }),
   unlinkPullRequest: (workspaceId: string, issueId: string, prId: string) =>
-    api.delete(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests/${prId}`),  restorePullRequest: (workspaceId: string, issueId: string, prId: string) =>
+    api.delete(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests/${prId}`),
+  restorePullRequest: (workspaceId: string, issueId: string, prId: string) =>
     api.post(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests/${prId}/restore`, {}),
 };
 
