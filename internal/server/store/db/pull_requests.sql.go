@@ -46,6 +46,11 @@ LIMIT 1
 
 // The issue's live line of work: open, claiming to close the issue, and not
 // unlinked by a human.
+//
+// It is also what a new task continues, which is why it is only reachable from
+// the two certain entries: the platform opens a PR for a task, or a human links
+// one. Nothing infers a link, so every row here is a statement rather than a
+// guess. An inferred entry would have to be kept out of this query.
 func (q *Queries) GetActivePullRequest(ctx context.Context, issueID uuid.UUID) (PullRequest, error) {
 	row := q.db.QueryRow(ctx, getActivePullRequest, issueID)
 	var i PullRequest

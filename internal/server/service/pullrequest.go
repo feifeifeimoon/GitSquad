@@ -5,12 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
-	"github.com/feifeifeimoon/GitSquad/internal/util"
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -20,13 +18,11 @@ import (
 // relationship needs. Kept as a plain struct so the rules can be exercised
 // without constructing a GitHub payload.
 type GitHubPullRequestEvent struct {
-	Action         string // opened | closed | reopened | ready_for_review | edited | synchronize | ...
 	InstallationID int64
 	RepoOwner      string
 	RepoName       string
 	Number         int32
 	Title          string
-	Body           string
 	State          string // open | closed
 	Merged         bool
 	Draft          bool
@@ -37,15 +33,14 @@ type GitHubPullRequestEvent struct {
 	UpdatedAt      time.Time
 }
 
-// PullRequestService owns the issue ↔ pull request relationship: the entries
-// that create links, the state that flows back onto the issue, and the
-// aggregate that decides whether the issue is finished.
+// PullRequestService owns the issue ↔ pull request relationship: the two entries
+// that create links, the state that flows back onto the issue, and the aggregate
+// that decides whether the issue is finished.
 //
-// The platform is the only writer it trusts. A PR it opened for a task is
-// recorded the moment it exists — not when a webhook happens to arrive — and a
-// PR discovered later is only linked when the branch convention or an explicit
-// closing keyword says it is the issue's work. A PR that merely mentions an
-// issue is never linked.
+// Exactly two things link a PR, and both are statements rather than guesses: the
+// platform records the one it just opened for a task, and a human links one by
+// hand. Webhooks never bind — they only refresh what is already bound — so a row
+// always means someone meant it, and no event ordering can change that.
 type PullRequestService struct {
 	store     *store.Store
 	publisher EventPublisher
@@ -60,9 +55,8 @@ func NewPullRequestService(s *store.Store) *PullRequestService {
 func (s *PullRequestService) SetPublisher(p EventPublisher) { s.publisher = p }
 
 // LinkCreated records the pull request the platform just opened for a finished
-// task. It is entry ①: the one link that needs no inference, so it is written
-// immediately rather than waiting for a webhook that may be delayed, missing or
-// never configured.
+// task. It is entry ①: the platform created the PR, so the link is written
+// immediately — there is nothing to infer and nothing to wait for.
 func (s *PullRequestService) LinkCreated(ctx context.Context, task db.Task, full v1.Task, prNum int, prURL, headBranch, baseBranch string) error {
 	if full.Issue.ID == uuid.Nil {
 		return errors.New("task context has no issue id")
@@ -96,7 +90,18 @@ func (s *PullRequestService) LinkCreated(ctx context.Context, task db.Task, full
 //
 // It is idempotent and order-tolerant — GitHub redelivers events and does not
 // guarantee their order — so it never fails on "nothing to do".
-func (s *PullRequestService) SyncFromWebhook(ctx context.Context, ev GitHubPullRequestEvent) error {
+// ApplyState records what GitHub reports about a pull request the platform
+// already knows about, and lets the issue follow.
+//
+// It deliberately cannot bind. A PR is linked when the platform opens it or when
+// a human says so — never because an event arrived — so an event for a PR nobody
+// linked is somebody else's business and is ignored rather than stored. That is
+// what keeps `source` honest: only the two certain entries ever write a row, and
+// no event can arrive first and claim one for a guess.
+//
+// Order tolerance lives in the store: a redelivered or reordered event that is
+// older than what is stored does not roll the state back.
+func (s *PullRequestService) ApplyState(ctx context.Context, ev GitHubPullRequestEvent) error {
 	ws, err := s.store.GetWorkspaceByRepo(ctx, db.GetWorkspaceByRepoParams{
 		InstallationID: ev.InstallationID,
 		Owner:          ev.RepoOwner,
@@ -109,126 +114,62 @@ func (s *PullRequestService) SyncFromWebhook(ctx context.Context, ev GitHubPullR
 		return fmt.Errorf("resolve workspace for repo: %w", err)
 	}
 
-	for _, target := range s.linkTargets(ctx, ws.ID, ev) {
-		if err := s.linkOne(ctx, ws.ID, ev, target); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-// linkTarget is one issue a PR claims to belong to, and how it was recognised.
-type linkTarget struct {
-	issueID     uuid.UUID
-	issueKey    string
-	source      string
-	closeIntent bool
-}
-
-// linkTargets resolves the issues this PR names. The branch convention wins over
-// the body: a branch we created is the issue's line of work even when the author
-// never wrote a closing keyword, and a PR body can mention several issues.
-func (s *PullRequestService) linkTargets(ctx context.Context, workspaceID uuid.UUID, ev GitHubPullRequestEvent) []linkTarget {
-	seen := map[uuid.UUID]bool{}
-	var out []linkTarget
-
-	add := func(key, source string) {
-		issue, err := s.issueByKey(ctx, workspaceID, key)
-		if err != nil {
-			if !errors.Is(err, pgx.ErrNoRows) {
-				slog.Warn("resolve issue for pull request", "key", key, "error", err)
-			}
-			return
-		}
-		if seen[issue.ID] {
-			return
-		}
-		seen[issue.ID] = true
-		out = append(out, linkTarget{issueID: issue.ID, issueKey: key, source: source, closeIntent: true})
-	}
-
-	if key, ok := parseIssueKeyFromBranch(ev.HeadBranch); ok {
-		add(key, "branch")
-	}
-	for _, key := range parseIssueKeysFromText(ev.Title + "\n" + ev.Body) {
-		add(key, "body")
-	}
-	return out
-}
-
-// issueByKey resolves "PREFIX-42" within a workspace. The prefix is the
-// workspace's own, so a key that does not match it belongs to some other
-// workspace and is not ours to bind.
-func (s *PullRequestService) issueByKey(ctx context.Context, workspaceID uuid.UUID, key string) (db.GetIssueByNumberRow, error) {
-	num, ok := parseIssueNumber(key)
-	if !ok {
-		return db.GetIssueByNumberRow{}, pgx.ErrNoRows
-	}
-	row, err := s.store.GetIssueByNumber(ctx, db.GetIssueByNumberParams{WorkspaceID: workspaceID, Number: num})
+	row, err := s.store.GetPullRequestByNumber(ctx, db.GetPullRequestByNumberParams{
+		WorkspaceID: ws.ID,
+		RepoOwner:   ev.RepoOwner,
+		RepoName:    ev.RepoName,
+		Number:      ev.Number,
+	})
 	if err != nil {
-		return db.GetIssueByNumberRow{}, err
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil // never linked: not ours to track
+		}
+		return fmt.Errorf("find pull request: %w", err)
 	}
-	if !strings.EqualFold(issueKey(row.IssuePrefix, row.Number), key) {
-		return db.GetIssueByNumberRow{}, pgx.ErrNoRows
-	}
-	return row, nil
-}
 
-// linkOne writes the link (or refreshes the row) and lets the issue follow.
-func (s *PullRequestService) linkOne(ctx context.Context, workspaceID uuid.UUID, ev GitHubPullRequestEvent, target linkTarget) error {
-	state := "open"
-	switch {
-	case ev.Merged:
-		state = "merged"
-	case ev.State == "closed":
-		state = "closed"
-	}
-	// A suppressed row keeps its tombstone: RecordPullRequest never touches
-	// suppressed_at, so an unlinked PR cannot be resurrected by a redelivery,
-	// and its state still stays accurate for the history.
-	var mergedAt *time.Time
-	if ev.Merged && !ev.UpdatedAt.IsZero() {
-		t := ev.UpdatedAt
-		mergedAt = &t
-	}
-	updatedAt := ev.UpdatedAt
-	row, err := s.store.RecordPullRequest(ctx, db.InsertPullRequestParams{
-		WorkspaceID:     workspaceID,
-		IssueID:         target.issueID,
+	updated, err := s.store.RecordPullRequest(ctx, db.InsertPullRequestParams{
+		WorkspaceID:     row.WorkspaceID,
+		IssueID:         row.IssueID,
 		RepoOwner:       ev.RepoOwner,
 		RepoName:        ev.RepoName,
 		Number:          ev.Number,
 		Title:           ev.Title,
 		Url:             ev.HTMLURL,
-		State:           state,
+		State:           pullRequestState(ev),
 		Draft:           ev.Draft,
 		HeadBranch:      ev.HeadBranch,
 		BaseBranch:      ev.BaseBranch,
 		Author:          ev.Author,
-		Source:          target.source,
-		CloseIntent:     target.closeIntent,
-		MergedAt:        mergedAt,
-		GithubUpdatedAt: &updatedAt,
+		Source:          row.Source,
+		CloseIntent:     row.CloseIntent,
+		MergedAt:        mergedAt(ev),
+		GithubUpdatedAt: &ev.UpdatedAt,
 	})
 	if err != nil {
-		if util.IsUniqueViolation(err) {
-			// Another PR already holds this issue's active slot. Nothing is
-			// lost: the PR exists on GitHub, and the issue keeps the PR it was
-			// already tracking. Say so rather than silently dropping it.
-			s.appendSystemComment(ctx, workspaceID, target.issueID, fmt.Sprintf(
-				"检测到另一个开放的 PR #%d 也指向本 issue，但本 issue 已有活跃 PR，请确认哪个是本次的工作线。", ev.Number))
-			return nil
-		}
-		return fmt.Errorf("record pull request: %w", err)
+		return fmt.Errorf("record pull request state: %w", err)
 	}
-
-	return s.afterPullRequestChange(ctx, workspaceID, target.issueID, row)
+	return s.afterPullRequestChange(ctx, row.WorkspaceID, row.IssueID, updated)
 }
 
-// afterPullRequestChange moves the issue to match the PR that just changed.
-//
-// The status only ever moves forward, and never over a human's terminal call:
-// an issue already marked done or cancelled stays where the human put it.
+// pullRequestState reduces an event to the stored vocabulary. A merge is how
+// GitHub closes a PR, so it is checked first.
+func pullRequestState(ev GitHubPullRequestEvent) string {
+	if ev.Merged {
+		return "merged"
+	}
+	if ev.State == "closed" {
+		return "closed"
+	}
+	return "open"
+}
+
+func mergedAt(ev GitHubPullRequestEvent) *time.Time {
+	if !ev.Merged || ev.UpdatedAt.IsZero() {
+		return nil
+	}
+	t := ev.UpdatedAt
+	return &t
+}
 func (s *PullRequestService) afterPullRequestChange(ctx context.Context, workspaceID, issueID uuid.UUID, row db.PullRequest) error {
 	issue, err := s.store.GetIssue(ctx, db.GetIssueParams{ID: issueID, WorkspaceID: workspaceID})
 	if err != nil {
@@ -295,8 +236,10 @@ func (s *PullRequestService) setIssueStatus(ctx context.Context, workspaceID, is
 }
 
 // ActivePullRequest returns the PR the issue is currently tracking — open,
-// claiming to close the issue, and not unlinked — whichever entry linked it.
-// This is display material: the issue page shows it as the current PR.
+// claiming to close the issue, and not unlinked — which is both what the issue
+// page shows and what a new task continues. Only the two certain entries write
+// rows (the platform opening a PR, a human linking one), so there is no inferred
+// link to keep out.
 func (s *PullRequestService) ActivePullRequest(ctx context.Context, issueID uuid.UUID) (db.PullRequest, error) {
 	row, err := s.store.GetActivePullRequest(ctx, issueID)
 	if err != nil {
@@ -304,23 +247,6 @@ func (s *PullRequestService) ActivePullRequest(ctx context.Context, issueID uuid
 			return db.PullRequest{}, nil
 		}
 		return db.PullRequest{}, err
-	}
-	return row, nil
-}
-
-// ContinuablePullRequest returns the PR a new task's work should land on.
-//
-// Deliberately narrower than ActivePullRequest: only the certain entries (the
-// platform opened it, or a human linked it) may decide where code goes. A PR
-// matched by the branch convention or a keyword is a guess, and a guess must
-// not send an agent's work onto someone else's branch.
-func (s *PullRequestService) ContinuablePullRequest(ctx context.Context, issueID uuid.UUID) (db.PullRequest, error) {
-	row, err := s.ActivePullRequest(ctx, issueID)
-	if err != nil || row.ID == uuid.Nil {
-		return db.PullRequest{}, err
-	}
-	if row.Source != "platform" && row.Source != "manual" {
-		return db.PullRequest{}, nil
 	}
 	return row, nil
 }

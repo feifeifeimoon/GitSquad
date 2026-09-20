@@ -60,6 +60,11 @@ WHERE workspace_id = $1 AND repo_owner = $2 AND repo_name = $3 AND number = $4;
 -- name: GetActivePullRequest :one
 -- The issue's live line of work: open, claiming to close the issue, and not
 -- unlinked by a human.
+--
+-- It is also what a new task continues, which is why it is only reachable from
+-- the two certain entries: the platform opens a PR for a task, or a human links
+-- one. Nothing infers a link, so every row here is a statement rather than a
+-- guess. An inferred entry would have to be kept out of this query.
 SELECT * FROM pull_requests
 WHERE issue_id = $1
   AND state = 'open'

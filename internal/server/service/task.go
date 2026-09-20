@@ -216,7 +216,7 @@ func (s *TaskService) buildClaim(ctx context.Context, task db.Task) (*v1.Task, e
 	// the issue's PRs, and by the time it could, the agent would already have
 	// started from the wrong base.
 	if s.pullRequests != nil {
-		if pr, err := s.pullRequests.ContinuablePullRequest(ctx, full.Issue.ID); err != nil {
+		if pr, err := s.pullRequests.ActivePullRequest(ctx, full.Issue.ID); err != nil {
 			slog.Warn("resolve active pull request", "issue", full.Issue.ID, "error", err)
 		} else if pr.ID != uuid.Nil && pr.HeadBranch != "" {
 			full.Repo.Branch = pr.HeadBranch
@@ -445,18 +445,26 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 			return err
 		}
 		result["pr_number"] = prNum
-		// Entry ① of the issue ↔ PR relationship: the platform opened it, so
-		// the link is certain and is written now rather than waiting for a
-		// webhook that may be delayed, missing, or never configured. A failure
-		// here is worth a log, not failing a task that already succeeded.
-		if s.pullRequests != nil {
-			if err := s.pullRequests.LinkCreated(ctx, task, full, prNum,
-				pullRequestURL(ws.RepoOwner, ws.RepoName, prNum), branch, base); err != nil {
+		// Entry ① of the issue ↔ PR relationship: the platform opened this PR, so
+		// the link is certain and is written now. The comment has to match what
+		// the platform actually knows — nothing backfills a link later, so
+		// claiming "已提 PR" over a row that was never written would be a lie the
+		// user has no way to see through.
+		prURL := pullRequestURL(ws.RepoOwner, ws.RepoName, prNum)
+		linked := s.pullRequests == nil
+		if !linked {
+			if err := s.pullRequests.LinkCreated(ctx, task, full, prNum, prURL, branch, base); err != nil {
 				slog.Warn("record created pull request", "task", task.ID, "pr", prNum, "error", err)
+			} else {
+				linked = true
 			}
 		}
+		trailer := ""
+		if !linked {
+			trailer = "（未能记录到本 issue，请刷新或手工关联）"
+		}
 		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
-			fmt.Sprintf("已提 PR #%d：%s", prNum, pullRequestURL(ws.RepoOwner, ws.RepoName, prNum))); err != nil {
+			fmt.Sprintf("已提 PR #%d：%s%s", prNum, prURL, trailer)); err != nil {
 			return err
 		}
 	} else if output == "" {
