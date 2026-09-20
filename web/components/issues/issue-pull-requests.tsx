@@ -46,9 +46,6 @@ function PullRequestRow({
           {pr.suppressed && (
             <span className="font-mono text-[11px] text-mute">unlinked</span>
           )}
-          {pr.source !== "platform" && !pr.suppressed && (
-            <span className="font-mono text-[11px] text-mute">{pr.source}</span>
-          )}
         </div>
       </div>
       {!pr.suppressed && onUnlink && (
