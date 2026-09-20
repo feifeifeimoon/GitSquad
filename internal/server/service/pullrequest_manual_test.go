@@ -66,14 +66,14 @@ func TestLinkManualRecordsAndAdoptsThePullRequest(t *testing.T) {
 		t.Errorf("head branch = %q, want the one GitHub reported", row.HeadBranch)
 	}
 
-	// A human asserting the relationship is certainty, so it drives the branch a
-	// new task continues.
-	continuable, err := svc.ContinuablePullRequest(ctx, f.issue.ID)
+	// A human asserting the relationship is certainty, so it is the issue's
+	// live line of work for the next task.
+	active, err := svc.ActivePullRequest(ctx, f.issue.ID)
 	if err != nil {
-		t.Fatalf("ContinuablePullRequest: %v", err)
+		t.Fatalf("ActivePullRequest: %v", err)
 	}
-	if continuable.Number != 77 {
-		t.Errorf("continuable = #%d, want the manually linked PR", continuable.Number)
+	if active.Number != 77 {
+		t.Errorf("active = #%d, want the manually linked PR", active.Number)
 	}
 
 	issue, err := s.GetIssue(ctx, db.GetIssueParams{ID: f.issue.ID, WorkspaceID: f.workspace.ID})

@@ -359,6 +359,10 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 			head_branch TEXT NOT NULL DEFAULT '',
 			base_branch TEXT NOT NULL DEFAULT '',
 			author TEXT NOT NULL DEFAULT '',
+			-- Only platform and manual are produced: the platform records the PR
+			-- it opens, a human links one by hand, and webhooks never bind. The
+			-- other two are what the removed inference wrote, kept so historical
+			-- rows stay valid.
 			source TEXT NOT NULL DEFAULT 'platform'
 				CHECK (source IN ('platform','branch','body','manual')),
 			close_intent BOOLEAN NOT NULL DEFAULT false,

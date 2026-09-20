@@ -343,14 +343,12 @@ func (s *GitHubAppService) handlePullRequest(ctx context.Context, payload []byte
 		installationID = inst.GetID()
 	}
 
-	err := s.pullRequests.SyncFromWebhook(ctx, GitHubPullRequestEvent{
-		Action:         ev.GetAction(),
+	err := s.pullRequests.ApplyState(ctx, GitHubPullRequestEvent{
 		InstallationID: installationID,
 		RepoOwner:      repo.GetOwner().GetLogin(),
 		RepoName:       repo.GetName(),
 		Number:         int32(ev.GetNumber()),
 		Title:          pr.GetTitle(),
-		Body:           pr.GetBody(),
 		State:          pr.GetState(),
 		Merged:         pr.GetMerged(),
 		Draft:          pr.GetDraft(),
