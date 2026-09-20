@@ -8,6 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 
+/** The colour of a PR's state, in one place rather than a chain of ternaries. */
+const STATE_CLASS: Record<PullRequest["state"], string> = {
+  merged: "text-emerald-600 dark:text-emerald-400",
+  closed: "text-mute",
+  open: "text-amber-600 dark:text-amber-400",
+};
+
 /** One PR row: the state colour, number, title and the link out to GitHub. */
 function PullRequestRow({
   pr,
@@ -18,12 +25,7 @@ function PullRequestRow({
   onUnlink?: (pr: PullRequest) => void;
   onRestore?: (pr: PullRequest) => void;
 }) {
-  const stateClass =
-    pr.state === "merged"
-      ? "text-emerald-600 dark:text-emerald-400"
-      : pr.state === "closed"
-        ? "text-mute"
-        : "text-amber-600 dark:text-amber-400";
+  const stateClass = STATE_CLASS[pr.state] ?? STATE_CLASS.open;
   return (
     <div className="flex items-start gap-2 text-sm" data-testid={`pull-request-${pr.number}`}>
       <GitPullRequest className={`mt-0.5 size-3.5 shrink-0 ${stateClass}`} />
@@ -99,14 +101,18 @@ export function IssuePullRequests({
   const history = all.filter((pr) => !active.includes(pr));
   const shown = showHistory ? history : history.slice(0, 2);
 
-  const act = async (fn: () => Promise<unknown>, message: string) => {
+  // Returns whether it worked, so callers can decide what a success means —
+  // clearing a form input, for instance, must not happen on failure.
+  const act = async (fn: () => Promise<unknown>, message: string): Promise<boolean> => {
     setBusy(true);
     try {
       await fn();
       toast.success(message);
       onChange();
+      return true;
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Something went wrong");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -123,13 +129,13 @@ export function IssuePullRequests({
             onUnlink={(p) =>
               act(
                 () => issueApi.unlinkPullRequest(slug, issue.issue_key, p.id),
-                `已解绑 PR #${p.number}`,
+                `Unlinked #${p.number}`,
               )
             }
           />
         ))}
         {active.length === 0 && (
-          <p className="text-sm text-body">暂无活跃 PR。</p>
+          <p className="text-sm text-body">No pull request yet.</p>
         )}
 
         {history.length > 0 && (
@@ -140,7 +146,7 @@ export function IssuePullRequests({
               className="flex items-center gap-1 text-[11px] text-mute hover:text-body"
             >
               {showHistory ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-              历程（{history.length}）
+              History ({history.length})
             </button>
             {shown.map((pr) => (
               <PullRequestRow
@@ -149,7 +155,7 @@ export function IssuePullRequests({
                 onRestore={(p) =>
                   act(
                     () => issueApi.restorePullRequest(slug, issue.issue_key, p.id),
-                    `已恢复 PR #${p.number}`,
+                    `Restored #${p.number}`,
                   )
                 }
               />
@@ -162,26 +168,32 @@ export function IssuePullRequests({
           onSubmit={(e) => {
             e.preventDefault();
             if (!ref.trim() || busy) return;
+            // Keep what the user pasted when the link is refused — the refusal
+            // is usually about a different PR, and retyping a URL is a tax on an
+            // error they did not make.
             act(
               () => issueApi.linkPullRequest(slug, issue.issue_key, ref.trim()),
-              "已关联 PR",
-            ).then(() => setRef(""));
+              "Linked the pull request",
+            ).then((linked) => {
+              if (linked) setRef("");
+            });
           }}
         >
           <Input
             value={ref}
             onChange={(e) => setRef(e.target.value)}
-            placeholder="关联 PR：粘贴链接或编号"
+            placeholder="Link a pull request: paste a URL or number"
             className="h-8 text-xs"
             disabled={busy}
           />
           <Button type="submit" size="sm" variant="outline" disabled={!ref.trim() || busy}>
-            关联
+            Link
           </Button>
         </form>
         {active.length > 0 && (
           <p className="text-[11px] text-mute">
-            同一时刻只有一个活跃 PR；想另起一条工作线，先把当前这个关掉。
+            One active pull request at a time. To start a new line of work, close the
+            current one.
           </p>
         )}
       </div>
