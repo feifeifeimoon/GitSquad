@@ -92,7 +92,7 @@ export default function DaemonDetailPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4 text-sm">
+      <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4 text-copy">
         <Link
           href={paths.daemons()}
           className="text-mute transition-colors hover:text-ink"
@@ -122,7 +122,7 @@ export default function DaemonDetailPage() {
                 <Pencil className="size-3.5" />
               </button>
             </div>
-            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-mute">
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-caption text-mute">
               <DaemonStatusBadge status={status} />
               <span aria-hidden="true">·</span>
               <span className="font-mono">
@@ -152,8 +152,8 @@ export default function DaemonDetailPage() {
 
         <section className="mt-8">
           <div className="mb-3 flex items-center justify-between gap-3">
-            <h2 className="text-sm font-medium text-ink">Runtimes</h2>
-            <span className="text-xs text-mute">
+            <h2 className="text-label font-semibold text-ink">Runtimes</h2>
+            <span className="text-caption text-mute">
               Detected on this machine and reported by the daemon.
             </span>
           </div>
@@ -212,12 +212,12 @@ function Fact({
   const [copied, setCopied] = useState(false);
   return (
     <div className="min-w-0">
-      <dt className="font-mono text-xs font-semibold uppercase tracking-wide text-mute">
+      <dt className="font-mono text-caption font-semibold uppercase tracking-wide text-mute">
         {label}
       </dt>
       <dd className="mt-1 flex min-w-0 items-center gap-1.5">
         <span
-          className={`truncate text-sm text-ink ${mono ? "font-mono text-xs" : ""}`}
+          className={`truncate text-copy text-ink ${mono ? "font-mono text-caption" : ""}`}
           title={value}
         >
           {value}
@@ -262,22 +262,22 @@ function RuntimeCard({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h3 className="text-sm font-medium text-ink">{runtime.kind}</h3>
-            <span className="font-mono text-xs text-body">
+            <h3 className="text-copy font-semibold text-ink">{runtime.kind}</h3>
+            <span className="font-mono text-caption text-body">
               {runtime.version || "version unknown"}
             </span>
             {failed ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-error-soft px-2 py-0.5 text-xs font-medium text-destructive">
+              <span className="inline-flex items-center gap-1 rounded-full bg-error-soft px-2 py-0.5 text-caption font-medium text-destructive">
                 <TriangleAlert className="size-3" />
                 unavailable
               </span>
             ) : (
-              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-body">
+              <span className="rounded-full bg-muted px-2 py-0.5 text-caption font-medium text-body">
                 {runtime.status || "available"}
               </span>
             )}
           </div>
-          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-mute">
+          <p className="mt-1 flex flex-wrap items-center gap-x-2 text-caption text-mute">
             <span
               className="truncate font-mono"
               title={runtime.executable_path}
@@ -288,7 +288,7 @@ function RuntimeCard({
             <span>max {runtime.max_concurrency} concurrent</span>
           </p>
           {failed && runtime.diagnostics && (
-            <p className="mt-2 rounded-sm bg-error-soft px-2 py-1.5 font-mono text-xs text-destructive">
+            <p className="mt-2 rounded-sm bg-error-soft px-2 py-1.5 font-mono text-caption text-destructive">
               {runtime.diagnostics}
             </p>
           )}
@@ -296,11 +296,11 @@ function RuntimeCard({
       </div>
 
       <div className="border-t border-hairline px-4 py-3">
-        <p className="mb-2 font-mono text-xs font-semibold uppercase tracking-wide text-mute">
+        <p className="mb-2 font-mono text-caption font-semibold uppercase tracking-wide text-mute">
           Agents ({runtime.agents.length})
         </p>
         {runtime.agents.length === 0 ? (
-          <p className="text-xs text-mute">
+          <p className="text-caption text-mute">
             No agents are bound to this runtime.
           </p>
         ) : (
@@ -334,17 +334,17 @@ function AgentRow({
         <div className="flex min-w-0 items-center gap-2">
           <Link
             href={paths.workspace(agent.workspace_slug).agents()}
-            className="truncate text-sm font-medium text-ink hover:underline"
+            className="truncate text-copy font-medium text-ink hover:underline"
           >
             @{agent.name}
           </Link>
           {!agent.enabled && (
-            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-mute">
+            <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption text-mute">
               disabled
             </span>
           )}
         </div>
-        <p className="truncate text-xs text-mute">
+        <p className="truncate text-caption text-mute">
           {agent.workspace_name}
           {agent.model ? ` · ${agent.model}` : ""}
           {agent.total_runs > 0 ? ` · ${agent.total_runs} runs` : ""}
@@ -407,7 +407,7 @@ function RenameDialog({
               autoFocus
               placeholder="My laptop"
             />
-            <p className="mt-1.5 text-xs text-mute">
+            <p className="mt-1.5 text-caption text-mute">
               A label for this machine in the console. The daemon itself is
               unaffected.
             </p>

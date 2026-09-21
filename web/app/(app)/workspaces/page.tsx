@@ -201,11 +201,11 @@ function WorkspaceCard({
             avatarUrl={workspace.avatar_url}
             className="size-8"
           />
-          <p className="truncate text-sm font-medium text-ink">{workspace.name}</p>
+          <p className="truncate text-copy font-medium text-ink">{workspace.name}</p>
         </div>
         <StatusBadge status={workspace.status} />
       </div>
-      <p className="mt-1 flex items-start gap-1.5 text-xs text-body">
+      <p className="mt-1 flex items-start gap-1.5 text-caption text-body">
         <GitCommitHorizontal className="mt-0.5 size-3.5 shrink-0 text-mute" />
         <span className="line-clamp-2 min-w-0 flex-1">
           {workspace.last_commit_message || "No commits yet"}
@@ -220,7 +220,7 @@ function WorkspaceCard({
             height={14}
             className="size-3.5 shrink-0"
           />
-          <span className="truncate font-mono text-xs text-mute">
+          <span className="truncate font-mono text-caption text-mute">
             {workspace.repo_full_name ||
               `${workspace.repo_owner}/${workspace.repo_name}`}
           </span>
@@ -228,7 +228,7 @@ function WorkspaceCard({
         </span>
         <TimeAgo
           iso={workspace.last_commit_at || workspace.created_at}
-          className="shrink-0 font-mono text-xs tabular-nums text-mute"
+          className="shrink-0 font-mono text-caption tabular-nums text-mute"
         />
       </div>
     </button>
@@ -249,7 +249,7 @@ function WorkspaceTable({
   return (
     <div className="px-8 py-6">
       <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-copy">
           <thead>
             <tr className="border-b border-hairline bg-canvas-soft">
               <SortHeader label="Name" column="name" sort={sort} onSort={onSort} />
@@ -283,7 +283,7 @@ function WorkspaceTable({
                   </div>
                 </td>
                 <td className="px-4 py-3">
-                  <span className="flex items-center gap-1.5 font-mono text-xs text-body">
+                  <span className="flex items-center gap-1.5 font-mono text-caption text-body">
                     <Image
                       src="/logo-github-light.svg"
                       alt="GitHub"
@@ -301,11 +301,11 @@ function WorkspaceTable({
                   <StatusBadge status={w.status} />
                 </td>
                 <td className="max-w-0 px-4 py-3">
-                  <p className="truncate text-xs text-body">
+                  <p className="truncate text-caption text-body">
                     {w.last_commit_message || "No commits yet"}
                   </p>
                 </td>
-                <td className="px-4 py-3 text-right font-mono text-xs tabular-nums text-mute">
+                <td className="px-4 py-3 text-right font-mono text-caption tabular-nums text-mute">
                   <TimeAgo iso={w.created_at} />
                 </td>
               </tr>

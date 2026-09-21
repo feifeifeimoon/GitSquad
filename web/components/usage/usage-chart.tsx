@@ -39,7 +39,7 @@ export function UsageChart({
   if (points.length === 0) {
     return (
       <div className="flex h-44 items-center justify-center rounded-lg border border-dashed border-hairline">
-        <p className="text-xs text-mute">Nothing in this window.</p>
+        <p className="text-caption text-mute">Nothing in this window.</p>
       </div>
     );
   }
@@ -84,7 +84,7 @@ export function UsageChart({
 
       <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 border-t border-hairline pt-3">
         {SEGMENTS.map((s) => (
-          <span key={s.key} className="flex items-center gap-1.5 text-xs text-mute">
+          <span key={s.key} className="flex items-center gap-1.5 text-caption text-mute">
             <span className={`size-2 rounded-xs ${s.className}`} />
             {s.label}
           </span>

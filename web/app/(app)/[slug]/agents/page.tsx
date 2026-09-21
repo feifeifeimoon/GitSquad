@@ -273,7 +273,7 @@ export default function WorkspaceAgentsPage() {
                     key={f.key}
                     onClick={() => setStatusFilter(f.key)}
                     disabled={count === 0 && f.key !== "all"}
-                    className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-40 ${
+                    className={`rounded-full px-2.5 py-1 text-caption font-medium transition-colors disabled:opacity-40 ${
                       active
                         ? "bg-ink text-canvas"
                         : "bg-muted text-body hover:text-ink"
@@ -289,7 +289,7 @@ export default function WorkspaceAgentsPage() {
             </div>
 
             <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
-              <table className="w-full border-collapse text-sm">
+              <table className="w-full border-collapse text-copy">
                 <thead>
                   <tr className="border-b border-hairline bg-canvas-soft">
                     <th className={TH_CLASS}>Agent</th>
@@ -317,7 +317,7 @@ export default function WorkspaceAgentsPage() {
                 </tbody>
               </table>
               {visible.length === 0 && (
-                <p className="px-4 py-8 text-center text-xs text-mute">
+                <p className="px-4 py-8 text-center text-caption text-mute">
                   No agents are {AGENT_STATUS_LABEL[statusFilter as AgentStatus].toLowerCase()}.
                 </p>
               )}
@@ -366,9 +366,9 @@ export default function WorkspaceAgentsPage() {
                     onChange={handleFileChange}
                   />
                   {avatarError ? (
-                    <p className="text-xs text-destructive">{avatarError}</p>
+                    <p className="text-caption text-destructive">{avatarError}</p>
                   ) : (
-                    <p className="text-xs text-mute">PNG, JPG or SVG, up to 1MB</p>
+                    <p className="text-caption text-mute">PNG, JPG or SVG, up to 1MB</p>
                   )}
                 </div>
               </div>
@@ -452,7 +452,7 @@ export default function WorkspaceAgentsPage() {
               <Field label="Skills">
                 <div className="max-h-32 space-y-1 overflow-y-auto rounded-sm border border-hairline p-2">
                   {skills.map((s) => (
-                    <label key={s.id} className="flex items-center gap-2 text-sm text-body">
+                    <label key={s.id} className="flex items-center gap-2 text-copy text-body">
                       <input
                         type="checkbox"
                         checked={skillIds.includes(s.id)}
@@ -465,7 +465,7 @@ export default function WorkspaceAgentsPage() {
                 </div>
               </Field>
             )}
-            <label className="flex items-center gap-2 text-sm text-body">
+            <label className="flex items-center gap-2 text-copy text-body">
               <input
                 type="checkbox"
                 checked={enabled}
@@ -519,13 +519,13 @@ function AgentRow({
             <div className="flex min-w-0 items-center gap-2">
               <span className="truncate font-medium text-ink">@{agent.name}</span>
               {!agent.enabled && (
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs text-mute">
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption text-mute">
                   disabled
                 </span>
               )}
             </div>
             {agent.description && (
-              <p className="truncate text-xs text-mute">{agent.description}</p>
+              <p className="truncate text-caption text-mute">{agent.description}</p>
             )}
           </div>
         </div>
@@ -535,29 +535,29 @@ function AgentRow({
         {/* The current issue is a second line so the row stays narrow while
             still naming what the agent is actually working on. */}
         {detail && (
-          <p className="mt-0.5 truncate text-xs text-mute" title={detail}>
+          <p className="mt-0.5 truncate text-caption text-mute" title={detail}>
             {detail}
           </p>
         )}
       </td>
       <td className="px-4 py-3">
-        <span className="flex min-w-0 items-center gap-1.5 text-xs text-body">
+        <span className="flex min-w-0 items-center gap-1.5 text-caption text-body">
           <ProviderIcon
             provider={agent.runtime?.provider ?? ""}
             className="size-3.5 shrink-0"
           />
           <span className="truncate">{agent.runtime?.provider || "—"}</span>
         </span>
-        <p className="truncate text-xs text-mute">
+        <p className="truncate text-caption text-mute">
           {agent.runtime?.daemon_name || "no daemon"}
         </p>
       </td>
       <td className="hidden px-4 py-3 lg:table-cell">
-        <span className="font-mono text-xs text-body">
+        <span className="font-mono text-caption text-body">
           {agent.model || "default"}
         </span>
       </td>
-      <td className="hidden px-4 py-3 text-right font-mono text-xs tabular-nums text-body sm:table-cell">
+      <td className="hidden px-4 py-3 text-right font-mono text-caption tabular-nums text-body sm:table-cell">
         {agent.total_runs}
       </td>
       <td className="px-4 py-3">

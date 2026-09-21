@@ -157,11 +157,15 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     };
   }, []);
 
+  // Three planes: the page the content sits on, the chrome framing it, and the
+  // surfaces — cards, panels — that sit on top of the page. The sidebar is its
+  // own tone in both themes, which is what lets a card read as raised instead of
+  // leaning on its border to say so.
   return (
-    <div className="flex h-screen bg-canvas">
+    <div className="flex h-screen bg-page">
       {/* Sidebar */}
       <aside
-        className="relative flex shrink-0 flex-col border-r border-hairline bg-canvas"
+        className="relative flex shrink-0 flex-col border-r border-hairline bg-chrome"
         style={{ width: sidebarWidth }}
       >
         {/* Logo / workspace switcher */}
@@ -175,14 +179,14 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                     avatarUrl={workspace.avatar_url}
                     className="size-6"
                   />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold tracking-tight">
+                  <span className="min-w-0 flex-1 truncate text-copy font-semibold tracking-tight">
                     {workspace.name}
                   </span>
                 </>
               ) : (
                 <>
                   <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
-                  <span className="min-w-0 flex-1 text-sm font-semibold tracking-tight">GitSquad</span>
+                  <span className="min-w-0 flex-1 text-copy font-semibold tracking-tight">GitSquad</span>
                 </>
               )}
               <ChevronsUpDown className="size-3.5 shrink-0 text-mute" />
@@ -216,17 +220,17 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         <nav className="flex-1 space-y-1 px-3 py-4">
           <button
             onClick={() => setPaletteOpen(true)}
-            className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium text-body transition-colors hover:bg-muted hover:text-ink"
+            className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-copy font-medium text-body transition-colors hover:bg-muted hover:text-ink"
           >
             <Search className="size-4" />
             <span>Search</span>
-            <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-0.5 rounded border border-hairline bg-muted px-1.5 font-mono text-xs text-mute">
+            <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-0.5 rounded border border-hairline bg-muted px-1.5 font-mono text-caption text-mute">
               {isMac ? "⌘K" : "Ctrl K"}
             </kbd>
           </button>
           {wsId && (
             <>
-              <div className="mt-4 mb-1 px-3 text-xs font-semibold uppercase tracking-wide text-mute">
+              <div className="mt-4 mb-1 px-3 text-caption font-semibold uppercase tracking-wide text-mute">
                 Workspace
               </div>
               {workspaceNavItems.map((item) => {
@@ -236,7 +240,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                   <button
                     key={item.key}
                     onClick={() => router.push(href)}
-                    className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-copy font-medium transition-colors ${
                       active
                         ? "bg-muted text-ink"
                         : "text-body hover:bg-muted hover:text-ink"
@@ -265,7 +269,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               <button
                 key={item.href}
                 onClick={() => router.push(href)}
-                className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-sm font-medium transition-colors ${
+                className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-copy font-medium transition-colors ${
                   active
                     ? "bg-muted text-ink"
                     : "text-body hover:bg-muted hover:text-ink"
@@ -286,12 +290,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           <div className="flex items-center gap-3">
             <Avatar className="size-8">
               <AvatarImage src={user?.avatar_url} />
-              <AvatarFallback className="text-xs">
+              <AvatarFallback className="text-caption">
                 {user?.login?.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium text-ink">
+              <p className="truncate text-copy font-medium text-ink">
                 @{user?.login}
               </p>
             </div>
@@ -322,10 +326,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       {/* Logout confirmation */}
       <Dialog open={logoutConfirm} onOpenChange={setLogoutConfirm}>
         <DialogContent className="sm:max-w-xs">
-          <DialogTitle className="text-sm font-semibold text-ink">
+          <DialogTitle className="text-copy font-semibold text-ink">
             Sign out
           </DialogTitle>
-          <p className="text-sm text-body">Are you sure you want to sign out?</p>
+          <p className="text-copy text-body">Are you sure you want to sign out?</p>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setLogoutConfirm(false)}>
               Cancel

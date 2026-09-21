@@ -103,20 +103,20 @@ export default function WorkspaceSettingsPage() {
 
         {/* General */}
         <section className="mb-8">
-          <h2 className="mb-3 text-sm font-medium text-ink">General</h2>
+          <h2 className="mb-3 text-label font-semibold text-ink">General</h2>
           <div className="space-y-4 rounded-lg border border-hairline bg-canvas p-5 shadow-level-2">
             <Field label="Workspace Name">
-              <div className="text-sm text-ink">{workspace.name}</div>
+              <div className="text-copy text-ink">{workspace.name}</div>
             </Field>
             <Field label="URL">
-              <div className="truncate font-mono text-xs text-body">{url}</div>
+              <div className="truncate font-mono text-caption text-body">{url}</div>
             </Field>
           </div>
         </section>
 
         {/* Avatar */}
         <section className="mb-8">
-          <h2 className="mb-3 text-sm font-medium text-ink">Avatar</h2>
+          <h2 className="mb-3 text-label font-semibold text-ink">Avatar</h2>
           <div className="flex items-center gap-4 rounded-lg border border-hairline bg-canvas p-5 shadow-level-2">
             <WorkspaceAvatar
               name={workspace.name}
@@ -152,9 +152,9 @@ export default function WorkspaceSettingsPage() {
                 onChange={handleFileChange}
               />
               {avatarError ? (
-                <p className="text-xs text-destructive">{avatarError}</p>
+                <p className="text-caption text-destructive">{avatarError}</p>
               ) : (
-                <p className="text-xs text-mute">PNG, JPG or SVG, up to 1MB</p>
+                <p className="text-caption text-mute">PNG, JPG or SVG, up to 1MB</p>
               )}
             </div>
           </div>
@@ -162,11 +162,11 @@ export default function WorkspaceSettingsPage() {
 
         {/* Danger zone */}
         <section>
-          <h2 className="mb-3 text-sm font-medium text-destructive">Danger Zone</h2>
+          <h2 className="mb-3 text-label font-semibold text-destructive">Danger Zone</h2>
           <div className="flex items-center justify-between gap-4 rounded-lg border border-hairline bg-canvas p-5 shadow-level-2">
             <div>
-              <p className="text-sm font-medium text-ink">Delete Project</p>
-              <p className="mt-0.5 text-xs text-mute">
+              <p className="text-copy font-medium text-ink">Delete Project</p>
+              <p className="mt-0.5 text-caption text-mute">
                 Deleting a workspace cannot be undone.
               </p>
             </div>
@@ -195,7 +195,7 @@ export default function WorkspaceSettingsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-2">
-                  <p className="text-sm text-body">
+                  <p className="text-copy text-body">
                     To confirm, type{" "}
                     <span className="font-mono font-medium text-ink">
                       {workspace.name}

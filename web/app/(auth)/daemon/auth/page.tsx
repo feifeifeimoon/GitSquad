@@ -86,12 +86,12 @@ function DaemonAuthContent() {
           {/* Need login */}
           {status === "need_login" && (
             <div className="space-y-5 text-center">
-              <p className="text-sm text-body">
+              <p className="text-copy text-body">
                 Log in with your Google account to connect a daemon to GitSquad.
               </p>
               <button
                 onClick={() => router.push(`/login?return=${encodeURIComponent(`/daemon/auth?code=${code}`)}`)}
-                className="inline-flex w-full items-center justify-center gap-2 rounded-sm bg-primary px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/85"
+                className="inline-flex w-full items-center justify-center gap-2 rounded-sm bg-primary px-5 py-2.5 text-copy font-medium text-white transition-colors hover:bg-primary/85"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4" />
@@ -116,7 +116,7 @@ function DaemonAuthContent() {
             <div className="space-y-6">
               {/* Pairing code */}
               <div>
-                <p className="mb-3 text-center font-mono text-xs uppercase tracking-wider text-mute">
+                <p className="mb-3 text-center font-mono text-caption uppercase tracking-wider text-mute">
                   Verification Code
                 </p>
                 <div className="flex items-center justify-center gap-2">
@@ -142,18 +142,18 @@ function DaemonAuthContent() {
 
               {/* Device info */}
               <div className="rounded-sm border border-hairline bg-canvas-soft p-4 text-center">
-                <p className="mb-1 text-xs text-mute">Device</p>
-                <p className="text-sm font-semibold text-ink">{machineName}</p>
+                <p className="mb-1 text-caption text-mute">Device</p>
+                <p className="text-copy font-semibold text-ink">{machineName}</p>
               </div>
 
-              <p className="text-center text-xs text-mute">
+              <p className="text-center text-caption text-mute">
                 This device will be able to execute tasks on your behalf.
               </p>
 
               <button
                 onClick={handleConfirm}
                 disabled={status === "confirming"}
-                className="w-full rounded-sm bg-primary px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-primary/85 disabled:opacity-50"
+                className="w-full rounded-sm bg-primary px-4 py-2.5 text-copy font-medium text-white transition-colors hover:bg-primary/85 disabled:opacity-50"
               >
                 {status === "confirming" ? "Confirming..." : "Authorize Device"}
               </button>
@@ -168,7 +168,7 @@ function DaemonAuthContent() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-ink">Device Connected</h2>
-                <p className="mt-1 text-sm text-body">
+                <p className="mt-1 text-copy text-body">
                   You can close this page and return to your terminal.
                 </p>
               </div>
@@ -183,11 +183,11 @@ function DaemonAuthContent() {
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-ink">Verification Failed</h2>
-                <p className="mt-1 text-sm text-body">{error}</p>
+                <p className="mt-1 text-copy text-body">{error}</p>
               </div>
               <Link
                 href="/login"
-                className="inline-block text-sm text-body transition-colors hover:text-ink"
+                className="inline-block text-copy text-body transition-colors hover:text-ink"
               >
                 Back to login
               </Link>
@@ -195,7 +195,7 @@ function DaemonAuthContent() {
           )}
         </div>
 
-        <p className="mt-4 text-center text-xs text-mute">
+        <p className="mt-4 text-center text-caption text-mute">
           GitSquad — Autonomous developer team on GitHub
         </p>
       </div>

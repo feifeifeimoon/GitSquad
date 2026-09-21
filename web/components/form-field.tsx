@@ -17,7 +17,7 @@ export function Field({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs text-mute">{label}</label>
+      <label className="mb-1.5 block text-caption text-mute">{label}</label>
       {children}
     </div>
   );
@@ -36,7 +36,7 @@ export function TextArea({
     <textarea
       data-slot="textarea"
       className={cn(
-        "min-h-24 w-full min-w-0 resize-y rounded-sm border border-hairline bg-card px-3 py-2 text-sm text-ink transition-colors outline-none placeholder:text-mute focus-visible:border-hairline-strong focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
+        "min-h-24 w-full min-w-0 resize-y rounded-sm border border-hairline bg-card px-3 py-2 text-copy text-ink transition-colors outline-none placeholder:text-mute focus-visible:border-hairline-strong focus-visible:ring-2 focus-visible:ring-ring/30 disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-2 aria-invalid:ring-destructive/20",
         className,
       )}
       {...props}

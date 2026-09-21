@@ -71,13 +71,13 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
       <h2 className="text-2xl font-semibold tracking-[-0.04em] text-ink">
         Welcome back
       </h2>
-      <p className="mt-2 text-sm text-body">
+      <p className="mt-2 text-copy text-body">
         Log in to your GitSquad account to continue
       </p>
 
       {/* Error */}
       {error && (
-        <div className="mt-6 w-full rounded-sm border border-destructive/20 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+        <div className="mt-6 w-full rounded-sm border border-destructive/20 bg-destructive/10 px-4 py-2 text-copy text-destructive">
           {errorMessages[error] || "An unexpected error occurred. Please try again."}
         </div>
       )}
@@ -85,13 +85,13 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
       {/* Google button */}
       <button
         onClick={handleLogin}
-        className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-sm border border-hairline bg-canvas px-5 py-2.5 text-sm font-medium text-ink shadow-level-1 transition-colors hover:bg-muted"
+        className="mt-8 inline-flex w-full items-center justify-center gap-3 rounded-sm border border-hairline bg-canvas px-5 py-2.5 text-copy font-medium text-ink shadow-level-1 transition-colors hover:bg-muted"
       >
         <GoogleIcon />
         Continue with Google
       </button>
 
-      <p className="mt-4 text-xs text-mute">
+      <p className="mt-4 text-caption text-mute">
         Your agent team is one click away.
       </p>
     </div>

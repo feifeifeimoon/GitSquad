@@ -65,7 +65,8 @@ test("issue board drags between columns with dnd-kit", () => {
   assert.match(board, /issueApi\.update/);
   assert.match(card, /useDraggable/);
   assert.match(column, /useDroppable/);
-  assert.match(column, /COLUMN_BG/);
+  // The column is a neutral surface; the status colour arrives through the icon.
+  assert.match(column, /StatusIcon/);
 });
 
 test("issue board supports create, empty columns, and per-column add", () => {
@@ -76,7 +77,12 @@ test("issue board supports create, empty columns, and per-column add", () => {
   assert.match(column, /No issues/);
   assert.match(column, /Plus/);
   assert.match(card, /issue_key/);
-  assert.match(card, /Unassigned/);
+  // Two lines: the title and a meta row. The description preview is gone, and
+  // with it the markdown-stripping pass every card used to run while rendering.
+  // (No negative assertion on the removed label: these specs read the file as
+  // text, so a comment that merely names the thing would fail it.)
+  assert.match(card, /line-clamp-2/);
+  assert.doesNotMatch(card, /stripMarkdown/);
 });
 
 test("issue board and cards use skeletons and timestamp tooltips", () => {

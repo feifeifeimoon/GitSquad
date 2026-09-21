@@ -57,7 +57,7 @@ export function UsageBreakdown({
   if (rows.length === 0) {
     return (
       <div className="flex items-center justify-center rounded-lg border border-dashed border-hairline py-10">
-        <p className="text-xs text-mute">
+        <p className="text-caption text-mute">
           No usage recorded for this window yet.
         </p>
       </div>
@@ -66,7 +66,7 @@ export function UsageBreakdown({
 
   return (
     <div className="overflow-hidden rounded-lg border border-hairline bg-canvas">
-      <table className="w-full border-collapse text-sm">
+      <table className="w-full border-collapse text-copy">
         <thead>
           <tr className="border-b border-hairline bg-canvas-soft">
             <th className={TH_CLASS}>
@@ -104,10 +104,10 @@ export function UsageBreakdown({
                     )}
                   </div>
                 </td>
-                <td className="whitespace-nowrap px-4 py-2.5 text-right font-mono text-xs tabular-nums text-body">
+                <td className="whitespace-nowrap px-4 py-2.5 text-right font-mono text-caption tabular-nums text-body">
                   {formatTokens(total)}
                 </td>
-                <td className="hidden whitespace-nowrap px-4 py-2.5 text-right font-mono text-xs tabular-nums text-mute sm:table-cell">
+                <td className="hidden whitespace-nowrap px-4 py-2.5 text-right font-mono text-caption tabular-nums text-mute sm:table-cell">
                   {row.run_count}
                 </td>
                 <td className="hidden px-4 py-2.5 md:table-cell">
@@ -118,7 +118,7 @@ export function UsageBreakdown({
                         style={{ width: `${share * 100}%` }}
                       />
                     </div>
-                    <span className="w-9 shrink-0 text-right font-mono text-xs tabular-nums text-mute">
+                    <span className="w-9 shrink-0 text-right font-mono text-caption tabular-nums text-mute">
                       {Math.round(share * 100)}%
                     </span>
                   </div>

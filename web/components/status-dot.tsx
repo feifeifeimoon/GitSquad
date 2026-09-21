@@ -36,7 +36,7 @@ export function AgentStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex min-w-0 items-center gap-1.5 text-xs font-medium",
+        "inline-flex min-w-0 items-center gap-1.5 text-caption font-medium",
         STATUS_TEXT[status],
         className,
       )}
@@ -60,7 +60,7 @@ export function DaemonStatusBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1.5 text-xs font-medium",
+        "inline-flex items-center gap-1.5 text-caption font-medium",
         STATUS_TEXT[status],
         className,
       )}

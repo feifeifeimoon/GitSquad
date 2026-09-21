@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { LogOut, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface User {
   id: string;
@@ -53,30 +53,33 @@ export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
           onClick={() => setOpen(!open)}
           className="flex items-center gap-2 rounded-full border border-hairline p-0.5 transition-colors hover:border-hairline-strong"
         >
-          <Image
-            src={user.avatar_url}
-            alt={user.login}
-            width={28}
-            height={28}
-            className="size-7 rounded-full"
-          />
+          {/* The Avatar primitive, not a bare <Image>: an account with no
+              picture has an empty avatar_url, and an <img src=""> paints a
+              broken-image glyph in the corner of the marketing nav. The
+              fallback is what actually renders for those accounts. */}
+          <Avatar className="size-7 text-micro uppercase">
+            <AvatarImage src={user.avatar_url} alt={user.login} />
+            <AvatarFallback className="uppercase">
+              {user.login.slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
         </button>
 
         {open && (
           <div className="absolute right-0 top-11 w-48 rounded-md border border-hairline bg-canvas py-1 shadow-level-4 z-50">
               <div className="border-b border-hairline px-3 py-2">
-                <p className="text-sm font-semibold text-ink">@{user.login}</p>
+                <p className="text-copy font-semibold text-ink">@{user.login}</p>
               </div>
               <button
                 onClick={() => { router.push(paths.workspaces()); setOpen(false); }}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-body transition-colors hover:bg-muted hover:text-ink"
+                className="flex w-full items-center gap-2 px-3 py-2 text-copy text-body transition-colors hover:bg-muted hover:text-ink"
               >
                 <LayoutDashboard className="size-3.5" />
                 Console
               </button>
               <button
                 onClick={handleLogout}
-                className="flex w-full items-center gap-2 px-3 py-2 text-sm text-body transition-colors hover:bg-muted hover:text-ink"
+                className="flex w-full items-center gap-2 px-3 py-2 text-copy text-body transition-colors hover:bg-muted hover:text-ink"
               >
                 <LogOut className="size-3.5" />
                 Logout

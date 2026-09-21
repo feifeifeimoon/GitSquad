@@ -175,7 +175,7 @@ export default function DaemonsPage() {
           <EmptyTitle>No daemons registered yet</EmptyTitle>
           <EmptyDescription>
             Run{" "}
-            <code className="rounded-sm bg-muted px-1 font-mono text-xs">
+            <code className="rounded-sm bg-muted px-1 font-mono text-caption">
               gitsquad daemon login
             </code>{" "}
             on your machine to register a daemon.
@@ -225,7 +225,7 @@ export default function DaemonsPage() {
 function RuntimeChips({ runtimes }: { runtimes: DaemonRuntime[] }) {
   const list = Array.isArray(runtimes) ? runtimes : [];
   if (list.length === 0) {
-    return <span className="text-xs text-mute">No capabilities reported.</span>;
+    return <span className="text-caption text-mute">No capabilities reported.</span>;
   }
   return (
     <div className="flex flex-wrap gap-1.5">
@@ -269,7 +269,7 @@ function DaemonCard({
           />
           <Link
             href={paths.daemon(daemon.id)}
-            className="truncate text-sm font-medium text-ink hover:underline"
+            className="truncate text-copy font-medium text-ink hover:underline"
           >
             {daemon.name}
           </Link>
@@ -287,18 +287,18 @@ function DaemonCard({
         </div>
       </div>
 
-      <p className="mt-1 text-xs text-mute">
+      <p className="mt-1 text-caption text-mute">
         {daemon.os}/{daemon.arch} · v{daemon.daemon_version}
       </p>
 
       <div className="mt-3 border-t border-hairline pt-3">
-        <p className="mb-2 font-mono text-xs font-semibold uppercase text-mute">
+        <p className="mb-2 font-mono text-caption font-semibold uppercase text-mute">
           Runtimes
         </p>
         <RuntimeChips runtimes={daemon.runtimes} />
       </div>
 
-      <div className="mt-3 flex items-center justify-between gap-2 text-xs text-mute">
+      <div className="mt-3 flex items-center justify-between gap-2 text-caption text-mute">
         <span>Last seen: {timeAgo(daemon.last_seen_at)}</span>
         <span className="font-mono">{daemon.id.slice(0, 8)}</span>
       </div>
@@ -324,7 +324,7 @@ function DaemonTable({
   return (
     <div className="px-8 py-6">
       <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
-        <table className="w-full border-collapse text-sm">
+        <table className="w-full border-collapse text-copy">
           <thead>
             <tr className="border-b border-hairline bg-canvas-soft">
               <SortHeader label="Name" column="name" sort={sort} onSort={onSort} />
@@ -363,14 +363,14 @@ function DaemonTable({
                   <DaemonStatusBadge status={d.status} />
                 </td>
                 <td className="px-4 py-3">
-                  <span className="font-mono text-xs text-body">
+                  <span className="font-mono text-caption text-body">
                     {d.os}/{d.arch}
                   </span>
                 </td>
                 <td className="max-w-0 px-4 py-3">
                   <RuntimeChips runtimes={d.runtimes} />
                 </td>
-                <td className="px-4 py-3 font-mono text-xs tabular-nums text-mute">
+                <td className="px-4 py-3 font-mono text-caption tabular-nums text-mute">
                   {timeAgo(d.last_seen_at)}
                 </td>
                 <td className="px-4 py-3 text-right">
@@ -454,11 +454,11 @@ function ConnectDaemonModal({
                 <Laptop className="size-4 text-ink" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-ink">Local machine</p>
-                <p className="text-xs text-mute">Run on your own hardware</p>
+                <p className="text-copy font-semibold text-ink">Local machine</p>
+                <p className="text-caption text-mute">Run on your own hardware</p>
               </div>
             </div>
-            <div className="space-y-2 rounded-sm bg-muted p-3 font-mono text-xs text-body">
+            <div className="space-y-2 rounded-sm bg-muted p-3 font-mono text-caption text-body">
               <ConnectStep
                 label="Step 1: Install GitSquad CLI"
                 command="curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash"
@@ -490,8 +490,8 @@ function ConnectDaemonModal({
                 <Cloud className="size-4 text-mute" />
               </div>
               <div>
-                <p className="text-sm font-semibold text-mute">Cloud sandbox</p>
-                <p className="text-xs text-mute">Coming soon</p>
+                <p className="text-copy font-semibold text-mute">Cloud sandbox</p>
+                <p className="text-caption text-mute">Coming soon</p>
               </div>
             </div>
           </div>

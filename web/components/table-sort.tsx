@@ -11,9 +11,15 @@ export interface SortState<K extends string> {
   dir: SortDir;
 }
 
-/** The header cell every console table shares. */
+/**
+ * The header cell every console table shares.
+ *
+ * Sentence case, no mono: a column heading is a label, and reserving the
+ * monospace family and the uppercase treatment for identifiers and code is what
+ * keeps them meaning something when they do appear.
+ */
 export const TH_CLASS =
-  "px-4 py-2 text-left font-mono text-xs font-medium uppercase tracking-wide text-mute";
+  "px-4 py-2 text-left text-caption font-medium text-mute";
 
 /**
  * Column sorting for a list page.

@@ -126,7 +126,7 @@ export function IssuesToolbar({
                 >
                   <StatusIcon status={s} />
                   {ISSUE_STATUS_LABELS[s]}
-                  <span className="ml-auto text-xs tabular-nums text-mute">
+                  <span className="ml-auto text-caption tabular-nums text-mute">
                     {statusCounts.get(s) ?? 0}
                   </span>
                 </DropdownMenuCheckboxItem>
@@ -147,7 +147,7 @@ export function IssuesToolbar({
                     onCheckedChange={() => toggleAssignee(a)}
                   >
                     {a}
-                    <span className="ml-auto text-xs tabular-nums text-mute">
+                    <span className="ml-auto text-caption tabular-nums text-mute">
                       {assigneeCounts.get(a) ?? 0}
                     </span>
                   </DropdownMenuCheckboxItem>
@@ -169,7 +169,7 @@ export function IssuesToolbar({
                     onCheckedChange={() => toggleCreator(c)}
                   >
                     {c}
-                    <span className="ml-auto text-xs tabular-nums text-mute">
+                    <span className="ml-auto text-caption tabular-nums text-mute">
                       {creatorCounts.get(c) ?? 0}
                     </span>
                   </DropdownMenuCheckboxItem>

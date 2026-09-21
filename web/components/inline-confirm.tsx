@@ -28,7 +28,7 @@ export function InlineConfirm({
 }) {
   if (confirming) {
     return (
-      <span className="flex items-center gap-2 whitespace-nowrap text-xs">
+      <span className="flex items-center gap-2 whitespace-nowrap text-caption">
         <span className="text-destructive">{question}</span>
         <button
           onClick={onConfirm}

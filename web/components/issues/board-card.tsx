@@ -6,12 +6,14 @@ import { MessageSquare } from "lucide-react";
 import type { Issue } from "@/lib/api";
 import { TimeAgo } from "@/components/time-ago";
 import { IssuePullRequestBadge } from "@/components/issues/issue-pull-requests";
-import { stripMarkdown } from "@/lib/utils";
 
-// Memoized on the issue object: a column re-renders whenever its array identity
-// changes, and every card here recomputes a markdown-stripped preview and a
-// relative timestamp. The board hands down stable issue objects and stable
-// callbacks, so a card only repaints when its own issue does.
+// Two lines: what the issue is, and the few facts worth scanning a column for.
+//
+// The description preview and the "Unassigned" label are gone. Both were
+// identical on nearly every card, so each cost a line of height — and the
+// preview a markdown-stripping pass — without ever changing a decision. An
+// unassigned issue is the default, and the default does not need saying out
+// loud; what remains is rendered only when it exists.
 export const IssueCard = memo(function IssueCard({
   issue,
   className,
@@ -19,44 +21,41 @@ export const IssueCard = memo(function IssueCard({
   issue: Issue;
   className?: string;
 }) {
+  const assignees = issue.assigned_agents.join(", ");
+
   return (
     <div
-      className={`rounded-lg border border-hairline bg-card p-3 shadow-level-2 transition-shadow hover:shadow-level-3 ${
+      className={`rounded-lg border border-hairline bg-canvas p-3 shadow-level-1 transition-shadow hover:shadow-level-2 ${
         className ?? ""
       }`}
     >
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-mono text-xs tabular-nums text-mute">
+      <p className="line-clamp-2 text-copy font-medium text-ink">
+        {issue.title}
+      </p>
+
+      <div className="mt-2 flex items-center gap-2">
+        <span className="shrink-0 font-mono text-micro text-mute">
           {issue.issue_key}
         </span>
-        <span className="flex items-center gap-1.5">
+        {assignees && (
+          <span className="min-w-0 truncate text-micro text-body">
+            {assignees}
+          </span>
+        )}
+
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
           <IssuePullRequestBadge issue={issue} />
           {issue.comments_count > 0 && (
-            <span className="flex items-center gap-1 text-xs tabular-nums text-mute">
+            <span className="flex items-center gap-1 text-micro tabular-nums text-mute">
               <MessageSquare className="size-3" />
               {issue.comments_count}
             </span>
           )}
+          <TimeAgo
+            iso={issue.updated_at}
+            className="text-micro tabular-nums text-mute"
+          />
         </span>
-      </div>
-      <p className="mt-1 line-clamp-2 text-sm font-medium text-ink">
-        {issue.title}
-      </p>
-      {issue.description ? (
-        <p className="mt-1 line-clamp-1 text-xs text-body">
-          {stripMarkdown(issue.description)}
-        </p>
-      ) : null}
-      <div className="mt-2 flex items-center justify-between gap-2 text-xs">
-        <span className="truncate text-body">
-          {issue.assigned_agents.length > 0
-            ? issue.assigned_agents.join(", ")
-            : "Unassigned"}
-        </span>
-        <TimeAgo
-          iso={issue.updated_at}
-          className="shrink-0 tabular-nums text-mute"
-        />
       </div>
     </div>
   );
