@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
@@ -11,6 +11,7 @@ import {
   Search,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
+import { useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { TimeAgo } from "@/components/time-ago";
 import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
@@ -34,22 +35,17 @@ const VIEW_KEY = "gitsquad_workspaces_view";
 
 export default function WorkspacesPage() {
   const router = useRouter();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Shared with the shell and the command palette: one request, one cache entry.
+  const { data: workspaces = [], loading } = useApi<Workspace[]>(
+    "/api/v1/workspaces",
+    () => api.get<Workspace[]>("/api/v1/workspaces"),
+  );
   const [view, setView] = useViewMode(VIEW_KEY);
   const [search, setSearch] = useState("");
   const { sort, toggle: toggleSort } = useSort<SortKey>(
     { key: "created", dir: "desc" },
     "name",
   );
-
-  useEffect(() => {
-    api
-      .get<Workspace[]>("/api/v1/workspaces")
-      .then((data) => setWorkspaces(data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();

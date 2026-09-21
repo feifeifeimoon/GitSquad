@@ -19,6 +19,7 @@ import {
   issueApi,
   api,
   Workspace,
+  Agent,
   agentApi,
 } from "@/lib/api";
 import { paths } from "@/lib/paths";
@@ -26,7 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { CreateIssueDialog } from "@/components/issues/create-issue-dialog";
-import { useWorkspaceEvents } from "@/lib/realtime";
+import { setApiData, useApi } from "@/lib/query";
 import { IssueCard } from "@/components/issues/board-card";
 import { BoardColumn } from "@/components/issues/board-column";
 import { IssuesToolbar } from "@/components/issues/issues-toolbar";
@@ -46,16 +47,25 @@ export default function WorkspaceBoardPage({
 }) {
   const { slug } = use(params);
   const router = useRouter();
-  const [issues, setIssues] = useState<Issue[]>([]);
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [loading, setLoading] = useState(true);
+  const issuesKey = `/api/v1/workspaces/${slug}/issues`;
+  const { data: issues, loading, refresh: refreshIssues } = useApi<Issue[]>(
+    issuesKey,
+    () => issueApi.list(slug),
+  );
+  const { data: workspace } = useApi<Workspace>(
+    `/api/v1/workspaces/${slug}`,
+    () => api.get<Workspace>(`/api/v1/workspaces/${slug}`),
+  );
+  const { data: agents } = useApi<Agent[]>(
+    `/api/v1/workspaces/${slug}/agents`,
+    () => agentApi.list(slug),
+  );
   // Which status a new issue should start in, and which opening of the dialog
   // this is. The counter is the dialog's key: it hands each opening a fresh
   // component (and so an empty draft) without remounting on close, which would
   // cut off the dialog's exit animation.
   const [createStatus, setCreateStatus] = useState<IssueStatus | null>(null);
   const [createSession, setCreateSession] = useState(0);
-  const [agentNames, setAgentNames] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filters, setFilters] = useState<IssueFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
@@ -98,34 +108,13 @@ export default function WorkspaceBoardPage({
     };
   }, []);
 
-  const load = useCallback(() => {
-    issueApi
-      .list(slug)
-      .then(setIssues)
-      .catch(() => router.push(paths.workspaces()))
-      .finally(() => setLoading(false));
-  }, [slug, router]);
-  useEffect(load, [load]);
-
-  useEffect(() => {
-    agentApi
-      .list(slug)
-      .then((agents) =>
-        setAgentNames(agents.filter((a) => a.enabled).map((a) => a.name)),
-      )
-      .catch(() => {});
-  }, [slug]);
-
-  // Realtime: agent activity changes issue status and comment counts, so keep
-  // the board current without requiring a reload.
-  useWorkspaceEvents(slug, () => load());
-
-  useEffect(() => {
-    api
-      .get<Workspace>(`/api/v1/workspaces/${slug}`)
-      .then(setWorkspace)
-      .catch(() => {});
-  }, [slug]);
+  // Realtime needs no wiring here: the shell holds the socket, and an event
+  // invalidates this path, which re-reads it. Agent activity changes issue
+  // status and comment counts, so the board stays current without a reload.
+  const agentNames = useMemo(
+    () => (agents ?? []).filter((a) => a.enabled).map((a) => a.name),
+    [agents],
+  );
 
   const openCreate = useCallback((initial: IssueStatus) => {
     setCreateSession((n) => n + 1);
@@ -142,13 +131,13 @@ export default function WorkspaceBoardPage({
   );
 
   const move = async (issueId: string, status: IssueStatus) => {
-    setIssues((prev) =>
-      prev.map((i) => (i.id === issueId ? { ...i, status } : i)),
+    setApiData<Issue[]>(issuesKey, (current = []) =>
+      current.map((i) => (i.id === issueId ? { ...i, status } : i)),
     );
     try {
       await issueApi.update(slug, issueId, { status });
     } catch {
-      load(); // revert to server truth on failure
+      refreshIssues(); // revert to server truth on failure
       toast.error("Failed to move issue");
     }
   };
@@ -168,7 +157,7 @@ export default function WorkspaceBoardPage({
   };
 
   const visibleIssues = useMemo(() => {
-    return sortIssues(filterIssues(issues, filters), sort);
+    return sortIssues(filterIssues(issues ?? [], filters), sort);
   }, [issues, filters, sort]);
 
   // One pass into per-status arrays, memoized: the columns are memoized on
@@ -183,7 +172,7 @@ export default function WorkspaceBoardPage({
   }, [visibleIssues]);
 
   const activeIssue = useMemo(
-    () => (activeId ? issues.find((i) => i.id === activeId) ?? null : null),
+    () => (activeId ? (issues ?? []).find((i) => i.id === activeId) ?? null : null),
     [activeId, issues],
   );
 
@@ -224,7 +213,7 @@ export default function WorkspaceBoardPage({
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-8 pb-4 pt-6">
         <IssuesToolbar
-          issues={issues}
+          issues={issues ?? []}
           filters={filters}
           onFiltersChange={setFilters}
           sort={sort}
@@ -278,7 +267,7 @@ export default function WorkspaceBoardPage({
         open={createStatus !== null}
         initialStatus={createStatus ?? "backlog"}
         onOpenChange={closeCreate}
-        onCreated={load}
+        onCreated={refreshIssues}
         mentionItems={agentNames}
       />
     </div>

@@ -13,6 +13,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -36,12 +37,13 @@ interface Installation {
 
 export default function NewWorkspacePage() {
   const router = useRouter();
-  const [installations, setInstallations] = useState<Installation[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: installations = [], loading } = useApi<Installation[]>(
+    "/api/v1/github/installations",
+    () => api.get<Installation[]>("/api/v1/github/installations"),
+  );
   const [selectedInstallationID, setSelectedInstallationID] = useState("");
   const [selectedRepoID, setSelectedRepoID] = useState("");
   const [search, setSearch] = useState("");
-  const [repoLoading, setRepoLoading] = useState(false);
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [installLoading, setInstallLoading] = useState(false);
   const accountRef = useRef<HTMLDivElement>(null);
@@ -60,46 +62,24 @@ export default function NewWorkspacePage() {
     }
   };
 
-  // Fetch repos for the selected installation.
-  const fetchRepos = async (installationID: string) => {
-    const existing = installations.find((i) => i.id === installationID);
-    if (existing?.repos?.length) return;
+  // Land on the first account so the repository list is never empty by
+  // default. Derived rather than assigned in an effect: an effect would render
+  // once with no account selected and then again with one.
+  const activeInstallationID =
+    selectedInstallationID || installations[0]?.id || "";
 
-    setRepoLoading(true);
-    try {
-      const data = await api.get<{ repos: Repo[] }>(
-        `/api/v1/github/installations/${installationID}`
-      );
-      setInstallations((prev) =>
-        prev.map((inst) =>
-          inst.id === installationID
-            ? { ...inst, repos: data.repos || [] }
-            : inst
-        )
-      );
-    } catch {
-      // ignore
-    } finally {
-      setRepoLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    api
-      .get<Installation[]>("/api/v1/github/installations")
-      .then((data) => {
-        const list = data || [];
-        setInstallations(list);
-        if (list.length > 0) {
-          const first = list[0].id;
-          setSelectedInstallationID(first);
-          setTimeout(() => fetchRepos(first), 0);
-        }
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Repos are keyed per installation, so switching between accounts re-reads
+  // only what it has not seen, and the installation list never has to be
+  // patched with what came back.
+  const { data: reposRes, loading: repoLoading } = useApi<{ repos: Repo[] }>(
+    activeInstallationID
+      ? `/api/v1/github/installations/${activeInstallationID}`
+      : null,
+    () =>
+      api.get<{ repos: Repo[] }>(
+        `/api/v1/github/installations/${activeInstallationID}`,
+      ),
+  );
 
   // Close account menu on outside click.
   useEffect(() => {
@@ -113,13 +93,7 @@ export default function NewWorkspacePage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [accountMenuOpen]);
 
-  const selectedInstallation = installations.find(
-    (i) => i.id === selectedInstallationID
-  );
-  const repos = useMemo(
-    () => selectedInstallation?.repos || [],
-    [selectedInstallation?.repos]
-  );
+  const repos = useMemo(() => reposRes?.repos ?? [], [reposRes]);
 
   const filteredRepos = useMemo(() => {
     if (!search.trim()) return repos;
@@ -136,7 +110,6 @@ export default function NewWorkspacePage() {
     setSelectedInstallationID(inst.id);
     setSelectedRepoID("");
     setAccountMenuOpen(false);
-    fetchRepos(inst.id);
   };
 
   const handleImport = (repo: Repo) => {
@@ -222,7 +195,8 @@ export default function NewWorkspacePage() {
                   <span className="flex min-w-0 items-center gap-2">
                     <GitHubIcon className="size-4 shrink-0 text-ink" />
                     <span className="truncate font-medium">
-                      {selectedInstallation?.account_login || "Select account"}
+                      {installations.find((i) => i.id === activeInstallationID)
+                        ?.account_login || "Select account"}
                     </span>
                   </span>
                   {accountMenuOpen ? (
@@ -235,7 +209,7 @@ export default function NewWorkspacePage() {
                 {accountMenuOpen && (
                   <div className="absolute left-0 right-0 top-11 z-20 overflow-hidden rounded-md border border-hairline bg-canvas py-1 shadow-level-4">
                     {installations.map((inst) => {
-                      const isActive = selectedInstallationID === inst.id;
+                      const isActive = activeInstallationID === inst.id;
                       return (
                         <button
                           key={inst.id}

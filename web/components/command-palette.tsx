@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { FolderGit2, Monitor, Plus, Settings } from "lucide-react";
 import { api, Workspace, Issue, issueApi } from "@/lib/api";
+import { useApi } from "@/lib/query";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { StatusIcon } from "@/components/status-icon";
@@ -17,11 +18,6 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 
-interface WorkspaceIssues {
-  wsId: string;
-  items: Issue[];
-}
-
 export function CommandPalette({
   open,
   onOpenChange,
@@ -31,9 +27,6 @@ export function CommandPalette({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
-  const [issues, setIssues] = useState<WorkspaceIssues | null>(null);
-
   const wsId = workspaceSlugFromPath(pathname);
 
   useEffect(() => {
@@ -47,36 +40,24 @@ export function CommandPalette({
     return () => document.removeEventListener("keydown", down);
   }, [open, onOpenChange]);
 
-  useEffect(() => {
-    if (!open) return;
-    api
-      .get<Workspace[]>("/api/v1/workspaces")
-      .then((d) => setWorkspaces(d || []))
-      .catch(() => {});
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !wsId) return;
-    let cancelled = false;
-    issueApi
-      .list(wsId)
-      .then((d) => {
-        if (!cancelled) setIssues({ wsId, items: d });
-      })
-      .catch(() => {
-        if (!cancelled) setIssues({ wsId, items: [] });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, wsId]);
+  // Read through the cache rather than on open. Both of these used to be
+  // re-fetched every single time the palette was opened — including the whole
+  // issue list of the workspace — which made the one thing meant to be instant
+  // the slowest thing in the console.
+  const { data: workspaces = [] } = useApi<Workspace[]>("/api/v1/workspaces", () =>
+    api.get<Workspace[]>("/api/v1/workspaces"),
+  );
+  const { data: issueList = [] } = useApi<Issue[]>(
+    wsId ? `/api/v1/workspaces/${wsId}/issues` : null,
+    () => issueApi.list(wsId as string),
+  );
 
   const run = (href: string) => {
     onOpenChange(false);
     router.push(href);
   };
 
-  const currentIssues = issues && issues.wsId === wsId ? issues.items : [];
+  const currentIssues = wsId ? issueList ?? [] : [];
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>

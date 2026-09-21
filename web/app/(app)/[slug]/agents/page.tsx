@@ -15,6 +15,7 @@ import { ProviderIcon } from "@/components/provider-icon";
 import { AgentStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { PageHeader } from "@/components/page-header";
+import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { Field, TextArea } from "@/components/form-field";
 import { InlineConfirm } from "@/components/inline-confirm";
 import { TH_CLASS } from "@/components/table-sort";
@@ -57,10 +58,38 @@ export default function WorkspaceAgentsPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
 
-  const [agents, setAgents] = useState<Agent[]>([]);
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [daemons, setDaemons] = useState<DaemonOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Three reads, all cached: the agent list is also read by the shell's
+  // workspace switch, the skills by the skills page, the daemons by the daemons
+  // page — each used to be a separate request for the same bytes.
+  const {
+    data: agents,
+    loading,
+    error,
+    refresh: refreshAgents,
+  } = useApi<Agent[]>(`/api/v1/workspaces/${slug}/agents`, () =>
+    agentApi.list(slug),
+  );
+  const { data: skills = [] } = useApi<Skill[]>(
+    `/api/v1/workspaces/${slug}/skills`,
+    () => skillApi.list(slug),
+  );
+  const { data: daemonRows = [] } = useApi<Daemon[]>("/api/v1/daemons", () =>
+    api.get<Daemon[]>("/api/v1/daemons"),
+  );
+  // Safe to trust as-is: the server resolves liveness against the heartbeat
+  // before it sends a row, so this filter and the daemons page can never
+  // disagree about the same machine.
+  const daemons: DaemonOption[] = useMemo(
+    () =>
+      daemonRows
+        .filter((d) => d.status === "online")
+        .map((d) => ({
+          id: d.id,
+          name: d.name,
+          providers: (d.runtimes || []).map((r) => r.kind),
+        })),
+    [daemonRows],
+  );
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Agent | null>(null);
   const [saving, setSaving] = useState(false);
@@ -80,47 +109,19 @@ export default function WorkspaceAgentsPage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Status is derived from the daemon heartbeat, so the server has to be asked
+  // again on its schedule, not on the render's.
   useEffect(() => {
-    let first = true;
-    const load = () =>
-      agentApi
-        .list(slug)
-        .then(setAgents)
-        .catch(() => {
-          if (first) router.push(paths.workspaces());
-        })
-        .finally(() => {
-          first = false;
-          setLoading(false);
-        });
-    load();
-    const interval = setInterval(load, REFRESH_MS);
+    const interval = setInterval(
+      () => invalidateApi(`/api/v1/workspaces/${slug}/agents`),
+      REFRESH_MS,
+    );
     return () => clearInterval(interval);
-  }, [slug, router]);
-
-  useEffect(() => {
-    skillApi.list(slug).then(setSkills).catch(() => {});
   }, [slug]);
 
   useEffect(() => {
-    api
-      .get<Daemon[]>("/api/v1/daemons")
-      .then((ds) =>
-        setDaemons(
-          (ds || [])
-            // Safe to trust as-is: the server resolves liveness against the
-            // heartbeat before it sends a row, so this filter and the daemons
-            // page can never disagree about the same machine.
-            .filter((d) => d.status === "online")
-            .map((d) => ({
-              id: d.id,
-              name: d.name,
-              providers: (d.runtimes || []).map((r) => r.kind),
-            })),
-        ),
-      )
-      .catch(() => {});
-  }, []);
+    if (error) router.push(paths.workspaces());
+  }, [error, router]);
 
   const openCreate = () => {
     setEditing(null);
@@ -187,8 +188,9 @@ export default function WorkspaceAgentsPage() {
       if (editing) await agentApi.update(slug, editing.id, body);
       else await agentApi.create(slug, body);
       setOpen(false);
-      const list = await agentApi.list(slug);
-      setAgents(list);
+      // Re-read through the cache so the row shows the server's version of
+      // what was just written, not the optimistic one.
+      refreshAgents();
       toast.success(editing ? "Agent updated" : "Agent created");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save agent");
@@ -200,7 +202,9 @@ export default function WorkspaceAgentsPage() {
   const remove = async (id: string) => {
     try {
       await agentApi.remove(slug, id);
-      setAgents((prev) => prev.filter((a) => a.id !== id));
+      setApiData<Agent[]>(`/api/v1/workspaces/${slug}/agents`, (prev = []) =>
+        prev.filter((a) => a.id !== id),
+      );
       toast.success("Agent deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete agent");
@@ -208,21 +212,22 @@ export default function WorkspaceAgentsPage() {
     setConfirmId(null);
   };
 
+  const agentsList = useMemo(() => agents ?? [], [agents]);
   const counts = useMemo(() => {
     const acc: Record<string, number> = {};
-    for (const a of agents) {
+    for (const a of agentsList) {
       const s = agentStatus(a);
       acc[s] = (acc[s] ?? 0) + 1;
     }
     return acc;
-  }, [agents]);
+  }, [agentsList]);
 
   const visible = useMemo(
     () =>
       statusFilter === "all"
-        ? agents
-        : agents.filter((a) => agentStatus(a) === statusFilter),
-    [agents, statusFilter],
+        ? agentsList
+        : agentsList.filter((a) => agentStatus(a) === statusFilter),
+    [agentsList, statusFilter],
   );
 
   const selectedDaemon = daemons.find((d) => d.id === daemonId);
@@ -250,7 +255,7 @@ export default function WorkspaceAgentsPage() {
               <Skeleton key={i} className="h-14 w-full rounded-md" />
             ))}
           </div>
-        ) : agents.length === 0 ? (
+        ) : agentsList.length === 0 ? (
           <Empty className="rounded-lg bg-canvas-soft py-16">
             <EmptyMedia>
               <Pencil className="size-5" />
@@ -266,7 +271,7 @@ export default function WorkspaceAgentsPage() {
             <div className="mb-3 flex flex-wrap items-center gap-1.5">
               {STATUS_FILTERS.map((f) => {
                 const count =
-                  f.key === "all" ? agents.length : (counts[f.key] ?? 0);
+                  f.key === "all" ? agentsList.length : (counts[f.key] ?? 0);
                 const active = statusFilter === f.key;
                 return (
                   <button

@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useState } from "react";
+import { useParams } from "next/navigation";
 import { Plus, Pencil, Sparkles } from "lucide-react";
 import { skillApi, type Skill } from "@/lib/api";
-import { paths } from "@/lib/paths";
+import { useApi } from "@/lib/query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -17,10 +17,7 @@ import { toast } from "sonner";
 
 export default function WorkspaceSkillsPage() {
   const { slug } = useParams<{ slug: string }>();
-  const router = useRouter();
 
-  const [skills, setSkills] = useState<Skill[]>([]);
-  const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Skill | null>(null);
   const [saving, setSaving] = useState(false);
@@ -30,17 +27,10 @@ export default function WorkspaceSkillsPage() {
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
 
-  const load = () =>
-    skillApi
-      .list(slug)
-      .then(setSkills)
-      .catch(() => router.push(paths.workspaces()))
-      .finally(() => setLoading(false));
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug]);
+  const { data: skills = [], loading, refresh } = useApi<Skill[]>(
+    `/api/v1/workspaces/${slug}/skills`,
+    () => skillApi.list(slug),
+  );
 
   const openCreate = () => {
     setEditing(null);
@@ -65,7 +55,7 @@ export default function WorkspaceSkillsPage() {
       if (editing) await skillApi.update(slug, editing.id, { name, description, content });
       else await skillApi.create(slug, { name, description, content });
       setOpen(false);
-      load();
+      refresh();
       toast.success(editing ? "Skill updated" : "Skill created");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to save skill");
@@ -77,7 +67,7 @@ export default function WorkspaceSkillsPage() {
   const remove = async (id: string) => {
     try {
       await skillApi.remove(slug, id);
-      load();
+      refresh();
       toast.success("Skill deleted");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to delete skill");

@@ -18,6 +18,8 @@ import {
   Sparkles,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
+import { useApi } from "@/lib/query";
+import { RealtimeProvider } from "@/lib/realtime";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
@@ -77,15 +79,12 @@ const DEFAULT_WIDTH = 240;
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [user, setUser] = useState<User | null>(null);
   const [logoutConfirm, setLogoutConfirm] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
   const dragging = useRef(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const isMac = useSyncExternalStore(emptySubscribe, getIsMac, getIsMacServer);
 
-  const [ws, setWs] = useState<{ slug: string; data: Workspace } | null>(null);
-  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const pathWorkspaceId = workspaceSlugFromPath(pathname);
   // Remember the last workspace slug so the workspace context (switcher +
   // nav) survives navigating to global pages like /workspaces or /daemons.
@@ -94,38 +93,30 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     setLastWorkspaceSlug(pathWorkspaceId);
   }
   const wsId = pathWorkspaceId ?? lastWorkspaceSlug;
-  // Derived so a stale workspace is never shown when the route slug changes.
-  const workspace = ws && ws.slug === wsId ? ws.data : null;
 
-  useEffect(() => {
-    api
-      .get<User>("/api/v1/me")
-      .then(setUser)
-      .catch(() => router.push("/login"));
-  }, [router]);
+  // Reads go through the cache, so the shell, the command palette and the
+  // workspaces page share one request per path instead of one each.
+  const { data: me, error: meError } = useApi<User>("/api/v1/me", () =>
+    api.get<User>("/api/v1/me"),
+  );
+  const { data: workspaces = [] } = useApi<Workspace[]>("/api/v1/workspaces", () =>
+    api.get<Workspace[]>("/api/v1/workspaces"),
+  );
+  // Keyed by the slug, so this cannot show one workspace's name while the route
+  // is on another: a new slug is a new cache entry, and undefined until it
+  // lands. That is what the `{ slug, data }` pairing used to guard against.
+  const { data: workspace } = useApi<Workspace>(
+    wsId ? `/api/v1/workspaces/${wsId}` : null,
+    () => api.get<Workspace>(`/api/v1/workspaces/${wsId}`),
+  );
 
+  // On a failed identity read the session is not usable, so the shell hands
+  // off to the login page rather than rendering a console with no user. The
+  // token is left alone: `lib/api.ts` owns clearing it, and a network blip
+  // should not sign anyone out.
   useEffect(() => {
-    api
-      .get<Workspace[]>("/api/v1/workspaces")
-      .then((d) => setWorkspaces(d || []))
-      .catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!wsId) return;
-    let cancelled = false;
-    api
-      .get<Workspace>(`/api/v1/workspaces/${wsId}`)
-      .then((w) => {
-        if (!cancelled) setWs({ slug: wsId, data: w });
-      })
-      .catch(() => {
-        if (!cancelled) setWs(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [wsId]);
+    if (meError) router.push("/login");
+  }, [meError, router]);
 
   const handleLogout = () => {
     localStorage.removeItem("gitsquad_token");
@@ -289,14 +280,14 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         <div className="border-t border-hairline px-3 py-4">
           <div className="flex items-center gap-3">
             <Avatar className="size-8">
-              <AvatarImage src={user?.avatar_url} />
+              <AvatarImage src={me?.avatar_url} />
               <AvatarFallback className="text-caption">
-                {user?.login?.slice(0, 2).toUpperCase()}
+                {me?.login?.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
               <p className="truncate text-copy font-medium text-ink">
-                @{user?.login}
+                @{me?.login}
               </p>
             </div>
             <ThemeToggle />
@@ -317,8 +308,12 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         />
       </aside>
 
-      {/* Main content */}
-      <div className="flex-1 overflow-auto">{children}</div>
+      {/* Main content. The realtime socket lives at this level, not inside the
+          page, so navigating between routes does not tear the connection down
+          and lose whatever arrived in the gap. */}
+      <div className="flex-1 overflow-auto">
+        <RealtimeProvider workspace={wsId ?? undefined}>{children}</RealtimeProvider>
+      </div>
 
       {/* Global command palette (Cmd/Ctrl+K) */}
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />

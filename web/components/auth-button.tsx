@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
+import { clearApi, useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -14,21 +15,39 @@ interface User {
   avatar_url: string;
 }
 
+// Read the token as an external store rather than during render: the server has
+// no localStorage, so a plain read would hydrate against different output. Same
+// shape as the console shell's platform check, except this one has subscribers
+// — signing out has to re-render the button, and a stale `hasToken` would keep
+// it asking for an identity that no longer exists.
+const tokenListeners = new Set<() => void>();
+
+function subscribeToken(listener: () => void): () => void {
+  tokenListeners.add(listener);
+  return () => tokenListeners.delete(listener);
+}
+
+const readHasToken = () => !!localStorage.getItem("gitsquad_token");
+const serverHasToken = () => false;
+
 export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
   const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const hasToken = useSyncExternalStore(
+    subscribeToken,
+    readHasToken,
+    serverHasToken,
+  );
 
-  useEffect(() => {
-    const token = localStorage.getItem("gitsquad_token");
-    if (!token) return;
-
-    api
-      .get<User>("/api/v1/me")
-      .then(setUser)
-      .catch(() => localStorage.removeItem("gitsquad_token"));
-  }, []);
+  // Same key as the console shell, so moving between the landing page and the
+  // console does not re-read the identity. Only asked for when a token exists —
+  // `lib/api.ts` answers a 401 by sending the reader to /login, which is not
+  // what an anonymous visitor to the landing page asked for.
+  const { data: user } = useApi<User>(
+    hasToken ? "/api/v1/me" : null,
+    () => api.get<User>("/api/v1/me"),
+  );
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -42,7 +61,10 @@ export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
 
   const handleLogout = () => {
     localStorage.removeItem("gitsquad_token");
-    setUser(null);
+    // Evict rather than mark stale: the identity is not out of date, it is
+    // gone, and a revalidation would only 401 its way to the login page.
+    clearApi("/api/v1/me");
+    for (const listener of tokenListeners) listener();
     setOpen(false);
   };
 
