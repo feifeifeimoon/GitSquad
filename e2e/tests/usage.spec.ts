@@ -179,11 +179,14 @@ test.describe("Usage", () => {
     await loginAsE2E(page, api);
     await page.goto("/usage", { waitUntil: "domcontentloaded" });
 
-    await expect(page.getByText("Nothing in this window.")).toBeVisible({
-      timeout: 20_000,
-    });
+    // One state that explains the window is empty and offers the next step,
+    // rather than an empty chart and an empty table stacked on each other.
+    await expect(page.getByText("No usage yet")).toBeVisible({ timeout: 20_000 });
     await expect(
-      page.getByText("No usage recorded for this window yet."),
+      page.getByText("No usage recorded for this window yet.", { exact: false }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Connect a daemon" }),
     ).toBeVisible();
   });
 });
