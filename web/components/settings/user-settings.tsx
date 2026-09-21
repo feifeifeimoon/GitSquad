@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { api } from "@/lib/api";
+import { useApi } from "@/lib/query";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface User {
@@ -14,11 +14,11 @@ interface User {
 // Tokens). It is shared by the global /settings page and the workspace
 // /{slug}/settings page, where it appears above the workspace sections.
 export function UserSettings() {
-  const [user, setUser] = useState<User | null>(null);
-
-  useEffect(() => {
-    api.get<User>("/api/v1/me").then(setUser).catch(() => {});
-  }, []);
+  // Same key as the shell, so the settings page and the sidebar avatar share
+  // one read of the signed-in identity.
+  const { data: user } = useApi<User>("/api/v1/me", () =>
+    api.get<User>("/api/v1/me"),
+  );
 
   return (
     <>

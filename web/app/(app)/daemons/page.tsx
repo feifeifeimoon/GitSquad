@@ -19,6 +19,7 @@ import { paths } from "@/lib/paths";
 import { timeAgo } from "@/lib/time";
 import { ProviderIcon } from "@/components/provider-icon";
 import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
+import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
 import { SortHeader, TH_CLASS, useSort, type SortState } from "@/components/table-sort";
 import { InlineConfirm } from "@/components/inline-confirm";
@@ -39,8 +40,9 @@ type SortKey = "name" | "last_seen";
 const VIEW_KEY = "gitsquad_daemons_view";
 
 export default function DaemonsPage() {
-  const [daemons, setDaemons] = useState<Daemon[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: daemons, loading } = useApi<Daemon[]>("/api/v1/daemons", () =>
+    daemonApi.list(),
+  );
   const [deleting, setDeleting] = useState<string | null>(null);
   const [showConnect, setShowConnect] = useState(false);
   const [copied, setCopied] = useState("");
@@ -51,23 +53,21 @@ export default function DaemonsPage() {
     "name",
   );
 
+  // Liveness is decided by the server, so this page has to keep asking — the
+  // answer changes on the machine's schedule, not on the render's. It
+  // invalidates rather than fetching, so anything else reading a daemon (the
+  // detail page, an agent row) is refreshed by the same tick.
   useEffect(() => {
-    const fetchDaemons = () => {
-      daemonApi
-        .list()
-        .then((data) => setDaemons(data || []))
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    };
-    fetchDaemons();
-    const interval = setInterval(fetchDaemons, 15000);
+    const interval = setInterval(() => invalidateApi("/api/v1/daemons"), 15_000);
     return () => clearInterval(interval);
   }, []);
 
   const handleDelete = async (id: string) => {
     try {
       await daemonApi.remove(id);
-      setDaemons((prev) => prev.filter((d) => d.id !== id));
+      setApiData<Daemon[]>("/api/v1/daemons", (prev = []) =>
+        prev.filter((d) => d.id !== id),
+      );
       toast.success("Daemon removed");
     } catch {
       toast.error("Failed to remove daemon");
@@ -83,8 +83,8 @@ export default function DaemonsPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return daemons;
-    return daemons.filter(
+    if (!q) return daemons ?? [];
+    return (daemons ?? []).filter(
       (d) =>
         d.name.toLowerCase().includes(q) ||
         d.os.toLowerCase().includes(q) ||
@@ -167,7 +167,7 @@ export default function DaemonsPage() {
         }
       />
 
-      {daemons.length === 0 ? (
+      {(daemons ?? []).length === 0 ? (
         <Empty className="pb-16">
           <EmptyMedia>
             <Monitor className="size-5" />

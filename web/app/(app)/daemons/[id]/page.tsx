@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -24,6 +24,7 @@ import { AgentStatusBadge, DaemonStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { Field } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
+import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
@@ -33,33 +34,27 @@ import { toast } from "sonner";
 export default function DaemonDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
-  const [daemon, setDaemon] = useState<DaemonDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [renaming, setRenaming] = useState(false);
-
-  const load = useCallback(
-    () =>
-      daemonApi
-        .get(id)
-        .then(setDaemon)
-        .finally(() => setLoading(false)),
-    [id],
+  const { data: daemon, loading, error } = useApi<DaemonDetail>(
+    `/api/v1/daemons/${id}`,
+    () => daemonApi.get(id),
   );
+  const [renaming, setRenaming] = useState(false);
 
   // A daemon that no longer exists (or is no longer ours) is worth leaving the
   // page for; a blip on the poll below is not.
   useEffect(() => {
-    load().catch(() => router.push(paths.daemons()));
-  }, [load, router]);
+    if (error) router.push(paths.daemons());
+  }, [error, router]);
 
-  // Liveness is decided by the server, so this page has to keep asking it — the
+  // Liveness is decided by the server, so this page has to keep asking — the
   // answer changes on the machine's schedule, not on the render's.
   useEffect(() => {
-    const interval = setInterval(() => {
-      load().catch(() => {});
-    }, 15_000);
+    const interval = setInterval(
+      () => invalidateApi(`/api/v1/daemons/${id}`),
+      15_000,
+    );
     return () => clearInterval(interval);
-  }, [load]);
+  }, [id]);
 
   if (loading || !daemon) {
     return (
@@ -189,7 +184,9 @@ export default function DaemonDetailPage() {
           daemonId={daemon.id}
           currentName={daemon.name}
           onRenamed={(name) => {
-            setDaemon((d) => (d ? { ...d, name } : d));
+            setApiData<DaemonDetail | undefined>(`/api/v1/daemons/${id}`, (d) =>
+              d ? { ...d, name } : d,
+            );
             toast.success("Daemon renamed");
           }}
         />

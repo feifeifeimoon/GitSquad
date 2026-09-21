@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, type ReactNode } from "react";
+import { invalidateApi } from "@/lib/query";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -18,8 +19,36 @@ function wsURL(): string {
   return `${API_BASE.replace(/^http/, "ws")}/ws/app`;
 }
 
+// One refresh per window per workspace, not one per event.
+//
+// The server sends a refresh hint per change, and a workspace with agents on it
+// produces a burst of them. Each one used to refetch a whole list, so a busy
+// minute was a busy minute of HTTP. This is a fixed window — armed on the first
+// event and deliberately not reset by later ones — so a sustained stream still
+// lands one refresh per window rather than one at the end of the stream, or,
+// worse, one per event.
+const FLUSH_MS = 100;
+
+let pending: Set<string> | null = null;
+let timer: ReturnType<typeof setTimeout> | undefined;
+
+function flush(): void {
+  timer = undefined;
+  const workspaces = pending;
+  pending = null;
+  for (const workspace of workspaces ?? []) {
+    invalidateApi(`/api/v1/workspaces/${workspace}`);
+  }
+}
+
+function scheduleInvalidation(workspace: string): void {
+  pending ??= new Set();
+  pending.add(workspace);
+  if (timer === undefined) timer = setTimeout(flush, FLUSH_MS);
+}
+
 /**
- * Subscribe to realtime events for a workspace. Returns an unsubscribe function.
+ * Connect to the server's app socket for a workspace. Returns an unsubscribe.
  *
  * The token travels in the first frame, never in the URL: browsers cannot set
  * headers on a WebSocket handshake, and a query token would leak into proxy
@@ -86,21 +115,26 @@ export function subscribeWorkspace(
 }
 
 /**
- * Subscribe to a workspace's events for the lifetime of the component,
- * reconnecting on workspace changes. The handler is held in a ref so callers can
- * pass an inline closure without tearing the connection down every render.
+ * The app shell's connection to the server, mounted once around the console.
+ *
+ * It lives here rather than in the page that happens to show the data, because
+ * the page unmounts on every navigation: the socket used to be torn down and
+ * rebuilt on each route change, and any event that arrived in the gap was gone
+ * — leaving the next page showing stale data until something unrelated
+ * happened. Events now fan out to the cache by invalidation, so a page that
+ * mounts after an event reads fresh data anyway.
  */
-export function useWorkspaceEvents(
-  workspace: string | undefined,
-  onEvent: (event: AppEvent) => void,
-): void {
-  const handler = useRef(onEvent);
-  useEffect(() => {
-    handler.current = onEvent;
-  });
-
+export function RealtimeProvider({
+  workspace,
+  children,
+}: {
+  workspace?: string;
+  children: ReactNode;
+}) {
   useEffect(() => {
     if (!workspace) return;
-    return subscribeWorkspace(workspace, (event) => handler.current(event));
+    return subscribeWorkspace(workspace, () => scheduleInvalidation(workspace));
   }, [workspace]);
+
+  return <>{children}</>;
 }

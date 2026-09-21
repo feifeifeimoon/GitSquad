@@ -4,10 +4,9 @@ import { useEffect, useState } from "react";
 import { Info } from "lucide-react";
 import {
   usageApi,
-  type UsageBreakdownRow,
-  type UsagePoint,
-  type UsageSummary,
-  type UsageWindow,
+  type UsageBreakdownResponse,
+  type UsageSeriesResponse,
+  type UsageSummaryResponse,
 } from "@/lib/api";
 import {
   browserTimezone,
@@ -26,6 +25,7 @@ import {
 } from "@/lib/usage";
 import { Skeleton } from "@/components/ui/skeleton";
 import { PageHeader } from "@/components/page-header";
+import { useApi } from "@/lib/query";
 import { UsageChart } from "@/components/usage/usage-chart";
 import { UsageBreakdown } from "@/components/usage/usage-breakdown";
 import { toast } from "sonner";
@@ -37,65 +37,37 @@ const TZ = browserTimezone();
 export default function UsagePage() {
   const [range, setRange] = useState<UsageRange>("7d");
   const [group, setGroup] = useState<UsageGroup>("agent");
-  const [summary, setSummary] = useState<UsageSummary | null>(null);
-  const [usageWindow, setUsageWindow] = useState<UsageWindow | null>(null);
-  const [points, setPoints] = useState<UsagePoint[]>([]);
-  const [granularity, setGranularity] = useState<"hour" | "day">("day");
-  const [rows, setRows] = useState<{
-    key: string;
-    rows: UsageBreakdownRow[];
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
+  // The window reads and the breakdown are keyed separately, so switching
+  // dimension cannot re-render the headline figures back to skeletons — that
+  // was the reason for the two effects this replaces, and the cache gives it
+  // for free by keying on the parameters that produced the data.
+  const windowParams = `range=${range}&tz=${encodeURIComponent(TZ)}`;
 
-  // Summary and series only depend on the window; the breakdown additionally
-  // depends on the chosen dimension, so the two load independently — switching
-  // dimension must not re-render the headline figures back to skeletons.
+  const { data: summaryRes, error: summaryError } = useApi<UsageSummaryResponse>(
+    `/api/v1/usage/summary?${windowParams}`,
+    () => usageApi.summary({ range, tz: TZ }),
+  );
+  const { data: seriesRes, error: seriesError } = useApi<UsageSeriesResponse>(
+    `/api/v1/usage/series?${windowParams}`,
+    () => usageApi.series({ range, tz: TZ }),
+  );
+  const { data: breakdownRes, error: breakdownError } =
+    useApi<UsageBreakdownResponse>(
+      `/api/v1/usage/breakdown?${windowParams}&group_by=${group}`,
+      () => usageApi.breakdown({ range, tz: TZ, groupBy: group }),
+    );
+
+  const summary = summaryRes?.summary ?? null;
+  const usageWindow = summaryRes?.window ?? null;
+  const points = seriesRes?.points ?? [];
+  const granularity = seriesRes?.bucket ?? "day";
+  const loading = seriesRes === undefined || summaryRes === undefined;
+  const breakdownLoading = breakdownRes === undefined;
+
+  const usageError = summaryError ?? seriesError ?? breakdownError;
   useEffect(() => {
-    let cancelled = false;
-    const params = { range, tz: TZ };
-    Promise.all([usageApi.summary(params), usageApi.series(params)])
-      .then(([s, series]) => {
-        if (cancelled) return;
-        setSummary(s.summary);
-        setUsageWindow(s.window);
-        setPoints(series.points);
-        setGranularity(series.bucket);
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          toast.error(err instanceof Error ? err.message : "Failed to load usage");
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [range]);
-
-  // The breakdown is keyed by what it was fetched for, so "still loading" is
-  // simply "the rows on hand belong to something else" — no separate flag to
-  // keep in sync with two changing inputs.
-  const rowsKey = `${range}:${group}`;
-  const breakdownLoading = rows?.key !== rowsKey;
-
-  useEffect(() => {
-    let cancelled = false;
-    usageApi
-      .breakdown({ range, tz: TZ, groupBy: group })
-      .then((res) => {
-        if (!cancelled) setRows({ key: `${range}:${group}`, rows: res.rows });
-      })
-      .catch((err) => {
-        if (!cancelled) {
-          toast.error(err instanceof Error ? err.message : "Failed to load usage");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [range, group]);
+    if (usageError) toast.error(usageError.message || "Failed to load usage");
+  }, [usageError]);
 
   const coverage = summary ? usageCoverage(summary) : null;
   const total = summary ? totalTokens(summary) : 0;
@@ -170,7 +142,7 @@ export default function UsagePage() {
                   ))}
                 </div>
               ) : (
-                <UsageBreakdown group={group} rows={rows?.rows ?? []} />
+                <UsageBreakdown group={group} rows={breakdownRes?.rows ?? []} />
               )}
             </section>
           </>

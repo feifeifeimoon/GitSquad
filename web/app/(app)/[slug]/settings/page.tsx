@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
+import { setApiData, useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -23,8 +24,6 @@ import {
 export default function WorkspaceSettingsPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
-  const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [loading, setLoading] = useState(true);
   const [confirmText, setConfirmText] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -32,13 +31,14 @@ export default function WorkspaceSettingsPage() {
   const [avatarError, setAvatarError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { data: workspace, error } = useApi<Workspace>(
+    `/api/v1/workspaces/${slug}`,
+    () => api.get<Workspace>(`/api/v1/workspaces/${slug}`),
+  );
+
   useEffect(() => {
-    api
-      .get<Workspace>(`/api/v1/workspaces/${slug}`)
-      .then(setWorkspace)
-      .catch(() => router.push(paths.workspaces()))
-      .finally(() => setLoading(false));
-  }, [slug, router]);
+    if (error) router.push(paths.workspaces());
+  }, [error, router]);
 
   const url =
     typeof window !== "undefined"
@@ -50,7 +50,9 @@ export default function WorkspaceSettingsPage() {
     setAvatarError("");
     try {
       await api.put(`/api/v1/workspaces/${slug}/avatar`, { avatar_url: avatarUrl });
-      setWorkspace((prev) => (prev ? { ...prev, avatar_url: avatarUrl } : prev));
+      setApiData<Workspace | undefined>(`/api/v1/workspaces/${slug}`, (prev) =>
+        prev ? { ...prev, avatar_url: avatarUrl } : prev,
+      );
     } catch {
       setAvatarError("Failed to update avatar.");
     } finally {
@@ -86,7 +88,7 @@ export default function WorkspaceSettingsPage() {
     }
   };
 
-  if (loading || !workspace) {
+  if (!workspace) {
     return (
       <div className="flex h-full items-center justify-center">
         <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />

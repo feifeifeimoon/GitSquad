@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import {
-  IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi, agentApi,
+  IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi, agentApi, type Agent,
 } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { Badge } from "@/components/ui/badge";
@@ -20,45 +20,40 @@ import { CommentComposer } from "@/components/issues/comment-composer";
 import { StatusIconLabel } from "@/components/status-icon";
 import { IssuePullRequests } from "@/components/issues/issue-pull-requests";
 import { TimeAgo } from "@/components/time-ago";
-import { useWorkspaceEvents } from "@/lib/realtime";
+import { useApi } from "@/lib/query";
 
 export default function IssueDetailPage() {
   const { slug, issueKey } = useParams<{ slug: string; issueKey: string }>();
   const router = useRouter();
-  const [issue, setIssue] = useState<IssueDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [agentNames, setAgentNames] = useState<string[]>([]);
 
+  const { data: issue, loading, error, refresh } = useApi<IssueDetail>(
+    `/api/v1/workspaces/${slug}/issues/${issueKey}`,
+    () => issueApi.get(slug, issueKey),
+  );
+  const { data: agents } = useApi<Agent[]>(
+    `/api/v1/workspaces/${slug}/agents`,
+    () => agentApi.list(slug),
+  );
+
+  // A failed read here means the issue is gone or not ours; the board is the
+  // place to be. `lib/api.ts` already cleared the token if it was a 401.
   useEffect(() => {
-    agentApi
-      .list(slug)
-      .then((agents) =>
-        setAgentNames(agents.filter((a) => a.enabled).map((a) => a.name)),
-      )
-      .catch(() => {});
-  }, [slug]);
+    if (error) router.push(paths.workspace(slug).board());
+  }, [error, router, slug]);
 
-  const load = useCallback(() => {
-    issueApi
-      .get(slug, issueKey)
-      .then(setIssue)
-      .catch(() => router.push(paths.workspace(slug).board()))
-      .finally(() => setLoading(false));
-  }, [slug, issueKey, router]);
-  useEffect(load, [load]);
-
-  // Agent activity arrives as backend-written comments while this page is open;
-  // refetch when the server reports a change so it appears without a reload.
-  useWorkspaceEvents(slug, (event) => {
-    if (event.issue_id && issue && event.issue_id !== issue.id) return;
-    load();
-  });
+  // Realtime needs no wiring: the shell holds the socket, and an event
+  // invalidates this path, so a comment written elsewhere appears here without
+  // a reload.
+  const agentNames = useMemo(
+    () => (agents ?? []).filter((a) => a.enabled).map((a) => a.name),
+    [agents],
+  );
 
   const changeStatus = async (status: IssueStatus) => {
     if (!issue || status === issue.status) return;
     try {
       await issueApi.update(slug, issueKey, { status });
-      load();
+      refresh();
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to update status",
@@ -186,7 +181,7 @@ export default function IssueDetailPage() {
               slug={slug}
               issueKey={issueKey}
               mentionItems={agentNames}
-              onPosted={load}
+              onPosted={refresh}
             />
           </div>
         </div>
@@ -229,7 +224,7 @@ export default function IssueDetailPage() {
               <p className="text-copy text-body">{issue.creator_name || "—"}</p>
             </Field>
 
-            <IssuePullRequests slug={slug} issue={issue} onChange={load} />
+            <IssuePullRequests slug={slug} issue={issue} onChange={refresh} />
 
             <Field label="Created">
               <p className="font-mono text-copy text-body">
