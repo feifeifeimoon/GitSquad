@@ -82,6 +82,7 @@ test("issue board supports create, empty columns, and per-column add", () => {
   // (No negative assertion on the removed label: these specs read the file as
   // text, so a comment that merely names the thing would fail it.)
   assert.match(card, /line-clamp-2/);
+  assert.match(card, /STATUS_TONE/);
   assert.doesNotMatch(card, /stripMarkdown/);
 });
 

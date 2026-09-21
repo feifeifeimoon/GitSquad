@@ -6,6 +6,7 @@ import { MessageSquare } from "lucide-react";
 import type { Issue } from "@/lib/api";
 import { TimeAgo } from "@/components/time-ago";
 import { IssuePullRequestBadge } from "@/components/issues/issue-pull-requests";
+import { STATUS_TONE } from "@/components/status-icon";
 
 // Two lines: what the issue is, and the few facts worth scanning a column for.
 //
@@ -14,6 +15,12 @@ import { IssuePullRequestBadge } from "@/components/issues/issue-pull-requests";
 // preview a markdown-stripping pass — without ever changing a decision. An
 // unassigned issue is the default, and the default does not need saying out
 // loud; what remains is rendered only when it exists.
+//
+// The status is the accent down the left edge. The column already says which
+// status a card is in, but the eye scanning a board reads cards, not column
+// heads — and a column head that has scrolled out of view, or a card mid-drag,
+// says nothing at all. A 2px edge carries it without a fill, so the colour
+// never becomes the surface.
 export const IssueCard = memo(function IssueCard({
   issue,
   className,
@@ -25,10 +32,15 @@ export const IssueCard = memo(function IssueCard({
 
   return (
     <div
-      className={`rounded-lg border border-hairline bg-canvas p-3 shadow-level-1 transition-shadow hover:shadow-level-2 ${
+      className={`relative overflow-hidden rounded-lg border border-hairline bg-canvas p-3 pl-3.5 shadow-level-1 transition-shadow hover:shadow-level-2 ${
         className ?? ""
       }`}
     >
+      <span
+        aria-hidden="true"
+        className={`absolute inset-y-0 left-0 w-0.5 ${STATUS_TONE[issue.status].bar}`}
+      />
+
       <p className="line-clamp-2 text-copy font-medium text-ink">
         {issue.title}
       </p>

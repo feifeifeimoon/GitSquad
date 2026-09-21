@@ -135,15 +135,23 @@ const STATUS_RENDERERS: Record<IssueStatus, () => React.ReactNode> = {
   cancelled: CancelledIcon,
 };
 
-// Only StatusIcon reads this — the tone is not part of the icon's contract.
-const STATUS_ICON: Record<IssueStatus, { className: string }> = {
-  backlog: { className: "text-mute" },
-  todo: { className: "text-mute" },
-  in_progress: { className: "text-warning" },
-  in_review: { className: "text-violet" },
-  done: { className: "text-cyan-deep" },
-  blocked: { className: "text-destructive" },
-  cancelled: { className: "text-mute" },
+/**
+ * The colour of a status, in both places it is rendered: `text` for the icon
+ * beside a column label, `bar` for the accent down a card's left edge.
+ *
+ * One map rather than two, because a status that reads amber in the column and
+ * something else on the card is worse than having no colour at all. Both
+ * strings are literal — a name built by concatenation is invisible to the
+ * class scanner and never reaches the stylesheet.
+ */
+export const STATUS_TONE: Record<IssueStatus, { text: string; bar: string }> = {
+  backlog: { text: "text-mute", bar: "bg-hairline-strong" },
+  todo: { text: "text-mute", bar: "bg-hairline-strong" },
+  in_progress: { text: "text-warning", bar: "bg-warning" },
+  in_review: { text: "text-violet", bar: "bg-violet" },
+  done: { text: "text-cyan-deep", bar: "bg-cyan-deep" },
+  blocked: { text: "text-destructive", bar: "bg-destructive" },
+  cancelled: { text: "text-mute", bar: "bg-hairline-strong" },
 };
 
 export function StatusIcon({
@@ -158,7 +166,7 @@ export function StatusIcon({
     <svg
       viewBox="0 0 14 14"
       fill="none"
-      className={`${className} ${STATUS_ICON[status].className} shrink-0`}
+      className={`${className} ${STATUS_TONE[status].text} shrink-0`}
     >
       <Renderer />
     </svg>
