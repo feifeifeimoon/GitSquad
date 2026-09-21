@@ -3,19 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
-  ArrowDown,
-  ArrowUp,
-  XCircle,
   Monitor,
-  Trash2,
   Plus,
   Laptop,
   Cloud,
   Copy,
   Terminal,
   Check,
-  LayoutGrid,
-  List,
   Search,
 } from "lucide-react";
 import { daemonApi, type Daemon, type DaemonRuntime } from "@/lib/api";
@@ -24,7 +18,12 @@ import { DaemonStatusBadge } from "@/components/status-dot";
 import { paths } from "@/lib/paths";
 import { timeAgo } from "@/lib/time";
 import { ProviderIcon } from "@/components/provider-icon";
+import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
+import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
+import { SortHeader, TH_CLASS, useSort, type SortState } from "@/components/table-sort";
+import { InlineConfirm } from "@/components/inline-confirm";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -35,7 +34,6 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty";
 
-type ViewMode = "cards" | "list";
 type SortKey = "name" | "last_seen";
 
 const VIEW_KEY = "gitsquad_daemons_view";
@@ -46,16 +44,12 @@ export default function DaemonsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [showConnect, setShowConnect] = useState(false);
   const [copied, setCopied] = useState("");
-  const [view, setView] = useState<ViewMode>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(VIEW_KEY);
-      if (saved === "list" || saved === "cards") return saved;
-    }
-    return "cards";
-  });
+  const [view, setView] = useViewMode(VIEW_KEY);
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("last_seen");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const { sort, toggle: toggleSort } = useSort<SortKey>(
+    { key: "last_seen", dir: "desc" },
+    "name",
+  );
 
   useEffect(() => {
     const fetchDaemons = () => {
@@ -69,10 +63,6 @@ export default function DaemonsPage() {
     const interval = setInterval(fetchDaemons, 15000);
     return () => clearInterval(interval);
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(VIEW_KEY, view);
-  }, [view]);
 
   const handleDelete = async (id: string) => {
     try {
@@ -106,35 +96,27 @@ export default function DaemonsPage() {
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
-    const dir = sortDir === "asc" ? 1 : -1;
+    const dir = sort.dir === "asc" ? 1 : -1;
     arr.sort((a, b) => {
-      const av = sortKey === "name" ? a.name : a.last_seen_at || "";
-      const bv = sortKey === "name" ? b.name : b.last_seen_at || "";
+      const av = sort.key === "name" ? a.name : a.last_seen_at || "";
+      const bv = sort.key === "name" ? b.name : b.last_seen_at || "";
       return av < bv ? -dir : av > bv ? dir : 0;
     });
     return arr;
-  }, [filtered, sortKey, sortDir]);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
-    }
-  };
+  }, [filtered, sort]);
 
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between gap-3 px-8 pt-8">
-          <Skeleton className="h-5 w-24" />
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-8 w-56" />
-            <Skeleton className="h-8 w-16" />
-            <Skeleton className="h-8 w-32" />
-          </div>
-        </div>
+        <PageHeaderSkeleton
+          actions={
+            <>
+              <Skeleton className="h-8 w-56" />
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-8 w-32" />
+            </>
+          }
+        />
         <div className="grid grid-cols-1 gap-3 px-8 py-6 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div
@@ -163,25 +145,27 @@ export default function DaemonsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-3 px-8 pt-8">
-        <h1 className="text-sm font-medium text-ink">Daemons</h1>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-mute" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search daemons…"
-              className="h-8 w-56 pl-8"
-            />
-          </div>
-          <ViewSwitcher view={view} onChange={setView} />
-          <Button onClick={() => setShowConnect(true)}>
-            <Plus className="size-4" />
-            Connect Daemon
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Daemons"
+        actions={
+          <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-mute" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search daemons…"
+                className="h-8 w-56 pl-8"
+              />
+            </div>
+            <ViewSwitcher view={view} onChange={setView} />
+            <Button onClick={() => setShowConnect(true)}>
+              <Plus className="size-4" />
+              Connect Daemon
+            </Button>
+          </>
+        }
+      />
 
       {daemons.length === 0 ? (
         <Empty className="pb-16">
@@ -225,8 +209,7 @@ export default function DaemonsPage() {
       ) : (
         <DaemonTable
           daemons={sorted}
-          sortKey={sortKey}
-          sortDir={sortDir}
+          sort={sort}
           onSort={toggleSort}
           deleting={deleting}
           onRequestDelete={setDeleting}
@@ -235,33 +218,6 @@ export default function DaemonsPage() {
       )}
 
       {showConnect && <ConnectDaemonModal onClose={() => setShowConnect(false)} copied={copied} onCopy={handleCopy} />}
-    </div>
-  );
-}
-
-function ViewSwitcher({
-  view,
-  onChange,
-}: {
-  view: ViewMode;
-  onChange: (v: ViewMode) => void;
-}) {
-  const item = (v: ViewMode, Icon: typeof LayoutGrid, label: string) => (
-    <button
-      onClick={() => onChange(v)}
-      title={label}
-      aria-label={`${label} view`}
-      className={`flex size-7 items-center justify-center rounded-sm transition-colors ${
-        view === v ? "bg-muted text-ink" : "text-mute hover:text-ink"
-      }`}
-    >
-      <Icon className="size-3.5" />
-    </button>
-  );
-  return (
-    <div className="flex items-center rounded-sm border border-hairline bg-canvas p-0.5">
-      {item("cards", LayoutGrid, "Cards")}
-      {item("list", List, "List")}
     </div>
   );
 }
@@ -293,42 +249,6 @@ function RuntimeChips({ runtimes }: { runtimes: DaemonRuntime[] }) {
   );
 }
 
-function RemoveDaemon({
-  deleting,
-  onConfirm,
-  onToggle,
-}: {
-  deleting: boolean;
-  onConfirm: () => void;
-  onToggle: () => void;
-}) {
-  if (deleting) {
-    return (
-      <span className="flex items-center gap-1.5 text-xs">
-        <span className="text-destructive">Remove?</span>
-        <button
-          onClick={onConfirm}
-          className="font-medium text-destructive hover:underline"
-        >
-          Yes
-        </button>
-        <button onClick={onToggle} className="text-mute hover:text-body">
-          No
-        </button>
-      </span>
-    );
-  }
-  return (
-    <button
-      onClick={onToggle}
-      className="text-hairline-strong transition-colors hover:text-destructive"
-      title="Remove daemon"
-    >
-      <Trash2 className="size-3.5" />
-    </button>
-  );
-}
-
 function DaemonCard({
   daemon,
   deleting,
@@ -356,10 +276,13 @@ function DaemonCard({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <DaemonStatusBadge status={daemon.status} />
-          <RemoveDaemon
-            deleting={deleting}
+          <InlineConfirm
+            confirming={deleting}
+            question="Remove?"
+            title="Remove daemon"
+            onRequest={onRequestDelete}
             onConfirm={onConfirmDelete}
-            onToggle={onRequestDelete}
+            onCancel={onRequestDelete}
           />
         </div>
       </div>
@@ -383,79 +306,38 @@ function DaemonCard({
   );
 }
 
-function SortIndicator({
-  column,
-  sortKey,
-  sortDir,
-}: {
-  column: SortKey;
-  sortKey: SortKey;
-  sortDir: "asc" | "desc";
-}) {
-  if (sortKey !== column) return null;
-  return sortDir === "asc" ? (
-    <ArrowUp className="size-3" />
-  ) : (
-    <ArrowDown className="size-3" />
-  );
-}
-
 function DaemonTable({
   daemons,
-  sortKey,
-  sortDir,
+  sort,
   onSort,
   deleting,
   onRequestDelete,
   onConfirmDelete,
 }: {
   daemons: Daemon[];
-  sortKey: SortKey;
-  sortDir: "asc" | "desc";
+  sort: SortState<SortKey>;
   onSort: (key: SortKey) => void;
   deleting: string | null;
   onRequestDelete: (id: string | null) => void;
   onConfirmDelete: (id: string) => void;
 }) {
-  const th =
-    "px-4 py-2 text-left font-mono text-xs font-medium uppercase tracking-wide text-mute";
-
   return (
     <div className="px-8 py-6">
       <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-hairline bg-canvas-soft">
-              <th className={th}>
-                <button
-                  onClick={() => onSort("name")}
-                  className="inline-flex items-center gap-1 text-mute transition-colors hover:text-ink"
-                >
-                  Name
-                  <SortIndicator
-                    column="name"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                  />
-                </button>
-              </th>
-              <th className={th}>Status</th>
-              <th className={th}>Platform</th>
-              <th className={th}>Runtimes</th>
-              <th className={th}>
-                <button
-                  onClick={() => onSort("last_seen")}
-                  className="inline-flex items-center gap-1 text-mute transition-colors hover:text-ink"
-                >
-                  Last seen
-                  <SortIndicator
-                    column="last_seen"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                  />
-                </button>
-              </th>
-              <th className={`${th} text-right`}></th>
+              <SortHeader label="Name" column="name" sort={sort} onSort={onSort} />
+              <th className={TH_CLASS}>Status</th>
+              <th className={TH_CLASS}>Platform</th>
+              <th className={TH_CLASS}>Runtimes</th>
+              <SortHeader
+                label="Last seen"
+                column="last_seen"
+                sort={sort}
+                onSort={onSort}
+              />
+              <th className={`${TH_CLASS} text-right`}></th>
             </tr>
           </thead>
           <tbody>
@@ -492,12 +374,13 @@ function DaemonTable({
                   {timeAgo(d.last_seen_at)}
                 </td>
                 <td className="px-4 py-3 text-right">
-                  <RemoveDaemon
-                    deleting={deleting === d.id}
+                  <InlineConfirm
+                    confirming={deleting === d.id}
+                    question="Remove?"
+                    title="Remove daemon"
+                    onRequest={() => onRequestDelete(d.id)}
                     onConfirm={() => onConfirmDelete(d.id)}
-                    onToggle={() =>
-                      onRequestDelete(deleting === d.id ? null : d.id)
-                    }
+                    onCancel={() => onRequestDelete(null)}
                   />
                 </td>
               </tr>
@@ -506,6 +389,44 @@ function DaemonTable({
         </table>
       </div>
     </div>
+  );
+}
+
+/** One copyable install step: the label, and the command it stands for. */
+function ConnectStep({
+  label,
+  command,
+  id,
+  copied,
+  onCopy,
+}: {
+  label: string;
+  command: string;
+  id: string;
+  copied: string;
+  onCopy: (text: string, id: string) => void;
+}) {
+  return (
+    <>
+      <div className="flex items-center justify-between">
+        <span className="flex items-center gap-1.5">
+          <Terminal className="size-3" />
+          {label}
+        </span>
+        <button
+          onClick={() => onCopy(command, id)}
+          aria-label={`Copy ${label}`}
+          className="text-mute hover:text-ink"
+        >
+          {copied === id ? (
+            <Check className="size-3 text-success" />
+          ) : (
+            <Copy className="size-3" />
+          )}
+        </button>
+      </div>
+      <p className="text-mute">{command}</p>
+    </>
   );
 }
 
@@ -519,18 +440,13 @@ function ConnectDaemonModal({
   onCopy: (text: string, id: string) => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20" onClick={onClose}>
-      <div className="mx-4 w-full max-w-lg rounded-lg border border-hairline bg-canvas shadow-level-5" onClick={(e) => e.stopPropagation()}>
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-hairline px-6 py-4">
-          <h2 className="text-base font-semibold text-ink">Connect a daemon</h2>
-          <button onClick={onClose} className="text-mute hover:text-ink">
-            <XCircle className="size-5" />
-          </button>
-        </div>
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogTitle className="pr-8 text-base font-semibold text-ink">
+          Connect a daemon
+        </DialogTitle>
 
-        {/* Options */}
-        <div className="space-y-4 p-6">
+        <div className="space-y-4">
           {/* Local */}
           <div className="rounded-md border border-hairline p-4">
             <div className="mb-3 flex items-center gap-3">
@@ -543,45 +459,27 @@ function ConnectDaemonModal({
               </div>
             </div>
             <div className="space-y-2 rounded-sm bg-muted p-3 font-mono text-xs text-body">
-              <div className="flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Terminal className="size-3" />
-                  Step 1: Install GitSquad CLI
-                </span>
-                <button
-                  onClick={() => onCopy("curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash", "install")}
-                  className="text-mute hover:text-ink"
-                >
-                  {copied === "install" ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
-                </button>
-              </div>
-              <p className="text-mute">curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash</p>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Terminal className="size-3" />
-                  Step 2: Login
-                </span>
-                <button
-                  onClick={() => onCopy("gitsquad daemon login", "login")}
-                  className="text-mute hover:text-ink"
-                >
-                  {copied === "login" ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
-                </button>
-              </div>
-              <p className="text-mute">gitsquad daemon login</p>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="flex items-center gap-1.5">
-                  <Terminal className="size-3" />
-                  Step 3: Start the daemon
-                </span>
-                <button
-                  onClick={() => onCopy("gitsquad daemon run", "run")}
-                  className="text-mute hover:text-ink"
-                >
-                  {copied === "run" ? <Check className="size-3 text-success" /> : <Copy className="size-3" />}
-                </button>
-              </div>
-              <p className="text-mute">gitsquad daemon run</p>
+              <ConnectStep
+                label="Step 1: Install GitSquad CLI"
+                command="curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash"
+                id="install"
+                copied={copied}
+                onCopy={onCopy}
+              />
+              <ConnectStep
+                label="Step 2: Login"
+                command="gitsquad daemon login"
+                id="login"
+                copied={copied}
+                onCopy={onCopy}
+              />
+              <ConnectStep
+                label="Step 3: Start the daemon"
+                command="gitsquad daemon run"
+                id="run"
+                copied={copied}
+                onCopy={onCopy}
+              />
             </div>
           </div>
 
@@ -598,7 +496,7 @@ function ConnectDaemonModal({
             </div>
           </div>
         </div>
-      </div>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

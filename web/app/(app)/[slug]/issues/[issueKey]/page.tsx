@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import {
   IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi, agentApi,
 } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -15,7 +14,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
 import { Markdown } from "@/components/markdown";
-import { MarkdownEditor } from "@/components/markdown-editor";
+import { Field } from "@/components/form-field";
+import { CommentComposer } from "@/components/issues/comment-composer";
 import { StatusIconLabel } from "@/components/status-icon";
 import { IssuePullRequests } from "@/components/issues/issue-pull-requests";
 import { useWorkspaceEvents } from "@/lib/realtime";
@@ -25,9 +25,6 @@ export default function IssueDetailPage() {
   const router = useRouter();
   const [issue, setIssue] = useState<IssueDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  const [content, setContent] = useState("");
-  const [posting, setPosting] = useState(false);
-  const [editorKey, setEditorKey] = useState(0);
   const [agentNames, setAgentNames] = useState<string[]>([]);
 
   useEffect(() => {
@@ -39,14 +36,14 @@ export default function IssueDetailPage() {
       .catch(() => {});
   }, [slug]);
 
-  const load = () => {
+  const load = useCallback(() => {
     issueApi
       .get(slug, issueKey)
       .then(setIssue)
       .catch(() => router.push(paths.workspace(slug).board()))
       .finally(() => setLoading(false));
-  };
-  useEffect(load, [slug, issueKey, router]);
+  }, [slug, issueKey, router]);
+  useEffect(load, [load]);
 
   // Agent activity arrives as backend-written comments while this page is open;
   // refetch when the server reports a change so it appears without a reload.
@@ -64,23 +61,6 @@ export default function IssueDetailPage() {
       toast.error(
         err instanceof Error ? err.message : "Failed to update status",
       );
-    }
-  };
-
-  const post = async () => {
-    if (!content.trim()) return;
-    setPosting(true);
-    try {
-      await issueApi.addComment(slug, issueKey, content);
-      setContent("");
-      setEditorKey((k) => k + 1);
-      load();
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to post comment",
-      );
-    } finally {
-      setPosting(false);
     }
   };
 
@@ -189,19 +169,13 @@ export default function IssueDetailPage() {
           </div>
 
           {/* Comment composer */}
-          <div className="mt-8 overflow-hidden rounded-lg border border-hairline bg-canvas">
-            <MarkdownEditor
-              key={editorKey}
-              onChange={setContent}
-              placeholder="Add a comment… (@mention an agent)"
+          <div className="mt-8">
+            <CommentComposer
+              slug={slug}
+              issueKey={issueKey}
               mentionItems={agentNames}
-              className="min-h-[100px] px-3 py-2"
+              onPosted={load}
             />
-            <div className="flex items-center justify-end border-t border-hairline px-3 py-2">
-              <Button disabled={!content.trim() || posting} onClick={post}>
-                {posting ? "Posting…" : "Comment"}
-              </Button>
-            </div>
           </div>
         </div>
 
@@ -209,8 +183,7 @@ export default function IssueDetailPage() {
         <div className="w-64 shrink-0 overflow-y-auto border-l border-hairline px-5 py-6">
           <h2 className="mb-4 font-mono text-xs font-medium uppercase text-mute">Details</h2>
           <div className="space-y-5">
-            <div>
-              <label className="mb-1.5 block text-xs text-mute">Status</label>
+            <Field label="Status">
               <Select
                 value={issue.status}
                 onValueChange={(v) => changeStatus(v as IssueStatus)}
@@ -226,10 +199,9 @@ export default function IssueDetailPage() {
                   ))}
                 </SelectContent>
               </Select>
-            </div>
+            </Field>
 
-            <div>
-              <label className="mb-1.5 block text-xs text-mute">Assignee</label>
+            <Field label="Assignee">
               {issue.assigned_agents.length > 0 ? (
                 <div className="flex flex-wrap gap-1">
                   {issue.assigned_agents.map((a) => (
@@ -239,21 +211,19 @@ export default function IssueDetailPage() {
               ) : (
                 <p className="text-sm text-body">Unassigned</p>
               )}
-            </div>
+            </Field>
 
-            <div>
-              <label className="mb-1.5 block text-xs text-mute">Creator</label>
+            <Field label="Creator">
               <p className="text-sm text-body">{issue.creator_name || "—"}</p>
-            </div>
+            </Field>
 
             <IssuePullRequests slug={slug} issue={issue} onChange={load} />
 
-            <div>
-              <label className="mb-1.5 block text-xs text-mute">Created</label>
+            <Field label="Created">
               <p className="font-mono text-sm text-body">
                 {new Date(issue.created_at).toLocaleString()}
               </p>
-            </div>
+            </Field>
           </div>
         </div>
       </div>

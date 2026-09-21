@@ -25,6 +25,7 @@ import {
   type UsageRange,
 } from "@/lib/usage";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/page-header";
 import { UsageChart } from "@/components/usage/usage-chart";
 import { UsageBreakdown } from "@/components/usage/usage-breakdown";
 import { toast } from "sonner";
@@ -102,10 +103,7 @@ export default function UsagePage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-3 border-b border-hairline px-8 py-4">
-        <h1 className="text-sm font-medium text-ink">Usage</h1>
-        <RangeSelector value={range} onChange={setRange} />
-      </div>
+      <PageHeader title="Usage" actions={<RangeSelector value={range} onChange={setRange} />} />
 
       <div className="flex-1 px-8 pb-12 pt-6">
         {loading ? (

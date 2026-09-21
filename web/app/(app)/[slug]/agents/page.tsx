@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Plus, Trash2, Pencil } from "lucide-react";
+import { Plus, Pencil } from "lucide-react";
 import { api, agentApi, skillApi, type Agent, type Skill } from "@/lib/api";
 import {
   agentStatus,
@@ -14,6 +14,10 @@ import { paths } from "@/lib/paths";
 import { ProviderIcon } from "@/components/provider-icon";
 import { AgentStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
+import { PageHeader } from "@/components/page-header";
+import { Field, TextArea } from "@/components/form-field";
+import { InlineConfirm } from "@/components/inline-confirm";
+import { TH_CLASS } from "@/components/table-sort";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -36,11 +40,6 @@ interface DaemonOption {
   name: string;
   providers: string[];
 }
-
-const labelCls = "mb-1.5 block text-xs text-mute";
-const inputCls =
-  "w-full rounded-sm border border-hairline bg-canvas px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-primary";
-const textareaCls = `${inputCls} min-h-24 resize-y`;
 
 // Status is derived (see lib/agent-status.ts), so the list has to re-read the
 // daemon heartbeat and the task queue instead of holding a stale snapshot.
@@ -234,13 +233,15 @@ export default function WorkspaceAgentsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-hairline px-8 py-4">
-        <h1 className="text-sm font-medium text-ink">Agents</h1>
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          New Agent
-        </Button>
-      </div>
+      <PageHeader
+        title="Agents"
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="size-4" />
+            New Agent
+          </Button>
+        }
+      />
 
       <div className="flex-1 px-8 pb-8 pt-6">
         {loading ? (
@@ -291,14 +292,14 @@ export default function WorkspaceAgentsPage() {
               <table className="w-full border-collapse text-sm">
                 <thead>
                   <tr className="border-b border-hairline bg-canvas-soft">
-                    <th className={th}>Agent</th>
-                    <th className={th}>Status</th>
-                    <th className={th}>Runtime</th>
-                    <th className={`${th} hidden lg:table-cell`}>Model</th>
-                    <th className={`${th} hidden text-right sm:table-cell`}>
+                    <th className={TH_CLASS}>Agent</th>
+                    <th className={TH_CLASS}>Status</th>
+                    <th className={TH_CLASS}>Runtime</th>
+                    <th className={`${TH_CLASS} hidden lg:table-cell`}>Model</th>
+                    <th className={`${TH_CLASS} hidden text-right sm:table-cell`}>
                       Runs
                     </th>
-                    <th className={`${th} text-right`}></th>
+                    <th className={`${TH_CLASS} text-right`}></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -331,8 +332,7 @@ export default function WorkspaceAgentsPage() {
             {editing ? "Edit agent" : "Create agent"}
           </DialogTitle>
           <div className="space-y-4">
-            <div>
-              <label className={labelCls}>Avatar</label>
+            <Field label="Avatar">
               <div className="flex items-center gap-3">
                 <WorkspaceAvatar
                   name={name || "agent"}
@@ -372,36 +372,31 @@ export default function WorkspaceAgentsPage() {
                   )}
                 </div>
               </div>
-            </div>
-            <div>
-              <label className={labelCls}>Name</label>
+            </Field>
+            <Field label="Name">
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="coder"
                 autoFocus
               />
-            </div>
-            <div>
-              <label className={labelCls}>Description</label>
+            </Field>
+            <Field label="Description">
               <Input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Backend engineer"
               />
-            </div>
-            <div>
-              <label className={labelCls}>Instructions</label>
-              <textarea
-                className={textareaCls}
+            </Field>
+            <Field label="Instructions">
+              <TextArea
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
                 placeholder="You are a senior backend engineer…"
               />
-            </div>
+            </Field>
             <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Daemon</label>
+              <Field label="Daemon">
                 <Select
                   value={daemonId}
                   onValueChange={(v) => {
@@ -420,9 +415,8 @@ export default function WorkspaceAgentsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
-              <div>
-                <label className={labelCls}>Provider</label>
+              </Field>
+              <Field label="Provider">
                 <Select value={provider} onValueChange={setProvider} disabled={!selectedDaemon}>
                   <SelectTrigger className="w-full">
                     {provider ? (
@@ -445,19 +439,17 @@ export default function WorkspaceAgentsPage() {
                     ))}
                   </SelectContent>
                 </Select>
-              </div>
+              </Field>
             </div>
-            <div>
-              <label className={labelCls}>Model (optional)</label>
+            <Field label="Model (optional)">
               <Input
                 value={model}
                 onChange={(e) => setModel(e.target.value)}
                 placeholder="Leave empty for provider default"
               />
-            </div>
+            </Field>
             {skills.length > 0 && (
-              <div>
-                <label className={labelCls}>Skills</label>
+              <Field label="Skills">
                 <div className="max-h-32 space-y-1 overflow-y-auto rounded-sm border border-hairline p-2">
                   {skills.map((s) => (
                     <label key={s.id} className="flex items-center gap-2 text-sm text-body">
@@ -471,7 +463,7 @@ export default function WorkspaceAgentsPage() {
                     </label>
                   ))}
                 </div>
-              </div>
+              </Field>
             )}
             <label className="flex items-center gap-2 text-sm text-body">
               <input
@@ -496,9 +488,6 @@ export default function WorkspaceAgentsPage() {
     </div>
   );
 }
-
-const th =
-  "px-4 py-2 text-left font-mono text-xs font-medium uppercase tracking-wide text-mute";
 
 function AgentRow({
   agent,
@@ -580,31 +569,14 @@ function AgentRow({
           >
             <Pencil className="size-4" />
           </button>
-          {confirming ? (
-            <span className="flex items-center gap-2 whitespace-nowrap text-xs">
-              <span className="text-destructive">Delete?</span>
-              <button
-                onClick={onConfirmDelete}
-                className="font-medium text-destructive hover:underline"
-              >
-                Yes
-              </button>
-              <button
-                onClick={onCancelDelete}
-                className="text-mute hover:text-body"
-              >
-                No
-              </button>
-            </span>
-          ) : (
-            <button
-              onClick={onRequestDelete}
-              className="text-hairline-strong transition-colors hover:text-destructive"
-              title="Delete agent"
-            >
-              <Trash2 className="size-4" />
-            </button>
-          )}
+          <InlineConfirm
+            confirming={confirming}
+            question="Delete?"
+            title="Delete agent"
+            onRequest={onRequestDelete}
+            onConfirm={onConfirmDelete}
+            onCancel={onCancelDelete}
+          />
         </div>
       </td>
     </tr>

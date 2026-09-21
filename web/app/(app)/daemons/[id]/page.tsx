@@ -22,6 +22,7 @@ import { timeAgo } from "@/lib/time";
 import { ProviderIcon } from "@/components/provider-icon";
 import { AgentStatusBadge, DaemonStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
+import { Field } from "@/components/form-field";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -397,8 +398,7 @@ function RenameDialog({
           Rename daemon
         </DialogTitle>
         <div className="mt-4 space-y-4">
-          <div>
-            <label className="mb-1.5 block text-xs text-mute">Name</label>
+          <Field label="Name">
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -411,7 +411,7 @@ function RenameDialog({
               A label for this machine in the console. The daemon itself is
               unaffected.
             </p>
-          </div>
+          </Field>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
               Cancel

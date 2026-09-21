@@ -6,6 +6,7 @@ import { formatTokens, totalTokens, type UsageGroup } from "@/lib/usage";
 import { paths } from "@/lib/paths";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { ProviderIcon } from "@/components/provider-icon";
+import { TH_CLASS } from "@/components/table-sort";
 
 // What a breakdown row links to, when there is somewhere to go. Issues and
 // models have no page of their own yet, so their rows stay plain text rather
@@ -68,18 +69,14 @@ export function UsageBreakdown({
       <table className="w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-hairline bg-canvas-soft">
-            <th className="px-4 py-2 text-left font-mono text-xs font-medium uppercase tracking-wide text-mute">
+            <th className={TH_CLASS}>
               {group === "daemon" ? "Runtime" : group}
             </th>
-            <th className="px-4 py-2 text-right font-mono text-xs font-medium uppercase tracking-wide text-mute">
-              Tokens
-            </th>
-            <th className="hidden px-4 py-2 text-right font-mono text-xs font-medium uppercase tracking-wide text-mute sm:table-cell">
+            <th className={`${TH_CLASS} text-right`}>Tokens</th>
+            <th className={`${TH_CLASS} hidden text-right sm:table-cell`}>
               Runs
             </th>
-            <th className="hidden w-40 px-4 py-2 text-left font-mono text-xs font-medium uppercase tracking-wide text-mute md:table-cell">
-              Share
-            </th>
+            <th className={`${TH_CLASS} hidden w-40 md:table-cell`}>Share</th>
           </tr>
         </thead>
         <tbody>

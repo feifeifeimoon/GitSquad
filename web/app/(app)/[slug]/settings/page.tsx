@@ -8,6 +8,8 @@ import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
+import { PageHeader } from "@/components/page-header";
+import { Field } from "@/components/form-field";
 import { UserSettings } from "@/components/settings/user-settings";
 import {
   Dialog,
@@ -94,9 +96,7 @@ export default function WorkspaceSettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="border-b border-hairline px-8 py-4">
-        <h1 className="text-sm font-medium text-ink">Settings</h1>
-      </div>
+      <PageHeader title="Settings" />
 
       <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8 pt-6">
         <UserSettings />
@@ -105,14 +105,12 @@ export default function WorkspaceSettingsPage() {
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-medium text-ink">General</h2>
           <div className="space-y-4 rounded-lg border border-hairline bg-canvas p-5 shadow-level-2">
-            <div>
-              <label className="mb-1.5 block text-xs text-mute">Workspace Name</label>
+            <Field label="Workspace Name">
               <div className="text-sm text-ink">{workspace.name}</div>
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs text-mute">URL</label>
+            </Field>
+            <Field label="URL">
               <div className="truncate font-mono text-xs text-body">{url}</div>
-            </div>
+            </Field>
           </div>
         </section>
 

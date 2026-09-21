@@ -1,10 +1,13 @@
 import { UserSettings } from "@/components/settings/user-settings";
+import { PageHeader } from "@/components/page-header";
 
 export default function SettingsPage() {
   return (
-    <div className="mx-auto w-full max-w-2xl px-8 pt-8 pb-8">
-      <h1 className="mb-6 text-lg font-semibold text-ink">Settings</h1>
-      <UserSettings />
+    <div className="flex h-full flex-col">
+      <PageHeader title="Settings" />
+      <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8 pt-6">
+        <UserSettings />
+      </div>
     </div>
   );
 }

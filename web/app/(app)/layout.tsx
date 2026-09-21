@@ -31,6 +31,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CommandPalette } from "@/components/command-palette";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 
 const emptySubscribe = () => () => {};
 const getIsMac = () =>
@@ -318,28 +320,22 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
 
       {/* Logout confirmation */}
-      {logoutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
-          <div className="max-w-xs rounded-lg border border-hairline bg-canvas p-6 shadow-level-5">
-            <p className="mb-1 text-sm font-semibold text-ink">Sign out</p>
-            <p className="mb-4 text-sm text-body">Are you sure you want to sign out?</p>
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setLogoutConfirm(false)}
-                className="rounded-sm px-3 py-1.5 text-sm text-body transition-colors hover:bg-muted"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleLogout}
-                className="rounded-sm bg-primary px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary/85"
-              >
-                Sign out
-              </button>
-            </div>
+      <Dialog open={logoutConfirm} onOpenChange={setLogoutConfirm}>
+        <DialogContent className="sm:max-w-xs">
+          <DialogTitle className="text-sm font-semibold text-ink">
+            Sign out
+          </DialogTitle>
+          <p className="text-sm text-body">Are you sure you want to sign out?</p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setLogoutConfirm(false)}>
+              Cancel
+            </Button>
+            <Button size="sm" onClick={handleLogout}>
+              Sign out
+            </Button>
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
