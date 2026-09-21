@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "bun test app/page.test.mjs lib/issues.test.mjs lib/workspaces.test.mjs lib/mention.test.mjs lib/agent-status.test.mjs lib/usage.test.mjs lib/paths.test.mjs"
+    "test": "bun test app/page.test.mjs lib/issues.test.mjs lib/workspaces.test.mjs lib/mention.test.mjs lib/markdown-syntax.test.mjs lib/agent-status.test.mjs lib/usage.test.mjs lib/paths.test.mjs"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

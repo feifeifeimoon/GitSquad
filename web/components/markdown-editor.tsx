@@ -1,8 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useEditor, EditorContent, type Editor } from "@tiptap/react";
+import {
+  EditorContent,
+  Extension,
+  InputRule,
+  useEditor,
+  type Editor,
+} from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
+import type { ResolvedPos } from "@tiptap/pm/model";
+import { Plugin } from "@tiptap/pm/state";
 import StarterKit from "@tiptap/starter-kit";
 import { Markdown as MarkdownExtension } from "@tiptap/markdown";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -21,6 +29,115 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mentionQueryAt } from "@/lib/mention";
+import {
+  markdownMarkerAt,
+  markerListName,
+  type MarkdownMarker,
+} from "@/lib/markdown-syntax";
+
+/** The list the caret's paragraph already sits in, when the marker repeats it. */
+function repeatedListAt($from: ResolvedPos, marker: MarkdownMarker): boolean {
+  const list = markerListName(marker);
+  // paragraph → listItem → list, so anything shallower is not in a list.
+  if (!list || $from.depth < 3) return false;
+  const item = $from.node(-1);
+  if (item.type.name !== "listItem" || $from.node(-2).type.name !== list) {
+    return false;
+  }
+  // A continuation is a freshly created item; one the user has written into
+  // keeps whatever follows its marker.
+  return item.childCount === 1;
+}
+
+/**
+ * Replace the marker the caret's paragraph opens with by the block it stands
+ * for. `committed` is the text that just arrived, so a marker already sitting in
+ * the paragraph — from an older paste, say — is never converted retroactively.
+ */
+function applyCommittedMarker(editor: Editor, committed: string): boolean {
+  const committedMarker = markdownMarkerAt(committed);
+  if (!committedMarker) return false;
+
+  const { $from, empty } = editor.state.selection;
+  if (!empty || $from.parent.type.name !== "paragraph") return false;
+  const marker = markdownMarkerAt($from.parent.textContent);
+  if (!marker || marker.block.kind !== committedMarker.block.kind) return false;
+  if ($from.parentOffset < marker.length) return false;
+
+  const from = $from.start();
+  const strip = () => editor.chain().focus().deleteRange({ from, to: from + marker.length });
+
+  // A marker that repeats the list the caret is already in is redundant — Enter
+  // made the item — so the line is a sibling and only the marker goes away.
+  if (repeatedListAt($from, marker)) return strip().run();
+
+  switch (marker.block.kind) {
+    case "heading":
+      return strip().setHeading({ level: marker.block.level }).run();
+    case "bulletList":
+      return strip().toggleBulletList().run();
+    case "orderedList": {
+      const listStart = marker.block.start;
+      const chained = strip().toggleOrderedList();
+      return (listStart > 1
+        ? chained.updateAttributes("orderedList", { start: listStart })
+        : chained
+      ).run();
+    }
+    case "blockquote":
+      return strip().toggleBlockquote().run();
+    case "codeBlock": {
+      const language = marker.block.language;
+      return (language ? strip().setCodeBlock({ language }) : strip().setCodeBlock()).run();
+    }
+  }
+}
+
+/**
+ * Markdown markers the built-in input rules cannot see.
+ *
+ * Those rules fire while the marker and its trailing space are the last thing
+ * typed, which leaves two gaps: a marker typed inside the list it repeats (the
+ * rule has nothing left to wrap), and a whole line that arrives at once — an IME
+ * committing `## 标题` — which never puts the paragraph into the bare `## ` state
+ * the rule waits for.
+ */
+const MarkdownMarkers = Extension.create({
+  name: "markdownMarkers",
+
+  addInputRules() {
+    return [
+      new InputRule({
+        find: /^([-*+]|\d{1,9}\.)[ \t]$/,
+        handler: ({ state, range, match, chain }) => {
+          const marker = markdownMarkerAt(match[0]);
+          if (!marker || !repeatedListAt(state.selection.$from, marker)) {
+            return null;
+          }
+          chain().deleteRange({ from: range.from, to: range.to }).run();
+        },
+      }),
+    ];
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          handleDOMEvents: {
+            compositionend: (_view, event) => {
+              const committed = (event as CompositionEvent).data ?? "";
+              // A tick later, so ProseMirror is out of composition mode before a
+              // command runs — the same deferral the input rules plugin uses.
+              setTimeout(() => applyCommittedMarker(this.editor, committed), 0);
+              return false;
+            },
+          },
+        },
+      }),
+    ];
+  },
+});
 
 function BubbleButton({
   active,
@@ -119,6 +236,7 @@ export function MarkdownEditor({
       StarterKit,
       MarkdownExtension,
       Placeholder.configure({ placeholder: placeholder ?? "Write markdown…" }),
+      MarkdownMarkers,
     ],
     onUpdate: ({ editor }) => {
       onChange?.(editor.getMarkdown());
@@ -177,7 +295,10 @@ export function MarkdownEditor({
   }
 
   return (
-    <div className="relative">
+    // The caller's className lands on EditorContent, so the wrapper has to carry
+    // the flex sizing: in the create dialog it is the child that fills the
+    // dialog, and the editor scrolls inside it.
+    <div className="relative flex min-h-0 flex-1 flex-col">
       <BubbleMenu
         editor={editor}
         className="flex items-center gap-0.5 rounded-md border border-hairline bg-canvas p-1 shadow-level-4"
