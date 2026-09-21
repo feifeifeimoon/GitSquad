@@ -243,9 +243,32 @@
   html {
     @apply font-sans;
   }
+  /* One focus ring for everything that does not bring its own. The primitives
+     that draw a ring opt out with `outline-none`, so this cannot double up on
+     them — which is what left a handful of controls with no focus indicator at
+     all, and the rest with the browser's default. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
   ::selection {
-    background: #171717;
-    color: #f2f2f2;
+    background: var(--ink);
+    color: var(--canvas);
+  }
+}
+
+/* Motion is decoration here: the transitions, the hover lifts and the rotating
+   agent log on the landing page all exist to look alive, and none of them is
+   worth making someone ill. Timers that change content stay in the component,
+   where they can stop instead of merely going instant. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 

@@ -92,7 +92,18 @@ export const DraggableIssueCard = memo(function DraggableIssueCard({
       {...listeners}
       {...attributes}
       onClick={() => onOpen(issue.issue_key)}
-      className={`cursor-grab active:cursor-grabbing ${
+      onKeyDown={(event) => {
+        // dnd-kit already makes this a tab stop (role="button", tabIndex 0),
+        // but the board registers only a pointer sensor — so every card was a
+        // tab stop where nothing happened. Enter opens the issue, which is
+        // where the status control is; the keyboard path to moving work runs
+        // through that rather than through a drag it cannot perform.
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onOpen(issue.issue_key);
+        }
+      }}
+      className={`cursor-grab rounded-lg active:cursor-grabbing ${
         isDragging ? "opacity-40" : ""
       }`}
     >

@@ -265,6 +265,10 @@ export default function WorkspaceAgentsPage() {
               Agents are AI workers bound to a runtime. Create one to start
               mentioning it in issues.
             </EmptyDescription>
+            <Button onClick={openCreate} className="mt-1">
+              <Plus className="size-4" />
+              Create your first agent
+            </Button>
           </Empty>
         ) : (
           <>
@@ -571,6 +575,7 @@ function AgentRow({
             onClick={onEdit}
             className="text-hairline-strong transition-colors hover:text-ink"
             title="Edit agent"
+            aria-label="Edit agent"
           >
             <Pencil className="size-4" />
           </button>

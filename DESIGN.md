@@ -11,9 +11,11 @@ colors:
   mute: "#888888"
   hairline: "#ebebeb"
   hairline-strong: "#a1a1a1"
+  chrome: "#ffffff"
+  page: "#fafafa"
   canvas: "#ffffff"
-  canvas-soft: "#fafafa"
-  canvas-soft-2: "#f5f5f5"
+  canvas-soft: "#f5f5f5"
+  canvas-soft-2: "#efefef"
   link: "#0070f3"
   link-deep: "#0761d1"
   link-bg-soft: "#d3e5ff"
@@ -32,12 +34,14 @@ colors:
   gradient-magenta: "#ff0080"
   gradient-teal: "#00dfd8"
   gradient-amber: "#f9cb28"
-  selection-bg: "#171717"
-  selection-fg: "#f2f2f2"
+  # ::selection is {colors.ink} on {colors.canvas}, so it inverts with the
+  # theme instead of staying dark-on-dark.
+  selection-bg: "{colors.ink}"
+  selection-fg: "{colors.canvas}"
   # Semantic layer consumed by the vendored shadcn/Radix primitives. These are
   # the names those components reference internally, mapped onto the brand
   # ladder above so a primitive styled out of the box still lands on-brand.
-  background: "#fafafa"
+  background: "{colors.page}"
   foreground: "#171717"
   card: "#ffffff"
   card-foreground: "#171717"
@@ -373,13 +377,18 @@ Surfaces use a four-step ladder: `{colors.canvas}` for cards and dialogs, `{colo
 
 ### Brand & Accent
 - **Ink** (`{colors.primary}` — `#171717`): The single primary CTA colour. Carries every affirmative button, the active nav indicator, the polarity-flipped dark band and the `::selection` background. Also the default `{colors.ink}` text colour on light surfaces.
-- **Link Blue** (`{colors.link}` — `#0070f3`): Inline links and the "info / running" semantic. In dark mode it is the one accent that keeps its light-mode value.
+- **Link Blue** (`{colors.link}` — `#0070f3`, dark `#3291ff`): Inline links and the "info / running" semantic. Lifted in dark mode: the light value is legible on white and muddy on `#171717`.
 - **Violet** (`{colors.violet}` — `#7928ca`) and **Cyan Deep** (`{colors.cyan-deep}` — `#29bc9b`): Telemetry series colours. `{colors.violet}` marks cache-read tokens, `{colors.cyan-deep}` marks output tokens.
 
 ### Surface
-- **Canvas** (`{colors.canvas}` — `#ffffff`): Card, dialog, sidebar and dropdown surface.
-- **Canvas Soft** (`{colors.canvas-soft}` — `#fafafa`): The default page background. `body` resolves to this via `--background`.
-- **Canvas Soft 2** (`{colors.canvas-soft-2}` — `#f5f5f5`): Inset regions — sidebar row hover, table header row, inline code, code blocks, the daemon pairing card.
+
+Three planes, back to front. A card `{colors.canvas}` sits on a page `{colors.page}`, framed by chrome `{colors.chrome}` — which is what lets a card read as raised without a border having to say so. A board column is a *well*: a step below the page (`{colors.canvas-soft}`), so cards rise out of it.
+
+- **Chrome** (`{colors.chrome}` — `#ffffff`): The sidebar and page chrome.
+- **Page** (`{colors.page}` — `#fafafa`): What content sits on. `body` resolves to this via `--background`.
+- **Canvas** (`{colors.canvas}` — `#ffffff`): Card, dialog, panel, popover, input — every raised surface.
+- **Canvas Soft** (`{colors.canvas-soft}` — `#f5f5f5`): Wells and insets — a board column, a table header row, an empty state, inline code. Never a card.
+- **Canvas Soft 2** (`{colors.canvas-soft-2}` — `#efefef`): A second inset step, for something sunk inside a well.
 - **Hairline** (`{colors.hairline}` — `#ebebeb`): The 1 px divider used by every card border, table row, sidebar edge and input outline.
 - **Hairline Strong** (`{colors.hairline-strong}` — `#a1a1a1`): The heavier divider, used for card hover borders, the sidebar resize handle on hover, blockquote rules and the focus ring.
 
@@ -391,12 +400,13 @@ Surfaces use a four-step ladder: `{colors.canvas}` for cards and dialogs, `{colo
 
 ### Semantic
 - **Success** (`{colors.success}` — `#0070f3`): Deliberately identical to `{colors.link}`. GitSquad has no green. "Healthy" is rendered as the link blue, which keeps the palette to ink + gray + blue + the gradient stops. It is the first segment of the token-usage chart (input tokens).
-- **Warning** (`{colors.warning}` — `#f5a623`): Caution and pending. Used as the cache-write token series and the `in_progress` board column fill (via `{colors.warning-soft}`).
+- **Warning** (`{colors.warning}` — `#f5a623`): Caution and pending. The `in_progress` status colour, the cache-write token series, and the degraded workspace dot.
 - **Warning Soft** (`{colors.warning-soft}` — `#ffefcf`) / **Warning Deep** (`{colors.warning-deep}` — `#ab570a`): Soft fill and readable-text variants of warning.
 - **Error** (`{colors.error}` — `#ee0000`): Destructive actions and validation failures. Bound to the `--destructive` token that the vendored shadcn primitives consume, so `Button variant="destructive"` and `aria-invalid` outlines pick it up automatically.
-- **Error Soft** (`{colors.error-soft}` — `#f7d4d6`): The `blocked` board column fill.
-- **Violet Soft** (`{colors.violet-soft}` — `#d8ccf1`): The `in_review` board column fill.
-- **Cyan Soft** (`{colors.cyan-soft}` — `#aaffec`): The `done` board column fill.
+- **Error Soft** (`{colors.error-soft}` — `#f7d4d6`, dark `#2c1215`): The `blocked` status tint on a card edge, and the fill behind an error callout.
+- **Violet Soft** (`{colors.violet-soft}` — `#d8ccf1`, dark `#241a33`): The `in_review` tint, and one of the avatar monogram backgrounds.
+- **Cyan Soft** (`{colors.cyan-soft}` — `#aaffec`, dark `#0d2b26`): The `done` tint, and one of the avatar monogram backgrounds.
+- **The `-soft` / `-deep` pairs are theme-aware tints**, not light-mode fills. Each is a background plus the readable text colour that belongs on it, defined in `"both"` themes; that is what makes them usable for monograms and status edges without a second palette.
 - **Link Deep** (`{colors.link-deep}` — `#0761d1`) / **Link Bg Soft** (`{colors.link-bg-soft}` — `#d3e5ff`): Pressed link tone and soft informational fill.
 
 ### Primitives & Gradient
@@ -409,19 +419,30 @@ The console ships a full dark theme (`.dark`), toggled from the sidebar. It is a
 
 | Token | Light | Dark |
 |---|---|---|
+| `{colors.chrome}` | `#ffffff` | `#0a0a0a` |
+| `{colors.page}` | `#fafafa` | `#0f0f0f` |
 | `{colors.canvas}` | `#ffffff` | `#171717` |
-| `{colors.canvas-soft}` | `#fafafa` | `#0a0a0a` |
-| `{colors.canvas-soft-2}` | `#f5f5f5` | `#262626` |
+| `{colors.canvas-soft}` | `#f5f5f5` | `#0a0a0a` |
+| `{colors.canvas-soft-2}` | `#efefef` | `#262626` |
 | `{colors.ink}` | `#171717` | `#ededed` |
 | `{colors.body}` | `#4d4d4d` | `#a1a1a1` |
 | `{colors.mute}` | `#888888` | `#888888` |
 | `{colors.hairline}` | `#ebebeb` | `#ffffff14` |
 | `{colors.primary}` | `#171717` | `#ededed` |
-| `{colors.link}` | `#0070f3` | `#0070f3` |
+| `{colors.link}` | `#0070f3` | `#3291ff` |
+| `{colors.warning}` | `#f5a623` | `#f7b955` |
+| `{colors.warning-soft}` | `#ffefcf` | `#2b1d08` |
+| `{colors.error-soft}` | `#f7d4d6` | `#2c1215` |
+| `{colors.violet}` | `#7928ca` | `#a970ff` |
+| `{colors.violet-soft}` | `#d8ccf1` | `#241a33` |
+| `{colors.cyan-deep}` | `#29bc9b` | `#3dd9b6` |
+| `{colors.cyan-soft}` | `#aaffec` | `#0d2b26` |
 
 Dark mode carries one deliberate difference: borders become translucent white (`#ffffff14`) instead of an opaque gray, so a hairline over a card and over the page body read the same.
 
-**Known gap.** The pastel "soft" fills used by the board columns (`{colors.warning-soft}`, `{colors.violet-soft}`, `{colors.cyan-soft}`, `{colors.error-soft}`) and the text tones `{colors.success}`, `{colors.link-deep}`, `{colors.link-bg-soft}`, `{colors.warning-deep}` have no `.dark` override, so they keep their light values on a dark page. Column headers in particular lose contrast in dark mode. Dark variants for the soft/strong pairs are outstanding work; do not add new surfaces that depend on them until they exist.
+**A palette is only a token set if both themes define all of it.** Every brand colour above has a dark value. It did not always: the pastel soft fills that used to paint the board columns were defined in `:root` and never in `.dark`, so `in_progress` stayed a light cream on a near-black page, with its own heading drawn in near-white on top of it. The rule that came out of that: a colour that appears in a component must be defined in both theme blocks, or it is a bug waiting for someone to flip the toggle.
+
+Permanently-dark surfaces — the marketing showcase band, the terminal aside in the workspace wizard — are pinned with a `dark` class on their own wrapper, which scopes the dark token block to that subtree. They are mockups of a terminal: they must not follow the reader's theme, and `bg-primary` was never a way to say so, because primary inverts.
 
 ## Typography
 
@@ -437,28 +458,32 @@ Both faces are open source under the SIL Open Font License and are fetched at bu
 
 The frontmatter above names the roles; this table maps each role to the Tailwind utility actually used in the codebase, since the console is built with Tailwind v4 rather than with raw pixel values.
 
-| Role | Utility | Size / Weight / Tracking | Use |
+The console names sizes by **role**, not by Tailwind's `text-sm`/`text-base` ramp: `--text-*` in `@theme`, each with a paired line-height. `components/ui/*` (vendored shadcn) keeps Tailwind's own names so it stays diffable against the registry; app code uses the roles. `copy` rather than `body` for the 14px step because `text-body` is already the body *colour*.
+
+| Role | Utility | Size / Line-height | Use |
 |---|---|---|---|
 | `{typography.display-xl}` | `text-4xl sm:text-5xl lg:text-6xl` | 36→60px / 600 / `-0.04em` | Marketing hero headline only. `leading-[1.05]`. |
 | `{typography.display-lg}` | `text-3xl sm:text-4xl` | 30→36px / 600 / `-0.04em` | Section headlines in marketing bands. |
-| `{typography.display-md}` | `text-2xl` | 24px / 600 / `-0.02em` | Page titles in the console. |
-| `{typography.display-sm}` | `text-xl` | 20px / 600 / `-0.015em` | Dialog titles, settings section headings. |
+| `{typography.display-md}` | `text-display` | 26px / 32px | The headline figure — a usage total. |
+| `{typography.title}` | `text-title` | 19px / 26px | Page title (`PageHeader`), and the issue title on its own page. |
+| `{typography.title-sm}` | `text-title-sm` | 16px / 22px | Dialog titles, KPI values, marketing card headings (`text-base`, same size). |
 | `{typography.body-lg}` | `text-lg` | 18px / 400 | Marketing lead paragraph under a section headline. |
-| `{typography.body-md}` | `text-base` | 16px / 400 | Default paragraph, marketing body. |
-| `{typography.body-md-strong}` | `text-base font-medium` | 16px / 500 | Emphasised inline copy. |
-| `{typography.body-sm}` | `text-sm` | 14px / 400 | The console's default body size — table cells, card copy, descriptions. |
-| `{typography.body-sm-strong}` | `text-sm font-medium` | 14px / 500 | Nav CTA labels, list-row titles, form labels. |
-| `{typography.caption}` | `text-xs` | 12px / 400 | Badges, sidebar section labels, dense metadata. |
-| `{typography.caption-mono}` | `font-mono text-xs` | 12px / 400 | Table headers, keyboard hints, model identifiers. |
+| `{typography.body-md}` | `text-base` | 16px / 400 | Default paragraph, marketing body, rendered markdown headings. |
+| `{typography.copy}` | `text-copy` | 14px / 20px | The console's body size — table cells, card copy, descriptions. |
+| `{typography.label}` | `text-label` | 13px / 18px | Section headings (`SectionHeading`), board column labels, form field labels. |
+| `{typography.caption}` | `text-caption` | 12px / 16px | Badges, table column headings, dense metadata, KPI labels. |
+| `{typography.micro}` | `text-micro` | 11px / 16px | Card meta — issue key, comment count, relative time. |
 | `{typography.code}` | `font-mono text-[13px]` | 13px / 400 | Inline code and code blocks. |
-| `{typography.button-md}` | `text-sm font-medium` | 14px / 500 | In-app button labels (sizes `sm` / `default` / `lg`). |
+| `{typography.button-md}` | `text-copy font-medium` | 14px / 500 | In-app button labels (sizes `sm` / `default` / `lg`). |
 | `{typography.button-lg}` | `text-base font-medium` | 16px / 500 | Marketing pill CTAs (size `pill`). |
+
+The page used to have two sizes and no hierarchy: a page title and a sidebar nav row were the same 14px at the same weight, so nothing led. Title, section, body and meta are four steps now, and the step is carried by size *and* colour *and* weight — never by one alone.
 
 ### Principles
 - **Weight 600 is the display ceiling.** The sans never appears at 700+. The interface reads as calm partly because of this.
 - **Negative tracking is part of the voice.** Display sizes use `-0.04em` down to `-0.015em`. Reverting to default tracking makes the headline look generic.
 - **Sentence-case headlines, period-terminated.** "Your autonomous developer team on GitHub." — the full stop is part of the voice, not a typo.
-- **Mono is the voice of the machine.** Statuses, counts, ids, logs and code. A narrative sentence is never set in mono.
+- **Mono is the voice of the machine.** Statuses, counts, ids, logs and code. A narrative sentence is never set in mono — and neither is a label. Table column headings and KPI labels are sentence case in the sans face: mono uppercase is how you say "this is an identifier", and "Total tokens" is not one.
 - **Uppercase is reserved for `{typography.caption}` labels only** — sidebar section headers ("Workspace", "Account"). Headlines are never all-caps.
 
 ## Layout
@@ -603,8 +628,8 @@ Every button carries `active:translate-y-px` and `focus-visible:ring-3 focus-vis
 
 ### Console-Specific Components
 
-- **`board-column`** — `w-72` fixed, `{rounded.xl}`, `border-hairline/50`, filled with a per-status pastel: `backlog`/`todo`/`cancelled` use `bg-muted/40`, `in_progress` uses `{colors.warning-soft}`, `in_review` uses `{colors.violet-soft}`, `done` uses `{colors.cyan-soft}`, `blocked` uses `{colors.error-soft}`. A column shows a sticky header with the status icon, the label, a count and a create affordance.
-- **`board-card`** — `bg-card border border-hairline rounded-lg shadow-level-1`, rising to Level 3 on hover. While dragging, the preview rotates 2° and takes Level 4 — the only rotation in the system.
+- **`board-column`** — `w-72` fixed, `{rounded.xl}`, `bg-canvas-soft` (a well) with a hairline, header in `{typography.label}` semibold carrying the status icon, the label, a count and a create affordance. **Colour does not fill a column.** Painting one turned a third of the viewport into the word "this is yellow" and said nothing about the work in it; the status colour belongs on the work, in the icon here and the edge on the card.
+- **`board-card`** — `bg-canvas border border-hairline rounded-lg shadow-level-1`, rising to Level 2 on hover. Two lines of content: the title, then a meta row that renders only what exists — issue key, assignee, PR badge, comment count, relative time. A description preview and an "Unassigned" label were both removed: identical on nearly every card, so each cost a line of height without ever changing a decision. A 2px **status edge** runs down the left side in the status colour, so a card still says what it is once its column header has scrolled out of view or while it is being dragged. While dragging, the preview rotates 2° and takes Level 4 — the only rotation in the system.
 - **`status-badge`** — a 6 px `rounded-full` dot plus a written label (`AgentStatusBadge`, `DaemonStatusBadge`). The dot is `aria-hidden`; the label carries the state. Colour never carries meaning alone.
 - **`usage-series`** — the token-usage chart and its legend use, in order: input `{colors.success}` (link blue), output `{colors.cyan-deep}`, cache read `{colors.violet}`, cache write `{colors.warning}`. Percentages are floored rather than rounded so a figure can never claim a false 100 %.
 - **`live-log`** — a `{colors.canvas-soft-2}` panel of `{typography.caption-mono}` lines with the newest pinned to the bottom; it is an output surface, never interactive.

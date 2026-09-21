@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Info } from "lucide-react";
+import Link from "next/link";
+import { Gauge, Info } from "lucide-react";
 import {
   usageApi,
   type UsageBreakdownResponse,
@@ -23,9 +24,12 @@ import {
   type UsageGroup,
   type UsageRange,
 } from "@/lib/usage";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 import { PageHeader } from "@/components/page-header";
-import { useApi } from "@/lib/query";
+import { invalidateApi, useApi } from "@/lib/query";
+import { ErrorState } from "@/components/error-state";
 import { UsageChart } from "@/components/usage/usage-chart";
 import { UsageBreakdown } from "@/components/usage/usage-breakdown";
 import { toast } from "sonner";
@@ -77,9 +81,30 @@ export default function UsagePage() {
     <div className="flex h-full flex-col">
       <PageHeader title="Usage" actions={<RangeSelector value={range} onChange={setRange} />} />
 
-      <div className="flex-1 px-8 pb-12 pt-6">
-        {loading ? (
+      <div className="flex-1 px-8 pb-8 pt-6">
+        {summaryError || seriesError ? (
+          <ErrorState
+            what="usage"
+            error={(summaryError ?? seriesError) as Error}
+            onRetry={() => invalidateApi("/api/v1/usage")}
+          />
+        ) : loading ? (
           <UsageSkeleton />
+        ) : summary && summary.runs_total === 0 ? (
+          <Empty className="py-20">
+            <EmptyMedia>
+              <Gauge className="size-5" />
+            </EmptyMedia>
+            <EmptyTitle>No usage yet</EmptyTitle>
+            <EmptyDescription>
+              No usage recorded for this window yet. Token spend shows up here
+              once an agent has run — connect a daemon, then mention an agent on
+              an issue.
+            </EmptyDescription>
+            <Button asChild className="mt-1">
+              <Link href="/daemons">Connect a daemon</Link>
+            </Button>
+          </Empty>
         ) : (
           <>
             <div className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-hairline pb-6 sm:grid-cols-3 lg:grid-cols-6">

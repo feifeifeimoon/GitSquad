@@ -98,7 +98,7 @@ export default function DaemonDetailPage() {
         <span className="truncate font-medium text-ink">{daemon.name}</span>
       </div>
 
-      <div className="flex-1 px-8 pb-12 pt-6">
+      <div className="flex-1 px-8 pb-8 pt-6">
         <header className="flex items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-hairline bg-canvas-soft">
             <Monitor className="size-5 text-body" />
