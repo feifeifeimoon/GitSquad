@@ -183,9 +183,11 @@ export default function WorkspaceBoardPage({
     return (
       <div className="p-8">
         <ErrorState
-          what="this board"
+          what="workspace"
           error={issuesError}
           onRetry={refreshIssues}
+          notFoundHref={paths.workspaces()}
+          notFoundLabel="Go to workspaces"
         />
       </div>
     );
