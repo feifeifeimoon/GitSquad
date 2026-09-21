@@ -22,14 +22,14 @@ const COMPONENTS: Components = {
     <h2 className="mb-1.5 mt-3 text-base font-semibold text-ink">{children}</h2>
   ),
   h3: ({ children }) => (
-    <h3 className="mb-1 mt-2 text-sm font-semibold text-ink">{children}</h3>
+    <h3 className="mb-1 mt-2 text-copy font-semibold text-ink">{children}</h3>
   ),
-  p: ({ children }) => <p className="my-1 text-sm text-body">{children}</p>,
+  p: ({ children }) => <p className="my-1 text-copy text-body">{children}</p>,
   ul: ({ children }) => (
-    <ul className="my-1 list-disc pl-5 text-sm text-body">{children}</ul>
+    <ul className="my-1 list-disc pl-5 text-copy text-body">{children}</ul>
   ),
   ol: ({ children }) => (
-    <ol className="my-1 list-decimal pl-5 text-sm text-body">{children}</ol>
+    <ol className="my-1 list-decimal pl-5 text-copy text-body">{children}</ol>
   ),
   li: ({ children }) => <li className="my-0.5">{children}</li>,
   a: ({ href, children }) => (
@@ -52,7 +52,7 @@ const COMPONENTS: Components = {
     return (
       <code
         className={cn(
-          "font-mono text-xs",
+          "font-mono text-caption",
           !isBlock && "rounded bg-muted px-1 py-0.5",
           className,
         )}
@@ -62,13 +62,13 @@ const COMPONENTS: Components = {
     );
   },
   pre: ({ children }) => (
-    <pre className="my-2 overflow-x-auto rounded-md bg-canvas-soft-2 p-3 font-mono text-xs text-ink">
+    <pre className="my-2 overflow-x-auto rounded-md bg-canvas-soft-2 p-3 font-mono text-caption text-ink">
       {children}
     </pre>
   ),
   table: ({ children }) => (
     <div className="my-2 overflow-x-auto">
-      <table className="w-full border-collapse text-sm">{children}</table>
+      <table className="w-full border-collapse text-copy">{children}</table>
     </div>
   ),
   th: ({ children }) => (

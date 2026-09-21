@@ -11,7 +11,29 @@
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-geist-sans);
 
+  /* Typography by role, not by size. Two sizes carrying a whole console is how
+     a page title ends up weighing the same as a nav item: these give a heading
+     somewhere to escalate to, and keep meta text off the body size.
+     `copy` rather than `body` because `text-body` is already the body *colour*,
+     and two utilities cannot share a name. */
+  --text-micro: 11px;
+  --text-micro--line-height: 16px;
+  --text-caption: 12px;
+  --text-caption--line-height: 16px;
+  --text-label: 13px;
+  --text-label--line-height: 18px;
+  --text-copy: 14px;
+  --text-copy--line-height: 20px;
+  --text-title-sm: 16px;
+  --text-title-sm--line-height: 22px;
+  --text-title: 19px;
+  --text-title--line-height: 26px;
+  --text-display: 26px;
+  --text-display--line-height: 32px;
+
   /* DESIGN.md brand + surface tokens */
+  --color-chrome: var(--chrome);
+  --color-page: var(--page);
   --color-canvas: var(--canvas);
   --color-canvas-soft: var(--canvas-soft);
   --color-canvas-soft-2: var(--canvas-soft-2);
@@ -74,10 +96,23 @@
 }
 
 :root {
-  /* DESIGN.md surface ladder */
+  /* Three planes, back to front: chrome (sidebar) sits behind the page it
+     frames, and a surface (card, panel, popover) sits on top of the page.
+     Cards used to share the page's colour, so the only thing separating them
+     was a hairline border — that is why every screen read as white boxes with
+     grey outlines. `--canvas` stays the surface colour it has always been. */
+  /* The ladder, shallowest first: page → soft (a well: a board column, a table
+     head, an inset) → canvas (a surface: a card, a panel, a popover). Each step
+     is a tone darker then lighter again, so a card reads as raised out of its
+     column and a column as sunk into the page — without any of them needing a
+     border to say which plane it is on. In light mode `--canvas-soft` used to
+     equal `--page`, which is why a board column and the page behind it were
+     indistinguishable. */
+  --chrome: #ffffff;
+  --page: #fafafa;
   --canvas: #ffffff;
-  --canvas-soft: #fafafa;
-  --canvas-soft-2: #f5f5f5;
+  --canvas-soft: #f5f5f5;
+  --canvas-soft-2: #efefef;
   --ink: #171717;
   --body: #4d4d4d;
   --mute: #888888;
@@ -152,7 +187,9 @@
   --border: #ffffff14;
   --input: #ffffff26;
   --ring: #a1a1a1;
-  --link: #0070f3;
+  --link: #3291ff;
+  --chrome: #0a0a0a;
+  --page: #0f0f0f;
   --canvas: #171717;
   --canvas-soft: #0a0a0a;
   --canvas-soft-2: #262626;
@@ -161,6 +198,30 @@
   --mute: #888888;
   --hairline: #ffffff14;
   --hairline-strong: #a1a1a1;
+
+  /* Every brand colour is defined here as well as in :root. They were not, and
+     the half that was missing was the half the board painted its columns with:
+     a light cream "in progress" and a light lavender "in review" survived into
+     dark mode, where their own headings were drawn in near-white on top of
+     them. A palette is only a token set if both themes define all of it. */
+  --link-deep: #6cb2ff;
+  --link-bg-soft: #10243e;
+  --success: #3291ff;
+  --warning: #f7b955;
+  --warning-soft: #2b1d08;
+  --warning-deep: #f7b955;
+  --error-soft: #2c1215;
+  --violet: #a970ff;
+  --violet-soft: #241a33;
+  --cyan-deep: #3dd9b6;
+  --cyan-soft: #0d2b26;
+
+  --chart-1: #3291ff;
+  --chart-2: #a970ff;
+  --chart-3: #ff4d9d;
+  --chart-4: #3dd9b6;
+  --chart-5: #f7b955;
+
   --sidebar: #171717;
   --sidebar-foreground: #ededed;
   --sidebar-primary: #ededed;

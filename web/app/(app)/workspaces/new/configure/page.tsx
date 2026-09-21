@@ -62,7 +62,7 @@ function ConfigureContent() {
       <div className="px-8 pb-4 pt-6">
         <button
           onClick={() => router.push(paths.newWorkspace())}
-          className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
+          className="flex items-center gap-1 text-copy text-body transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />
           Back to repositories
@@ -74,7 +74,7 @@ function ConfigureContent() {
         <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
           Configure Workspace
         </h1>
-      <p className="mb-8 text-sm text-body">
+      <p className="mb-8 text-copy text-body">
         Name your workspace and start importing{" "}
         <span className="font-medium text-ink">
           {repoOwner}/{repoName}
@@ -89,10 +89,10 @@ function ConfigureContent() {
             <GitHubIcon className="size-4 text-body" />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-ink">
+            <p className="truncate text-copy font-semibold text-ink">
               {repoOwner}/{repoName}
             </p>
-            <p className="text-xs text-mute">
+            <p className="text-caption text-mute">
               {repoPrivate ? "Private" : "Public"} repository
             </p>
           </div>
@@ -104,7 +104,7 @@ function ConfigureContent() {
         {/* Workspace name */}
         <div className="space-y-4 rounded-md border border-hairline bg-canvas p-5 shadow-level-2">
           <div>
-            <label className="mb-1.5 block text-sm font-semibold text-ink">
+            <label className="mb-1.5 block text-copy font-semibold text-ink">
               Workspace Name
             </label>
             <Input
@@ -115,13 +115,13 @@ function ConfigureContent() {
               required
               autoFocus
             />
-            <p className="mt-1.5 text-xs text-mute">
+            <p className="mt-1.5 text-caption text-mute">
               Defaults to the repository name.
             </p>
           </div>
 
           {error && (
-            <p className="rounded-sm bg-destructive/10 px-3 py-2 text-sm text-destructive">
+            <p className="rounded-sm bg-destructive/10 px-3 py-2 text-copy text-destructive">
               {error}
             </p>
           )}

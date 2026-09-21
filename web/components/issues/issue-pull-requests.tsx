@@ -28,7 +28,7 @@ function PullRequestRow({
 }) {
   const stateClass = STATE_CLASS[pr.state] ?? STATE_CLASS.open;
   return (
-    <div className="flex items-start gap-2 text-sm" data-testid={`pull-request-${pr.number}`}>
+    <div className="flex items-start gap-2 text-copy" data-testid={`pull-request-${pr.number}`}>
       <GitPullRequest className={`mt-0.5 size-3.5 shrink-0 ${stateClass}`} />
       <div className="min-w-0 flex-1">
         <a
@@ -38,7 +38,7 @@ function PullRequestRow({
           className="block truncate hover:underline"
           title={pr.title}
         >
-          <span className="font-mono text-xs text-mute">#{pr.number}</span> {pr.title}
+          <span className="font-mono text-caption text-mute">#{pr.number}</span> {pr.title}
         </a>
         <div className="mt-0.5 flex items-center gap-1.5">
           <span className={`font-mono text-[11px] ${stateClass}`}>
@@ -132,7 +132,7 @@ export function IssuePullRequests({
           />
         ))}
         {active.length === 0 && (
-          <p className="text-sm text-body">No pull request yet.</p>
+          <p className="text-copy text-body">No pull request yet.</p>
         )}
 
         {history.length > 0 && (
@@ -180,7 +180,7 @@ export function IssuePullRequests({
             value={ref}
             onChange={(e) => setRef(e.target.value)}
             placeholder="Link a pull request: paste a URL or number"
-            className="h-8 text-xs"
+            className="h-8 text-caption"
             disabled={busy}
           />
           <Button type="submit" size="sm" variant="outline" disabled={!ref.trim() || busy}>

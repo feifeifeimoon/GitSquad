@@ -163,7 +163,7 @@ export default function NewWorkspacePage() {
       <div className="px-8 pb-4 pt-6">
         <button
           onClick={() => router.push(paths.workspaces())}
-          className="flex items-center gap-1 text-sm text-body transition-colors hover:text-ink"
+          className="flex items-center gap-1 text-copy text-body transition-colors hover:text-ink"
         >
           <ChevronLeft className="size-4" />
           All Workspaces
@@ -175,7 +175,7 @@ export default function NewWorkspacePage() {
         <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
           Create a Workspace
         </h1>
-      <p className="mb-8 text-sm text-body">
+      <p className="mb-8 text-copy text-body">
         Import a Git repository and configure your agent team.
       </p>
 
@@ -184,10 +184,10 @@ export default function NewWorkspacePage() {
           <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-full bg-muted">
             <Search className="size-6 text-mute" />
           </div>
-          <p className="mb-1 text-sm font-semibold text-ink">
+          <p className="mb-1 text-copy font-semibold text-ink">
             No GitHub installations
           </p>
-          <p className="text-sm text-body">
+          <p className="text-copy text-body">
             Install the GitSquad GitHub App to connect your repositories.
           </p>
           <Button
@@ -210,14 +210,14 @@ export default function NewWorkspacePage() {
           <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
             {/* GitHub account dropdown */}
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-mute">
+              <label className="mb-1.5 block text-caption font-medium text-mute">
                 GitHub Account
               </label>
               <div className="relative" ref={accountRef}>
                 <button
                   type="button"
                   onClick={() => setAccountMenuOpen((v) => !v)}
-                  className="flex h-10 w-full items-center justify-between rounded-sm border border-hairline bg-canvas px-3 text-sm text-ink transition-colors hover:bg-muted focus-visible:border-hairline-strong focus-visible:outline-none"
+                  className="flex h-10 w-full items-center justify-between rounded-sm border border-hairline bg-canvas px-3 text-copy text-ink transition-colors hover:bg-muted focus-visible:border-hairline-strong focus-visible:outline-none"
                 >
                   <span className="flex min-w-0 items-center gap-2">
                     <GitHubIcon className="size-4 shrink-0 text-ink" />
@@ -241,7 +241,7 @@ export default function NewWorkspacePage() {
                           key={inst.id}
                           type="button"
                           onClick={() => handleSelectAccount(inst)}
-                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors ${
+                          className={`flex w-full items-center gap-2 px-3 py-2 text-left text-copy transition-colors ${
                             isActive
                               ? "bg-muted text-ink"
                               : "text-body hover:bg-muted hover:text-ink"
@@ -251,7 +251,7 @@ export default function NewWorkspacePage() {
                           <span className="truncate font-medium">
                             {inst.account_login}
                           </span>
-                          <span className="text-xs text-mute">
+                          <span className="text-caption text-mute">
                             ({inst.account_type})
                           </span>
                         </button>
@@ -264,7 +264,7 @@ export default function NewWorkspacePage() {
 
             {/* Repository search */}
             <div>
-              <label className="mb-1.5 block text-xs font-medium text-mute">
+              <label className="mb-1.5 block text-caption font-medium text-mute">
                 Search repositories
               </label>
               <div className="relative">
@@ -306,14 +306,16 @@ export default function NewWorkspacePage() {
                             : "border-hairline-strong"
                         }`}
                       >
-                        {isSelected && <Check className="size-3 text-white" />}
+                        {isSelected && (
+                          <Check className="size-3 text-primary-foreground" />
+                        )}
                       </div>
 
                       {/* icon + identity */}
                       <GitHubIcon className="size-4 shrink-0 text-mute" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="truncate text-sm">
+                          <p className="truncate text-copy">
                             <span className="text-mute">{repo.owner}/</span>
                             <span className="font-semibold text-ink">
                               {repo.name}
@@ -330,7 +332,7 @@ export default function NewWorkspacePage() {
                             )}
                           </Badge>
                         </div>
-                        <p className="mt-0.5 truncate text-xs text-mute">
+                        <p className="mt-0.5 truncate text-caption text-mute">
                           {repo.full_name} ·{" "}
                           {repo.private ? "Private" : "Public"} repository
                         </p>
@@ -355,7 +357,7 @@ export default function NewWorkspacePage() {
                 })}
                 {filteredRepos.length === 0 && !repoLoading && (
                   <div className="py-12 text-center">
-                    <p className="text-sm text-mute">
+                    <p className="text-copy text-mute">
                       {search
                         ? "No repositories match your search."
                         : "No repositories found."}

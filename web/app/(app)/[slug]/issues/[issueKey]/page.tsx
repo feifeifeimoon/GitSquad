@@ -15,9 +15,11 @@ import {
 } from "@/components/ui/select";
 import { Markdown } from "@/components/markdown";
 import { Field } from "@/components/form-field";
+import { SectionHeading } from "@/components/page-header";
 import { CommentComposer } from "@/components/issues/comment-composer";
 import { StatusIconLabel } from "@/components/status-icon";
 import { IssuePullRequests } from "@/components/issues/issue-pull-requests";
+import { TimeAgo } from "@/components/time-ago";
 import { useWorkspaceEvents } from "@/lib/realtime";
 
 export default function IssueDetailPage() {
@@ -111,60 +113,70 @@ export default function IssueDetailPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* Breadcrumb */}
+      {/* Breadcrumb — a path, so it stays quiet and leaves the title to the
+          heading in the column below. */}
       <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4">
         <button
           onClick={() => router.push(paths.workspace(slug).board())}
-          className="shrink-0 text-sm text-body transition-colors hover:text-ink"
+          className="shrink-0 text-label text-body transition-colors hover:text-ink"
         >
           Issues
         </button>
         <ChevronRight className="size-3.5 shrink-0 text-mute" />
-        <span className="truncate text-sm font-medium text-ink">{issue.title}</span>
+        <span className="truncate text-label text-mute">{issue.issue_key}</span>
       </div>
 
       {/* Two-column body */}
       <div className="flex min-h-0 flex-1">
         {/* Main column */}
         <div className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
+          {/* The title is the page's one loud element; the breadcrumb above it
+              is navigation and stays quiet. */}
+          <h1 className="mb-3 text-title font-semibold tracking-[-0.01em] text-ink">
+            {issue.title}
+          </h1>
+
           {issue.description ? (
             <div className="mb-8">
               <Markdown>{issue.description}</Markdown>
             </div>
           ) : (
-            <p className="mb-8 text-sm text-mute">No description.</p>
+            <p className="mb-8 text-copy text-mute">No description.</p>
           )}
 
           {/* Activity */}
-          <h2 className="mb-3 text-sm font-medium text-ink">Activity</h2>
-          <div className="space-y-4">
+          <SectionHeading className="mb-4">Activity</SectionHeading>
+          <div className="space-y-5">
             {issue.comments.map((c) => (
               <div key={c.id} className="flex gap-3">
-                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium text-body">
+                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-canvas-soft-2 text-caption font-medium text-body">
                   {c.type === "comment"
                     ? (c.author_name[0] ?? "?").toUpperCase()
                     : "·"}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-xs">
-                    <span className="font-medium text-ink">
+                  <div className="flex items-center gap-2">
+                    <span className="text-copy font-medium text-ink">
                       {c.type === "system" ? "System" : c.author_name}
                     </span>
-                    <span className="text-mute">
-                      {new Date(c.created_at).toLocaleString()}
-                    </span>
+                    {/* Relative, not absolute: an activity feed is read as a
+                        sequence, and the exact second is one hover away. */}
+                    <TimeAgo
+                      iso={c.created_at}
+                      className="text-caption text-mute"
+                    />
                     {c.type !== "comment" && (
                       <Badge variant="secondary">{c.type}</Badge>
                     )}
                   </div>
-                  <div className="mt-1 text-sm text-body">
+                  <div className="mt-1.5 text-copy text-body">
                     <Markdown>{c.content}</Markdown>
                   </div>
                 </div>
               </div>
             ))}
             {issue.comments.length === 0 && (
-              <p className="text-sm text-mute">No activity yet.</p>
+              <p className="text-copy text-mute">No activity yet.</p>
             )}
           </div>
 
@@ -181,7 +193,7 @@ export default function IssueDetailPage() {
 
         {/* Right sidebar */}
         <div className="w-64 shrink-0 overflow-y-auto border-l border-hairline px-5 py-6">
-          <h2 className="mb-4 font-mono text-xs font-medium uppercase text-mute">Details</h2>
+          <SectionHeading className="mb-4">Details</SectionHeading>
           <div className="space-y-5">
             <Field label="Status">
               <Select
@@ -209,18 +221,18 @@ export default function IssueDetailPage() {
                   ))}
                 </div>
               ) : (
-                <p className="text-sm text-body">Unassigned</p>
+                <p className="text-copy text-body">Unassigned</p>
               )}
             </Field>
 
             <Field label="Creator">
-              <p className="text-sm text-body">{issue.creator_name || "—"}</p>
+              <p className="text-copy text-body">{issue.creator_name || "—"}</p>
             </Field>
 
             <IssuePullRequests slug={slug} issue={issue} onChange={load} />
 
             <Field label="Created">
-              <p className="font-mono text-sm text-body">
+              <p className="font-mono text-copy text-body">
                 {new Date(issue.created_at).toLocaleString()}
               </p>
             </Field>

@@ -116,7 +116,7 @@ export function CommandPalette({
                   }
                 >
                   <StatusIcon status={issue.status} />
-                  <span className="shrink-0 font-mono text-xs text-mute">
+                  <span className="shrink-0 font-mono text-caption text-mute">
                     {issue.issue_key}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{issue.title}</span>
@@ -139,7 +139,7 @@ export function CommandPalette({
                 className="size-4"
               />
               <span className="min-w-0 flex-1 truncate">{w.name}</span>
-              <span className="shrink-0 font-mono text-xs text-mute">
+              <span className="shrink-0 font-mono text-caption text-mute">
                 {w.repo_full_name || `${w.repo_owner}/${w.repo_name}`}
               </span>
             </CommandItem>

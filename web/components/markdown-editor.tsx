@@ -399,7 +399,7 @@ export function MarkdownEditor({
                 selectMention(name);
               }}
               className={cn(
-                "flex w-full items-center px-3 py-1.5 text-left text-sm transition-colors",
+                "flex w-full items-center px-3 py-1.5 text-left text-copy transition-colors",
                 i === selectedIndex
                   ? "bg-muted text-ink"
                   : "text-body hover:bg-muted/50",

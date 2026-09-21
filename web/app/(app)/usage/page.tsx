@@ -131,7 +131,7 @@ export default function UsagePage() {
             </div>
 
             {coverage?.incomplete && (
-              <p className="mt-4 flex items-start gap-2 text-xs text-mute">
+              <p className="mt-4 flex items-start gap-2 text-caption text-mute">
                 <Info className="mt-px size-3.5 shrink-0" />
                 <span>
                   {coverage.reported} of {coverage.total} finished runs reported
@@ -144,8 +144,10 @@ export default function UsagePage() {
 
             <section className="mt-8">
               <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-sm font-medium text-ink">Tokens over time</h2>
-                <span className="text-xs text-mute">
+                <h2 className="text-label font-semibold text-ink">
+                  Tokens over time
+                </h2>
+                <span className="text-caption text-mute">
                   {usageWindow
                     ? `${usageWindow.range} · bucketed by ${granularity} in ${usageWindow.timezone}`
                     : ""}
@@ -158,7 +160,7 @@ export default function UsagePage() {
 
             <section className="mt-8">
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-sm font-medium text-ink">Breakdown</h2>
+                <h2 className="text-label font-semibold text-ink">Breakdown</h2>
                 <GroupSelector value={group} onChange={setGroup} />
               </div>
               {breakdownLoading ? (
@@ -189,12 +191,14 @@ function Kpi({
 }) {
   return (
     <div className="min-w-0">
-      <p className="font-mono text-xs font-semibold uppercase tracking-wide text-mute">
-        {label}
-      </p>
+      {/* Sentence case, not mono uppercase: mono uppercase is how you say "this
+          is an identifier", and "Total tokens" is not one. */}
+      <p className="text-caption text-mute">{label}</p>
       <p
         className={`mt-1 truncate tabular-nums ${
-          emphasis ? "text-xl font-semibold text-ink" : "text-base text-body"
+          emphasis
+            ? "text-display font-semibold tracking-[-0.01em] text-ink"
+            : "text-title-sm font-medium text-ink"
         }`}
         title={value}
       >
@@ -219,7 +223,7 @@ function RangeSelector({
           onClick={() => onChange(r)}
           title={USAGE_RANGE_TITLES[r]}
           aria-pressed={value === r}
-          className={`rounded-xs px-2.5 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-xs px-2.5 py-1 text-caption font-medium transition-colors ${
             value === r ? "bg-muted text-ink" : "text-mute hover:text-ink"
           }`}
         >
@@ -244,7 +248,7 @@ function GroupSelector({
           key={g}
           onClick={() => onChange(g)}
           aria-pressed={value === g}
-          className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${
+          className={`rounded-full px-2.5 py-1 text-caption font-medium transition-colors ${
             value === g ? "bg-ink text-canvas" : "bg-muted text-body hover:text-ink"
           }`}
         >

@@ -71,7 +71,7 @@ export function CreateIssueDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex h-[460px] max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
         <DialogTitle className="sr-only">Create issue</DialogTitle>
-        <div className="flex items-center gap-1.5 px-5 pr-12 pt-3 text-xs text-mute">
+        <div className="flex items-center gap-1.5 px-5 pr-12 pt-3 text-caption text-mute">
           <span className="truncate">{workspaceName}</span>
           <ChevronRight className="size-3 shrink-0 text-mute/50" />
           <span className="shrink-0 font-medium text-ink">Create issue</span>

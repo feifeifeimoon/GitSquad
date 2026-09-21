@@ -123,9 +123,9 @@ export default function WorkspaceSkillsPage() {
                 className="flex items-center gap-4 rounded-md border border-hairline bg-canvas p-4 shadow-level-2"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-ink">{s.name}</p>
+                  <p className="truncate text-copy font-semibold text-ink">{s.name}</p>
                   {s.description && (
-                    <p className="mt-0.5 truncate text-xs text-body">{s.description}</p>
+                    <p className="mt-0.5 truncate text-caption text-body">{s.description}</p>
                   )}
                 </div>
                 <button
