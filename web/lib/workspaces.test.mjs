@@ -30,6 +30,10 @@ const sonner = readFileSync(
   new URL("../components/ui/sonner.tsx", import.meta.url),
   "utf8",
 );
+const viewSwitcher = readFileSync(
+  new URL("../components/view-switcher.tsx", import.meta.url),
+  "utf8",
+);
 
 test("workspace list renders a card grid by default", () => {
   assert.match(list, /grid-cols-1/);
@@ -44,12 +48,15 @@ test("workspace list shows a skeleton while loading", () => {
 });
 
 test("workspace list offers a cards/list view switcher persisted to localStorage", () => {
+  // The toggle and its persistence live in one component now, shared with the
+  // daemon list; the page only wires it up.
   assert.match(list, /ViewSwitcher/);
-  assert.match(list, /LayoutGrid/);
-  assert.match(list, /localStorage/);
-  assert.match(list, /"Cards"/);
-  assert.match(list, /"List"/);
-  assert.match(list, /aria-label/);
+  assert.match(list, /useViewMode/);
+  assert.match(viewSwitcher, /LayoutGrid/);
+  assert.match(viewSwitcher, /localStorage/);
+  assert.match(viewSwitcher, /"Cards"/);
+  assert.match(viewSwitcher, /"List"/);
+  assert.match(viewSwitcher, /aria-label/);
 });
 
 test("workspace list supports search and a table list view", () => {

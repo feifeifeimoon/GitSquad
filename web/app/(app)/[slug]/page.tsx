@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useMemo, useRef, useState } from "react";
+import { use, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   DndContext,
@@ -11,7 +11,7 @@ import {
   type DragEndEvent,
   type DragStartEvent,
 } from "@dnd-kit/core";
-import { Plus, ChevronRight } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   Issue,
   IssueStatus,
@@ -25,19 +25,7 @@ import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-} from "@/components/ui/select";
-import { MarkdownEditor } from "@/components/markdown-editor";
-import { StatusIconLabel } from "@/components/status-icon";
+import { CreateIssueDialog } from "@/components/issues/create-issue-dialog";
 import { useWorkspaceEvents } from "@/lib/realtime";
 import { IssueCard } from "@/components/issues/board-card";
 import { BoardColumn } from "@/components/issues/board-column";
@@ -61,11 +49,12 @@ export default function WorkspaceBoardPage({
   const [issues, setIssues] = useState<Issue[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [status, setStatus] = useState<IssueStatus>("backlog");
-  const [creating, setCreating] = useState(false);
+  // Which status a new issue should start in, and which opening of the dialog
+  // this is. The counter is the dialog's key: it hands each opening a fresh
+  // component (and so an empty draft) without remounting on close, which would
+  // cut off the dialog's exit animation.
+  const [createStatus, setCreateStatus] = useState<IssueStatus | null>(null);
+  const [createSession, setCreateSession] = useState(0);
   const [agentNames, setAgentNames] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [filters, setFilters] = useState<IssueFilters>(EMPTY_FILTERS);
@@ -109,14 +98,14 @@ export default function WorkspaceBoardPage({
     };
   }, []);
 
-  const load = () => {
+  const load = useCallback(() => {
     issueApi
       .list(slug)
       .then(setIssues)
       .catch(() => router.push(paths.workspaces()))
       .finally(() => setLoading(false));
-  };
-  useEffect(load, [slug, router]);
+  }, [slug, router]);
+  useEffect(load, [load]);
 
   useEffect(() => {
     agentApi
@@ -138,39 +127,19 @@ export default function WorkspaceBoardPage({
       .catch(() => {});
   }, [slug]);
 
-  const create = async () => {
-    if (!title.trim()) return;
-    setCreating(true);
-    try {
-      await issueApi.create(slug, { title, description, status });
-      setTitle("");
-      setDescription("");
-      setStatus("backlog");
-      setOpen(false);
-      load();
-      toast.success("Issue created");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create issue");
-    } finally {
-      setCreating(false);
-    }
-  };
+  const openCreate = useCallback((initial: IssueStatus) => {
+    setCreateSession((n) => n + 1);
+    setCreateStatus(initial);
+  }, []);
 
-  const openCreate = (initial: IssueStatus) => {
-    setTitle("");
-    setDescription("");
-    setStatus(initial);
-    setOpen(true);
-  };
+  const closeCreate = useCallback((open: boolean) => {
+    if (!open) setCreateStatus(null);
+  }, []);
 
-  const handleOpenChange = (next: boolean) => {
-    setOpen(next);
-    if (!next) {
-      setTitle("");
-      setDescription("");
-      setStatus("backlog");
-    }
-  };
+  const openIssue = useCallback(
+    (issueKey: string) => router.push(paths.workspace(slug).issue(issueKey)),
+    [router, slug],
+  );
 
   const move = async (issueId: string, status: IssueStatus) => {
     setIssues((prev) =>
@@ -201,6 +170,17 @@ export default function WorkspaceBoardPage({
   const visibleIssues = useMemo(() => {
     return sortIssues(filterIssues(issues, filters), sort);
   }, [issues, filters, sort]);
+
+  // One pass into per-status arrays, memoized: the columns are memoized on
+  // their array identity, so re-filtering per column on every render would both
+  // cost seven passes over the board and hand every column a new array.
+  const byStatus = useMemo(() => {
+    const map = Object.fromEntries(
+      ISSUE_STATUSES.map((s) => [s, [] as Issue[]]),
+    ) as Record<IssueStatus, Issue[]>;
+    for (const issue of visibleIssues) map[issue.status].push(issue);
+    return map;
+  }, [visibleIssues]);
 
   const activeIssue = useMemo(
     () => (activeId ? issues.find((i) => i.id === activeId) ?? null : null),
@@ -240,9 +220,6 @@ export default function WorkspaceBoardPage({
     );
   }
 
-  const byStatus = (s: IssueStatus) =>
-    visibleIssues.filter((i) => i.status === s);
-
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between px-8 pb-4 pt-6">
@@ -276,9 +253,9 @@ export default function WorkspaceBoardPage({
             <BoardColumn
               key={status}
               status={status}
-              issues={byStatus(status)}
+              issues={byStatus[status]}
               onCreate={openCreate}
-              onOpen={(issueKey) => router.push(paths.workspace(slug).issue(issueKey))}
+              onOpen={openIssue}
             />
           ))}
           <DragOverlay dropAnimation={null}>
@@ -294,47 +271,16 @@ export default function WorkspaceBoardPage({
         </DndContext>
       </div>
 
-      {/* Create issue dialog */}
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="flex h-[460px] max-h-[85vh] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
-          <DialogTitle className="sr-only">Create issue</DialogTitle>
-          <div className="flex items-center gap-1.5 px-5 pr-12 pt-3 text-xs text-mute">
-            <span className="truncate">{workspace?.name ?? "Workspace"}</span>
-            <ChevronRight className="size-3 shrink-0 text-mute/50" />
-            <span className="shrink-0 font-medium text-ink">Create issue</span>
-          </div>
-          <input
-            autoFocus
-            placeholder="Issue title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="px-5 pb-2 pt-3 text-lg font-semibold text-ink outline-none placeholder:text-mute"
-          />
-          <MarkdownEditor
-            onChange={setDescription}
-            placeholder="Describe the issue… (@mention an agent)"
-            mentionItems={agentNames}
-            className="min-h-0 flex-1 overflow-y-auto px-5 py-3"
-          />
-          <div className="flex items-center justify-between border-t border-hairline px-4 py-3">
-            <Select value={status} onValueChange={(v) => setStatus(v as IssueStatus)}>
-              <SelectTrigger className="h-8 w-auto">
-                <StatusIconLabel status={status} />
-              </SelectTrigger>
-              <SelectContent position="popper" sideOffset={4}>
-                {ISSUE_STATUSES.map((s) => (
-                  <SelectItem key={s} value={s}>
-                    <StatusIconLabel status={s} />
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Button disabled={!title.trim() || creating} onClick={create}>
-              Create issue
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <CreateIssueDialog
+        key={createSession}
+        slug={slug}
+        workspaceName={workspace?.name ?? "Workspace"}
+        open={createStatus !== null}
+        initialStatus={createStatus ?? "backlog"}
+        onOpenChange={closeCreate}
+        onCreated={load}
+        mentionItems={agentNames}
+      />
     </div>
   );
 }

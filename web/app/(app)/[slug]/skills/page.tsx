@@ -2,20 +2,18 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Plus, Trash2, Pencil, Sparkles } from "lucide-react";
+import { Plus, Pencil, Sparkles } from "lucide-react";
 import { skillApi, type Skill } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
+import { PageHeader } from "@/components/page-header";
+import { Field, TextArea } from "@/components/form-field";
+import { InlineConfirm } from "@/components/inline-confirm";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-
-const labelCls = "mb-1.5 block text-xs text-mute";
-const inputCls =
-  "w-full rounded-sm border border-hairline bg-canvas px-3 py-2 text-sm text-ink outline-none placeholder:text-mute focus:border-primary";
-const textareaCls = `${inputCls} min-h-32 resize-y`;
 
 export default function WorkspaceSkillsPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -89,13 +87,15 @@ export default function WorkspaceSkillsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between border-b border-hairline px-8 py-4">
-        <h1 className="text-sm font-medium text-ink">Skills</h1>
-        <Button onClick={openCreate}>
-          <Plus className="size-4" />
-          New Skill
-        </Button>
-      </div>
+      <PageHeader
+        title="Skills"
+        actions={
+          <Button onClick={openCreate}>
+            <Plus className="size-4" />
+            New Skill
+          </Button>
+        }
+      />
 
       <div className="flex-1 px-8 pb-8 pt-6">
         {loading ? (
@@ -135,25 +135,14 @@ export default function WorkspaceSkillsPage() {
                 >
                   <Pencil className="size-4" />
                 </button>
-                {confirmId === s.id ? (
-                  <span className="flex items-center gap-2 text-xs">
-                    <span className="text-destructive">Delete?</span>
-                    <button onClick={() => remove(s.id)} className="font-medium text-destructive hover:underline">
-                      Yes
-                    </button>
-                    <button onClick={() => setConfirmId(null)} className="text-mute hover:text-body">
-                      No
-                    </button>
-                  </span>
-                ) : (
-                  <button
-                    onClick={() => setConfirmId(s.id)}
-                    className="text-hairline-strong transition-colors hover:text-destructive"
-                    title="Delete skill"
-                  >
-                    <Trash2 className="size-4" />
-                  </button>
-                )}
+                <InlineConfirm
+                  confirming={confirmId === s.id}
+                  question="Delete?"
+                  title="Delete skill"
+                  onRequest={() => setConfirmId(s.id)}
+                  onConfirm={() => remove(s.id)}
+                  onCancel={() => setConfirmId(null)}
+                />
               </div>
             ))}
           </div>
@@ -166,32 +155,29 @@ export default function WorkspaceSkillsPage() {
             {editing ? "Edit skill" : "Create skill"}
           </DialogTitle>
           <div className="space-y-4">
-            <div>
-              <label className={labelCls}>Name</label>
+            <Field label="Name">
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="react-patterns"
                 autoFocus
               />
-            </div>
-            <div>
-              <label className={labelCls}>Description</label>
+            </Field>
+            <Field label="Description">
               <Input
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Common React patterns and best practices"
               />
-            </div>
-            <div>
-              <label className={labelCls}>Content</label>
-              <textarea
-                className={textareaCls}
+            </Field>
+            <Field label="Content">
+              <TextArea
+                className="min-h-32"
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
                 placeholder="## Overview\n…"
               />
-            </div>
+            </Field>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setOpen(false)}>
                 Cancel

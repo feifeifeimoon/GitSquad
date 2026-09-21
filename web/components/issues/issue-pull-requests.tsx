@@ -6,6 +6,7 @@ import { Issue, PullRequest, issueApi } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Field } from "@/components/form-field";
 import { toast } from "sonner";
 
 /** The colour of a PR's state, in one place rather than a chain of ternaries. */
@@ -116,8 +117,7 @@ export function IssuePullRequests({
   };
 
   return (
-    <div>
-      <label className="mb-1.5 block text-xs text-mute">Pull requests</label>
+    <Field label="Pull requests">
       <div className="space-y-2">
         {active.map((pr) => (
           <PullRequestRow
@@ -194,7 +194,7 @@ export function IssuePullRequests({
           </p>
         )}
       </div>
-    </div>
+    </Field>
   );
 }
 

@@ -135,7 +135,8 @@ const STATUS_RENDERERS: Record<IssueStatus, () => React.ReactNode> = {
   cancelled: CancelledIcon,
 };
 
-export const STATUS_ICON: Record<IssueStatus, { className: string }> = {
+// Only StatusIcon reads this — the tone is not part of the icon's contract.
+const STATUS_ICON: Record<IssueStatus, { className: string }> = {
   backlog: { className: "text-mute" },
   todo: { className: "text-mute" },
   in_progress: { className: "text-warning" },

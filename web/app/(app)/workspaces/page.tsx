@@ -4,12 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import {
-  ArrowDown,
-  ArrowUp,
   FolderGit2,
   GitCommitHorizontal,
-  LayoutGrid,
-  List,
   Lock,
   Plus,
   Search,
@@ -17,6 +13,9 @@ import {
 import { api, Workspace } from "@/lib/api";
 import { paths } from "@/lib/paths";
 import { TimeAgo } from "@/components/time-ago";
+import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
+import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
+import { SortHeader, TH_CLASS, useSort, type SortState } from "@/components/table-sort";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -29,7 +28,6 @@ import {
   EmptyDescription,
 } from "@/components/ui/empty";
 
-type ViewMode = "cards" | "list";
 type SortKey = "name" | "created";
 
 const VIEW_KEY = "gitsquad_workspaces_view";
@@ -38,16 +36,12 @@ export default function WorkspacesPage() {
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<ViewMode>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem(VIEW_KEY);
-      if (saved === "list" || saved === "cards") return saved;
-    }
-    return "cards";
-  });
+  const [view, setView] = useViewMode(VIEW_KEY);
   const [search, setSearch] = useState("");
-  const [sortKey, setSortKey] = useState<SortKey>("created");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const { sort, toggle: toggleSort } = useSort<SortKey>(
+    { key: "created", dir: "desc" },
+    "name",
+  );
 
   useEffect(() => {
     api
@@ -56,10 +50,6 @@ export default function WorkspacesPage() {
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(VIEW_KEY, view);
-  }, [view]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -74,35 +64,27 @@ export default function WorkspacesPage() {
 
   const sorted = useMemo(() => {
     const arr = [...filtered];
-    const dir = sortDir === "asc" ? 1 : -1;
+    const dir = sort.dir === "asc" ? 1 : -1;
     arr.sort((a, b) => {
-      const av = sortKey === "name" ? a.name : a.created_at;
-      const bv = sortKey === "name" ? b.name : b.created_at;
+      const av = sort.key === "name" ? a.name : a.created_at;
+      const bv = sort.key === "name" ? b.name : b.created_at;
       return av < bv ? -dir : av > bv ? dir : 0;
     });
     return arr;
-  }, [filtered, sortKey, sortDir]);
-
-  const toggleSort = (key: SortKey) => {
-    if (sortKey === key) {
-      setSortDir((d) => (d === "asc" ? "desc" : "asc"));
-    } else {
-      setSortKey(key);
-      setSortDir(key === "name" ? "asc" : "desc");
-    }
-  };
+  }, [filtered, sort]);
 
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between gap-3 px-8 pt-8">
-          <Skeleton className="h-5 w-28" />
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-8 w-56" />
-            <Skeleton className="h-8 w-16" />
-            <Skeleton className="h-8 w-32" />
-          </div>
-        </div>
+        <PageHeaderSkeleton
+          actions={
+            <>
+              <Skeleton className="h-8 w-56" />
+              <Skeleton className="h-8 w-16" />
+              <Skeleton className="h-8 w-32" />
+            </>
+          }
+        />
         <div className="grid grid-cols-1 gap-3 px-8 py-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
@@ -131,25 +113,27 @@ export default function WorkspacesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between gap-3 px-8 pt-8">
-        <h1 className="text-sm font-medium text-ink">Workspaces</h1>
-        <div className="flex items-center gap-2">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-mute" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search workspaces…"
-              className="h-8 w-56 pl-8"
-            />
-          </div>
-          <ViewSwitcher view={view} onChange={setView} />
-          <Button onClick={() => router.push(paths.newWorkspace())}>
-            <Plus className="size-4" />
-            New Workspace
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Workspaces"
+        actions={
+          <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-mute" />
+              <Input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search workspaces…"
+                className="h-8 w-56 pl-8"
+              />
+            </div>
+            <ViewSwitcher view={view} onChange={setView} />
+            <Button onClick={() => router.push(paths.newWorkspace())}>
+              <Plus className="size-4" />
+              New Workspace
+            </Button>
+          </>
+        }
+      />
 
       {workspaces.length === 0 ? (
         <Empty className="pb-16">
@@ -189,39 +173,11 @@ export default function WorkspacesPage() {
       ) : (
         <WorkspaceTable
           workspaces={sorted}
-          sortKey={sortKey}
-          sortDir={sortDir}
+          sort={sort}
           onSort={toggleSort}
           onOpen={(slug) => router.push(paths.workspace(slug).board())}
         />
       )}
-    </div>
-  );
-}
-
-function ViewSwitcher({
-  view,
-  onChange,
-}: {
-  view: ViewMode;
-  onChange: (v: ViewMode) => void;
-}) {
-  const item = (v: ViewMode, Icon: typeof LayoutGrid, label: string) => (
-    <button
-      onClick={() => onChange(v)}
-      title={label}
-      aria-label={`${label} view`}
-      className={`flex size-7 items-center justify-center rounded-sm transition-colors ${
-        view === v ? "bg-muted text-ink" : "text-mute hover:text-ink"
-      }`}
-    >
-      <Icon className="size-3.5" />
-    </button>
-  );
-  return (
-    <div className="flex items-center rounded-sm border border-hairline bg-canvas p-0.5">
-      {item("cards", LayoutGrid, "Cards")}
-      {item("list", List, "List")}
     </div>
   );
 }
@@ -279,74 +235,34 @@ function WorkspaceCard({
   );
 }
 
-function SortIndicator({
-  column,
-  sortKey,
-  sortDir,
-}: {
-  column: SortKey;
-  sortKey: SortKey;
-  sortDir: "asc" | "desc";
-}) {
-  if (sortKey !== column) return null;
-  return sortDir === "asc" ? (
-    <ArrowUp className="size-3" />
-  ) : (
-    <ArrowDown className="size-3" />
-  );
-}
-
 function WorkspaceTable({
   workspaces,
-  sortKey,
-  sortDir,
+  sort,
   onSort,
   onOpen,
 }: {
   workspaces: Workspace[];
-  sortKey: SortKey;
-  sortDir: "asc" | "desc";
+  sort: SortState<SortKey>;
   onSort: (key: SortKey) => void;
   onOpen: (slug: string) => void;
 }) {
-  const th =
-    "px-4 py-2 text-left font-mono text-xs font-medium uppercase tracking-wide text-mute";
-
   return (
     <div className="px-8 py-6">
       <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="border-b border-hairline bg-canvas-soft">
-              <th className={th}>
-                <button
-                  onClick={() => onSort("name")}
-                  className="inline-flex items-center gap-1 text-mute transition-colors hover:text-ink"
-                >
-                  Name
-                  <SortIndicator
-                    column="name"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                  />
-                </button>
-              </th>
-              <th className={th}>Repository</th>
-              <th className={th}>Status</th>
-              <th className={th}>Last commit</th>
-              <th className={`${th} text-right`}>
-                <button
-                  onClick={() => onSort("created")}
-                  className="inline-flex items-center gap-1 text-mute transition-colors hover:text-ink"
-                >
-                  Created
-                  <SortIndicator
-                    column="created"
-                    sortKey={sortKey}
-                    sortDir={sortDir}
-                  />
-                </button>
-              </th>
+              <SortHeader label="Name" column="name" sort={sort} onSort={onSort} />
+              <th className={TH_CLASS}>Repository</th>
+              <th className={TH_CLASS}>Status</th>
+              <th className={TH_CLASS}>Last commit</th>
+              <SortHeader
+                label="Created"
+                column="created"
+                sort={sort}
+                onSort={onSort}
+                align="right"
+              />
             </tr>
           </thead>
           <tbody>

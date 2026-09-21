@@ -29,6 +29,14 @@ const detail = readFileSync(
   ),
   "utf8",
 );
+const createDialog = readFileSync(
+  new URL("../components/issues/create-issue-dialog.tsx", import.meta.url),
+  "utf8",
+);
+const composer = readFileSync(
+  new URL("../components/issues/comment-composer.tsx", import.meta.url),
+  "utf8",
+);
 const api = readFileSync(
   new URL("./api.ts", import.meta.url),
   "utf8",
@@ -62,6 +70,9 @@ test("issue board drags between columns with dnd-kit", () => {
 
 test("issue board supports create, empty columns, and per-column add", () => {
   assert.match(board, /New Issue/);
+  assert.match(board, /CreateIssueDialog/);
+  assert.match(createDialog, /issueApi\.create/);
+  assert.match(createDialog, /Issue title/);
   assert.match(column, /No issues/);
   assert.match(column, /Plus/);
   assert.match(card, /issue_key/);
@@ -81,7 +92,11 @@ test("issue board pans horizontally by dragging empty space", () => {
 });
 
 test("issue mutations surface toast feedback", () => {
-  assert.match(board, /toast\.success/);
+  // The create dialog owns its own request, so its feedback moved with it; the
+  // board still reports a failed drag.
+  assert.match(createDialog, /toast\.success/);
+  assert.match(createDialog, /toast\.error/);
+  assert.match(composer, /toast\.error/);
   assert.match(board, /toast\.error/);
   assert.match(detail, /toast\.error/);
 });
@@ -106,6 +121,8 @@ test("status icons use a self-drawn progress-ring family", () => {
 test("issue detail renders comments and a status selector", () => {
   assert.match(detail, /issue\.comments\.map/);
   assert.match(detail, /ISSUE_STATUSES\.map/);
-  assert.match(detail, /Add a comment…/);
-  assert.match(detail, /issueApi\.addComment/);
+  // The composer is its own component now — the draft it holds is what keeps
+  // typing a comment from re-parsing every comment above it.
+  assert.match(composer, /Add a comment…/);
+  assert.match(composer, /issueApi\.addComment/);
 });

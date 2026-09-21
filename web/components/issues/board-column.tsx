@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { Plus } from "lucide-react";
 import type { Issue, IssueStatus } from "@/lib/api";
@@ -17,7 +18,10 @@ export const COLUMN_BG: Record<IssueStatus, string> = {
   cancelled: "bg-muted/40",
 };
 
-export function BoardColumn({
+// Memoized alongside the cards: the board groups issues into stable per-status
+// arrays and passes stable callbacks, so a change that belongs to one column no
+// longer walks all seven.
+export const BoardColumn = memo(function BoardColumn({
   status,
   issues,
   onCreate,
@@ -64,4 +68,4 @@ export function BoardColumn({
       </div>
     </div>
   );
-}
+});

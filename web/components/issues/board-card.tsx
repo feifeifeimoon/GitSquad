@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { useDraggable } from "@dnd-kit/core";
 import { MessageSquare } from "lucide-react";
 import type { Issue } from "@/lib/api";
@@ -7,7 +8,11 @@ import { TimeAgo } from "@/components/time-ago";
 import { IssuePullRequestBadge } from "@/components/issues/issue-pull-requests";
 import { stripMarkdown } from "@/lib/utils";
 
-export function IssueCard({
+// Memoized on the issue object: a column re-renders whenever its array identity
+// changes, and every card here recomputes a markdown-stripped preview and a
+// relative timestamp. The board hands down stable issue objects and stable
+// callbacks, so a card only repaints when its own issue does.
+export const IssueCard = memo(function IssueCard({
   issue,
   className,
 }: {
@@ -55,9 +60,9 @@ export function IssueCard({
       </div>
     </div>
   );
-}
+});
 
-export function DraggableIssueCard({
+export const DraggableIssueCard = memo(function DraggableIssueCard({
   issue,
   onOpen,
 }: {
@@ -83,4 +88,4 @@ export function DraggableIssueCard({
       <IssueCard issue={issue} />
     </div>
   );
-}
+});
