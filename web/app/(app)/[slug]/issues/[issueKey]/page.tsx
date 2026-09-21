@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import {
@@ -16,6 +16,7 @@ import {
 import { Markdown } from "@/components/markdown";
 import { Field } from "@/components/form-field";
 import { SectionHeading } from "@/components/page-header";
+import { ErrorState } from "@/components/error-state";
 import { CommentComposer } from "@/components/issues/comment-composer";
 import { StatusIconLabel } from "@/components/status-icon";
 import { IssuePullRequests } from "@/components/issues/issue-pull-requests";
@@ -34,12 +35,6 @@ export default function IssueDetailPage() {
     `/api/v1/workspaces/${slug}/agents`,
     () => agentApi.list(slug),
   );
-
-  // A failed read here means the issue is gone or not ours; the board is the
-  // place to be. `lib/api.ts` already cleared the token if it was a 401.
-  useEffect(() => {
-    if (error) router.push(paths.workspace(slug).board());
-  }, [error, router, slug]);
 
   // Realtime needs no wiring: the shell holds the socket, and an event
   // invalidates this path, so a comment written elsewhere appears here without
@@ -60,6 +55,20 @@ export default function IssueDetailPage() {
       );
     }
   };
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          what="issue"
+          error={error}
+          onRetry={refresh}
+          notFoundHref={paths.workspace(slug).board()}
+          notFoundLabel="Back to the board"
+        />
+      </div>
+    );
+  }
 
   if (loading || !issue) {
     return (

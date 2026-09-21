@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   Check,
@@ -23,6 +23,7 @@ import { ProviderIcon } from "@/components/provider-icon";
 import { AgentStatusBadge, DaemonStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { Field } from "@/components/form-field";
+import { ErrorState } from "@/components/error-state";
 import { Button } from "@/components/ui/button";
 import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { Input } from "@/components/ui/input";
@@ -33,18 +34,13 @@ import { toast } from "sonner";
 
 export default function DaemonDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const { data: daemon, loading, error } = useApi<DaemonDetail>(
-    `/api/v1/daemons/${id}`,
-    () => daemonApi.get(id),
-  );
+  const {
+    data: daemon,
+    loading,
+    error,
+    refresh,
+  } = useApi<DaemonDetail>(`/api/v1/daemons/${id}`, () => daemonApi.get(id));
   const [renaming, setRenaming] = useState(false);
-
-  // A daemon that no longer exists (or is no longer ours) is worth leaving the
-  // page for; a blip on the poll below is not.
-  useEffect(() => {
-    if (error) router.push(paths.daemons());
-  }, [error, router]);
 
   // Liveness is decided by the server, so this page has to keep asking — the
   // answer changes on the machine's schedule, not on the render's.
@@ -55,6 +51,20 @@ export default function DaemonDetailPage() {
     );
     return () => clearInterval(interval);
   }, [id]);
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          what="daemon"
+          error={error}
+          onRetry={refresh}
+          notFoundHref={paths.daemons()}
+          notFoundLabel="Back to daemons"
+        />
+      </div>
+    );
+  }
 
   if (loading || !daemon) {
     return (

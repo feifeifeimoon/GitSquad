@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type ChangeEvent } from "react";
+import { useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { PageHeader } from "@/components/page-header";
 import { Field } from "@/components/form-field";
+import { ErrorState } from "@/components/error-state";
 import { UserSettings } from "@/components/settings/user-settings";
 import {
   Dialog,
@@ -31,14 +32,13 @@ export default function WorkspaceSettingsPage() {
   const [avatarError, setAvatarError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { data: workspace, error } = useApi<Workspace>(
-    `/api/v1/workspaces/${slug}`,
-    () => api.get<Workspace>(`/api/v1/workspaces/${slug}`),
+  const {
+    data: workspace,
+    error,
+    refresh,
+  } = useApi<Workspace>(`/api/v1/workspaces/${slug}`, () =>
+    api.get<Workspace>(`/api/v1/workspaces/${slug}`),
   );
-
-  useEffect(() => {
-    if (error) router.push(paths.workspaces());
-  }, [error, router]);
 
   const url =
     typeof window !== "undefined"
@@ -87,6 +87,20 @@ export default function WorkspaceSettingsPage() {
       setDeleting(false);
     }
   };
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          what="workspace"
+          error={error}
+          onRetry={refresh}
+          notFoundHref={paths.workspaces()}
+          notFoundLabel="Go to workspaces"
+        />
+      </div>
+    );
+  }
 
   if (!workspace) {
     return (
