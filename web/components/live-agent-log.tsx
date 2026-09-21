@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePrefersReducedMotion } from "@/lib/motion";
 
 const stream = [
   ["16:27:00", "@janitor", "Identified pattern for code duplication in /ui"],
@@ -13,14 +14,19 @@ const stream = [
 
 export function LiveAgentLog() {
   const [cursor, setCursor] = useState(3);
+  const reducedMotion = usePrefersReducedMotion();
 
+  // A line arriving every three seconds is motion, and the stylesheet cannot
+  // reach it — this is a timer, not a transition. Readers who asked for less
+  // motion get the four lines held still.
   useEffect(() => {
+    if (reducedMotion) return;
     const interval = window.setInterval(() => {
       setCursor((current) => (current + 1) % stream.length);
     }, 3000);
 
     return () => window.clearInterval(interval);
-  }, []);
+  }, [reducedMotion]);
 
   const visibleLines = useMemo(
     () => Array.from({ length: 4 }, (_, index) => stream[(cursor + index) % stream.length]),
@@ -29,7 +35,7 @@ export function LiveAgentLog() {
 
   return (
     <div className="h-[132px] overflow-hidden bg-black px-6 py-5 font-mono text-caption leading-6 sm:px-8">
-      <div className="transition-transform duration-500 ease-out">
+      <div>
         {visibleLines.map(([time, agent, message]) => (
           <p key={time + agent + message} className="grid grid-cols-[78px_82px_1fr] gap-2 text-white/40 max-sm:grid-cols-1 max-sm:gap-0 max-sm:py-1">
             <span>[{time}]</span>

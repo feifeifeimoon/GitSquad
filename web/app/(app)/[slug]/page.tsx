@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { CreateIssueDialog } from "@/components/issues/create-issue-dialog";
+import { ErrorState } from "@/components/error-state";
 import { setApiData, useApi } from "@/lib/query";
 import { IssueCard } from "@/components/issues/board-card";
 import { BoardColumn } from "@/components/issues/board-column";
@@ -48,10 +49,12 @@ export default function WorkspaceBoardPage({
   const { slug } = use(params);
   const router = useRouter();
   const issuesKey = `/api/v1/workspaces/${slug}/issues`;
-  const { data: issues, loading, refresh: refreshIssues } = useApi<Issue[]>(
-    issuesKey,
-    () => issueApi.list(slug),
-  );
+  const {
+    data: issues,
+    loading,
+    error: issuesError,
+    refresh: refreshIssues,
+  } = useApi<Issue[]>(issuesKey, () => issueApi.list(slug));
   const { data: workspace } = useApi<Workspace>(
     `/api/v1/workspaces/${slug}`,
     () => api.get<Workspace>(`/api/v1/workspaces/${slug}`),
@@ -175,6 +178,18 @@ export default function WorkspaceBoardPage({
     () => (activeId ? (issues ?? []).find((i) => i.id === activeId) ?? null : null),
     [activeId, issues],
   );
+
+  if (issuesError) {
+    return (
+      <div className="p-8">
+        <ErrorState
+          what="this board"
+          error={issuesError}
+          onRetry={refreshIssues}
+        />
+      </div>
+    );
+  }
 
   if (loading) {
     return (

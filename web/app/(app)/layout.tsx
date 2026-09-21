@@ -295,6 +295,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               onClick={() => setLogoutConfirm(true)}
               className="text-mute transition-colors hover:text-ink"
               title="Logout"
+              aria-label="Logout"
             >
               <LogOut className="size-4" />
             </button>

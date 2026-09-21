@@ -19,6 +19,7 @@ import { paths } from "@/lib/paths";
 import { timeAgo } from "@/lib/time";
 import { ProviderIcon } from "@/components/provider-icon";
 import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
+import { ErrorState } from "@/components/error-state";
 import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
 import { SortHeader, TH_CLASS, useSort, type SortState } from "@/components/table-sort";
@@ -40,9 +41,12 @@ type SortKey = "name" | "last_seen";
 const VIEW_KEY = "gitsquad_daemons_view";
 
 export default function DaemonsPage() {
-  const { data: daemons, loading } = useApi<Daemon[]>("/api/v1/daemons", () =>
-    daemonApi.list(),
-  );
+  const {
+    data: daemons,
+    loading,
+    error,
+    refresh,
+  } = useApi<Daemon[]>("/api/v1/daemons", () => daemonApi.list());
   const [deleting, setDeleting] = useState<string | null>(null);
   const [showConnect, setShowConnect] = useState(false);
   const [copied, setCopied] = useState("");
@@ -167,7 +171,11 @@ export default function DaemonsPage() {
         }
       />
 
-      {(daemons ?? []).length === 0 ? (
+      {error ? (
+        <div className="px-8 py-6">
+          <ErrorState what="your daemons" error={error} onRetry={refresh} />
+        </div>
+      ) : (daemons ?? []).length === 0 ? (
         <Empty className="pb-16">
           <EmptyMedia>
             <Monitor className="size-5" />

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 import { PageHeader } from "@/components/page-header";
+import { ErrorState } from "@/components/error-state";
 import { Field, TextArea } from "@/components/form-field";
 import { InlineConfirm } from "@/components/inline-confirm";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -27,9 +28,13 @@ export default function WorkspaceSkillsPage() {
   const [description, setDescription] = useState("");
   const [content, setContent] = useState("");
 
-  const { data: skills = [], loading, refresh } = useApi<Skill[]>(
-    `/api/v1/workspaces/${slug}/skills`,
-    () => skillApi.list(slug),
+  const {
+    data: skills = [],
+    loading,
+    error,
+    refresh,
+  } = useApi<Skill[]>(`/api/v1/workspaces/${slug}/skills`, () =>
+    skillApi.list(slug),
   );
 
   const openCreate = () => {
@@ -94,6 +99,12 @@ export default function WorkspaceSkillsPage() {
               <Skeleton key={i} className="h-16 w-full rounded-md" />
             ))}
           </div>
+        ) : error ? (
+          <ErrorState
+            what="this workspace's skills"
+            error={error}
+            onRetry={refresh}
+          />
         ) : skills.length === 0 ? (
           <Empty className="rounded-lg bg-canvas-soft py-16">
             <EmptyMedia>
@@ -104,6 +115,10 @@ export default function WorkspaceSkillsPage() {
               Skills are reusable instruction docs injected into an agent&apos;s
               working directory when it runs.
             </EmptyDescription>
+            <Button onClick={openCreate} className="mt-1">
+              <Plus className="size-4" />
+              Create your first skill
+            </Button>
           </Empty>
         ) : (
           <div className="space-y-3">
@@ -122,6 +137,7 @@ export default function WorkspaceSkillsPage() {
                   onClick={() => openEdit(s)}
                   className="text-hairline-strong transition-colors hover:text-ink"
                   title="Edit skill"
+                  aria-label="Edit skill"
                 >
                   <Pencil className="size-4" />
                 </button>

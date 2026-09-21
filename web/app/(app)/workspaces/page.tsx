@@ -15,6 +15,7 @@ import { useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { TimeAgo } from "@/components/time-ago";
 import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
+import { ErrorState } from "@/components/error-state";
 import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
 import { SortHeader, TH_CLASS, useSort, type SortState } from "@/components/table-sort";
 import { Button } from "@/components/ui/button";
@@ -36,9 +37,13 @@ const VIEW_KEY = "gitsquad_workspaces_view";
 export default function WorkspacesPage() {
   const router = useRouter();
   // Shared with the shell and the command palette: one request, one cache entry.
-  const { data: workspaces = [], loading } = useApi<Workspace[]>(
-    "/api/v1/workspaces",
-    () => api.get<Workspace[]>("/api/v1/workspaces"),
+  const {
+    data: workspaces = [],
+    loading,
+    error,
+    refresh,
+  } = useApi<Workspace[]>("/api/v1/workspaces", () =>
+    api.get<Workspace[]>("/api/v1/workspaces"),
   );
   const [view, setView] = useViewMode(VIEW_KEY);
   const [search, setSearch] = useState("");
@@ -131,7 +136,11 @@ export default function WorkspacesPage() {
         }
       />
 
-      {workspaces.length === 0 ? (
+      {error ? (
+        <div className="px-8 py-6">
+          <ErrorState what="your workspaces" error={error} onRetry={refresh} />
+        </div>
+      ) : workspaces.length === 0 ? (
         <Empty className="pb-16">
           <EmptyMedia>
             <FolderGit2 className="size-5" />
