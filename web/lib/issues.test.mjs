@@ -29,12 +29,24 @@ const detail = readFileSync(
   ),
   "utf8",
 );
+const timeline = readFileSync(
+  new URL("../components/issues/issue-timeline.tsx", import.meta.url),
+  "utf8",
+);
 const createDialog = readFileSync(
   new URL("../components/issues/create-issue-dialog.tsx", import.meta.url),
   "utf8",
 );
 const composer = readFileSync(
   new URL("../components/issues/comment-composer.tsx", import.meta.url),
+  "utf8",
+);
+const title = readFileSync(
+  new URL("../components/issues/issue-title.tsx", import.meta.url),
+  "utf8",
+);
+const description = readFileSync(
+  new URL("../components/issues/issue-description.tsx", import.meta.url),
   "utf8",
 );
 const api = readFileSync(
@@ -126,10 +138,29 @@ test("status icons use a self-drawn progress-ring family", () => {
 });
 
 test("issue detail renders comments and a status selector", () => {
-  assert.match(detail, /issue\.comments\.map/);
+  // The feed moved into its own component when it gained the jump rail; the
+  // page composes the pieces rather than mapping the comments itself.
+  assert.match(detail, /IssueTimeline/);
+  assert.match(timeline, /comments\.map/);
   assert.match(detail, /ISSUE_STATUSES\.map/);
   // The composer is its own component now — the draft it holds is what keeps
   // typing a comment from re-parsing every comment above it.
   assert.match(composer, /Add a comment…/);
   assert.match(composer, /issueApi\.addComment/);
+});
+
+test("issue detail edits its own title and description", () => {
+  // Both were write-once: the API has always accepted them and no page ever
+  // sent one, so the create dialog was the only moment either could be set.
+  assert.match(detail, /IssueTitle/);
+  assert.match(detail, /IssueDescription/);
+  assert.match(title, /issueApi\.update/);
+  assert.match(description, /issueApi\.update/);
+});
+
+test("the activity rail is a way through a long feed", () => {
+  assert.match(timeline, /scrollIntoView/);
+  assert.match(timeline, /IntersectionObserver/);
+  // Only worth its pixels once there is something to move through.
+  assert.match(timeline, /RAIL_MIN_ENTRIES/);
 });
