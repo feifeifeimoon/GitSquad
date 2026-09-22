@@ -43,7 +43,7 @@ test.describe("Agent mentions", () => {
       page.getByRole("heading", { name: "Activity" }),
     ).toBeVisible({ timeout: 20_000 });
 
-    const editor = page.locator('[contenteditable="true"]');
+    const editor = page.getByRole("textbox", { name: "Write a comment" });
     await editor.click();
     await page.keyboard.type("@");
 
@@ -67,7 +67,7 @@ test.describe("Agent mentions", () => {
       page.getByRole("heading", { name: "Activity" }),
     ).toBeVisible({ timeout: 20_000 });
 
-    const editor = page.locator('[contenteditable="true"]');
+    const editor = page.getByRole("textbox", { name: "Write a comment" });
     await editor.click();
     await page.keyboard.type(`@${agentName} please fix this`);
     await page.getByRole("button", { name: "Comment" }).click();

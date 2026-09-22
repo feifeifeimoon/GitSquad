@@ -17,10 +17,15 @@ import { MarkdownEditor } from "@/components/markdown-editor-lazy";
  * description as the page's main editing surface rather than as a rendered
  * artefact.
  *
- * Editing is explicit rather than click-anywhere: a description is prose you
- * also want to select and copy, and a click that silently turns prose into an
- * editor breaks that. The pencil is the affordance; the block itself stays
- * text.
+ * Clicking the prose opens the editor, and the caret lands in it — the gesture
+ * Linear teaches and multica implements: the block is text until you click it,
+ * and then it is where you type. A drag-selection is the one click that means
+ * something else (copying a sentence out), so it is left alone; a link is the
+ * other, and it navigates.
+ *
+ * An empty description keeps a visible control, because there is nothing to
+ * click on yet. Once there is, the affordance drops to a pencil that appears on
+ * hover or focus — kept for the keyboard, not drawn as a label under the prose.
  */
 export function IssueDescription({
   slug,
@@ -69,6 +74,10 @@ export function IssueDescription({
         <MarkdownEditor
           content={description}
           onChange={setDraft}
+          // Clicking the prose is meant to land the caret in it: the editor
+          // mounts on that click, so it has to take the focus itself.
+          autoFocus
+          ariaLabel="Issue description"
           placeholder="Describe the issue… (@mention an agent)"
           mentionItems={mentionItems}
           className="min-h-[140px] px-3 py-2"
@@ -109,19 +118,31 @@ export function IssueDescription({
   }
 
   return (
-    <section className="mb-8">
-      <Markdown>{description}</Markdown>
-      {/* Visible rather than hover-revealed: a control that appears only under
-          a pointer does not exist on a touch screen. */}
-      <div className="mt-2">
+    <section className="group mb-8">
+      <div
+        onClick={(event) => {
+          // Selecting a sentence to copy it is not a request to edit the block.
+          const selection = window.getSelection();
+          if (selection && !selection.isCollapsed) return;
+          // A link in the prose is a link.
+          if ((event.target as HTMLElement).closest("a")) return;
+          open();
+        }}
+        className="cursor-text"
+      >
+        <Markdown>{description}</Markdown>
+      </div>
+      {/* Revealed on hover or focus: the prose above is the control now, and
+          this is what makes the same edit reachable from the keyboard. */}
+      <div className="mt-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
         <Button
           variant="ghost"
-          size="sm"
+          size="icon-sm"
           onClick={open}
-          className="-ml-2 text-mute hover:text-ink"
+          aria-label="Edit description"
+          className="-ml-1.5 text-mute hover:text-ink"
         >
           <Pencil className="size-3.5" />
-          Edit description
         </Button>
       </div>
     </section>

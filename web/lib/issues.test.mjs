@@ -160,13 +160,16 @@ test("issue detail edits its own title and description", () => {
 
 test("the activity rail is a way through a long feed", () => {
   assert.match(timeline, /scrollIntoView/);
-  // Every tick is placed from the measured rectangle of the entry it stands
-  // for, and the rail is bounded by the reader's viewport rather than by the
-  // thread. Stacking one tick per entry in flow is what made it a dashed line
-  // down the whole page, saying nothing about any of the entries it stood for.
+  // The rail is the scroll viewport and the ticks share it out evenly, shrinking
+  // rather than overflowing — multica's shape. Growing with the thread is what
+  // made it a dashed line down the whole page; mapping document positions made
+  // it float wherever the feed happened to sit.
   assert.match(timeline, /getBoundingClientRect/);
-  assert.match(timeline, /box\.height - 64/);
   assert.match(timeline, /scrollerRef/);
+  assert.match(timeline, /flex-\[0_1_0\.875rem\]/);
+  assert.match(timeline, /min-h-\[5px\]/);
+  // A tick says where it goes before you commit to the jump.
+  assert.match(timeline, /role="tooltip"/);
   // Only worth its pixels once there is something to move through.
   assert.match(timeline, /RAIL_MIN_ENTRIES/);
 });
