@@ -54,9 +54,34 @@ test.describe("Issues", () => {
     const editor = page.locator('[contenteditable="true"]');
     await editor.click();
     await page.keyboard.type(comment);
-    await page.getByRole("button", { name: "Comment" }).click();
+    // Exact: the activity rail's jump targets are labelled "Comment from …",
+    // and an issue may itself be titled with the word.
+    await page.getByRole("button", { name: "Comment", exact: true }).click();
 
     await expect(page.getByText(comment)).toBeVisible({ timeout: 15_000 });
+  });
+
+  // A timeline read backwards is not a timeline: the server orders activity by
+  // `created_at ASC` and the feed has to keep that order, because the first
+  // entry is what explains the rest.
+  test("reads the activity feed oldest first", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `Order ${suffix}`);
+    const older = `first note ${suffix}`;
+    const newer = `second note ${suffix}`;
+    await api.addComment(workspace.id, issue.issue_key, older);
+    await api.addComment(workspace.id, issue.issue_key, newer);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByText(newer)).toBeVisible({ timeout: 20_000 });
+
+    const olderBox = await page.getByText(older).boundingBox();
+    const newerBox = await page.getByText(newer).boundingBox();
+    expect(olderBox).not.toBeNull();
+    expect(newerBox).not.toBeNull();
+    expect(newerBox?.y ?? 0).toBeGreaterThan(olderBox?.y ?? 0);
   });
 
   test("changes issue status from the detail page", async ({ page }) => {
@@ -74,6 +99,63 @@ test.describe("Issues", () => {
     await page.getByRole("option", { name: "In Progress" }).click();
 
     await expect(statusSelect).toContainText("In Progress", { timeout: 10_000 });
+  });
+
+  // Both of these were write-once before: the API has always accepted a title
+  // and a description on update, and no page ever sent one, so the create
+  // dialog was the only moment either could be set.
+  test("renames an issue from its own heading", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `Old title ${suffix}`);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    // The heading itself is not the control; the pencil beside it is.
+    await expect(
+      page.getByRole("heading", { name: `Old title ${suffix}` }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    const renamed = `Renamed ${suffix}`;
+    await page.getByRole("button", { name: "Rename this issue" }).click();
+
+    const field = page.locator("textarea");
+    await expect(field).toBeVisible();
+    await field.fill(renamed);
+    await field.press("Enter");
+
+    // The heading is the assertion, not the textarea: it only comes back once
+    // the save has landed.
+    await expect(
+      page.getByRole("heading", { name: renamed }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+
+  test("edits the description after the issue exists", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `Body target ${suffix}`);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    await expect(
+      page.getByRole("heading", { name: "Activity" }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    await page.getByRole("button", { name: "Add a description" }).click();
+    const editor = page.locator('[contenteditable="true"]');
+    await editor.click();
+    await page.keyboard.type(`Written after the fact ${suffix}`);
+    await page.getByRole("button", { name: "Save" }).click();
+
+    await expect(
+      page.getByText(`Written after the fact ${suffix}`),
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("button", { name: "Edit description" }),
+    ).toBeVisible();
   });
 });
 

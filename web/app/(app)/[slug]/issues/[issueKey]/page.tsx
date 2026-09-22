@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ChevronRight } from "lucide-react";
 import {
@@ -13,11 +13,12 @@ import { toast } from "sonner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
-import { Markdown } from "@/components/markdown";
-import { Field } from "@/components/form-field";
 import { SectionHeading } from "@/components/page-header";
-import { ErrorState } from "@/components/error-state";
 import { CommentComposer } from "@/components/issues/comment-composer";
+import { IssueActions } from "@/components/issues/issue-actions";
+import { IssueDescription } from "@/components/issues/issue-description";
+import { IssueTimeline } from "@/components/issues/issue-timeline";
+import { IssueTitle } from "@/components/issues/issue-title";
 import { StatusIconLabel } from "@/components/status-icon";
 import { IssuePullRequests } from "@/components/issues/issue-pull-requests";
 import { TimeAgo } from "@/components/time-ago";
@@ -36,9 +37,12 @@ export default function IssueDetailPage() {
     () => agentApi.list(slug),
   );
 
-  // Realtime needs no wiring: the shell holds the socket, and an event
-  // invalidates this path, so a comment written elsewhere appears here without
-  // a reload.
+  // A failed read here means the issue is gone or not ours; the board is the
+  // place to be. `lib/api.ts` already cleared the token if it was a 401.
+  useEffect(() => {
+    if (error) router.push(paths.workspace(slug).board());
+  }, [error, router, slug]);
+
   const agentNames = useMemo(
     () => (agents ?? []).filter((a) => a.enabled).map((a) => a.name),
     [agents],
@@ -56,20 +60,6 @@ export default function IssueDetailPage() {
     }
   };
 
-  if (error) {
-    return (
-      <div className="p-8">
-        <ErrorState
-          what="issue"
-          error={error}
-          onRetry={refresh}
-          notFoundHref={paths.workspace(slug).board()}
-          notFoundLabel="Back to the board"
-        />
-      </div>
-    );
-  }
-
   if (loading || !issue) {
     return (
       <div className="flex h-full flex-col">
@@ -78,8 +68,8 @@ export default function IssueDetailPage() {
           <Skeleton className="h-4 w-4" />
           <Skeleton className="h-4 w-24" />
         </div>
-        <div className="flex min-h-0 flex-1">
-          <div className="min-w-0 flex-1 px-8 py-6">
+        <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-10 px-8 py-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
+          <div className="min-w-0">
             <Skeleton className="h-6 w-3/4" />
             <div className="mt-4 space-y-2">
               <Skeleton className="h-3 w-full" />
@@ -99,7 +89,7 @@ export default function IssueDetailPage() {
               ))}
             </div>
           </div>
-          <div className="w-64 shrink-0 border-l border-hairline px-5 py-6">
+          <div className="min-w-0">
             <Skeleton className="h-3 w-14" />
             <div className="mt-5 space-y-4">
               {Array.from({ length: 4 }).map((_, i) => (
@@ -115,10 +105,18 @@ export default function IssueDetailPage() {
     );
   }
 
+  // Read once and shared by the copy actions; the origin is only known in the
+  // browser, so it is computed during render like the settings page does.
+  const url =
+    typeof window !== "undefined"
+      ? `${window.location.origin}${paths.workspace(slug).issue(issueKey)}`
+      : "";
+
   return (
     <div className="flex h-full flex-col">
       {/* Breadcrumb — a path, so it stays quiet and leaves the title to the
-          heading in the column below. */}
+          heading below. The key is mono here because it is an identifier, and
+          the only one on the page. */}
       <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4">
         <button
           onClick={() => router.push(paths.workspace(slug).board())}
@@ -127,122 +125,124 @@ export default function IssueDetailPage() {
           Issues
         </button>
         <ChevronRight className="size-3.5 shrink-0 text-mute" />
-        <span className="truncate text-label text-mute">{issue.issue_key}</span>
+        <span className="truncate font-mono text-label text-mute">
+          {issue.issue_key}
+        </span>
       </div>
 
-      {/* Two-column body */}
-      <div className="flex min-h-0 flex-1">
-        {/* Main column */}
-        <div className="min-w-0 flex-1 overflow-y-auto px-8 py-6">
-          {/* The title is the page's one loud element; the breadcrumb above it
-              is navigation and stays quiet. */}
-          <h1 className="mb-3 text-title font-semibold tracking-[-0.01em] text-ink">
-            {issue.title}
-          </h1>
-
-          {issue.description ? (
-            <div className="mb-8">
-              <Markdown>{issue.description}</Markdown>
-            </div>
-          ) : (
-            <p className="mb-8 text-copy text-mute">No description.</p>
-          )}
-
-          {/* Activity */}
-          <SectionHeading className="mb-4">Activity</SectionHeading>
-          <div className="space-y-5">
-            {issue.comments.map((c) => (
-              <div key={c.id} className="flex gap-3">
-                <div className="flex size-6 shrink-0 items-center justify-center rounded-full bg-canvas-soft-2 text-caption font-medium text-body">
-                  {c.type === "comment"
-                    ? (c.author_name[0] ?? "?").toUpperCase()
-                    : "·"}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="text-copy font-medium text-ink">
-                      {c.type === "system" ? "System" : c.author_name}
-                    </span>
-                    {/* Relative, not absolute: an activity feed is read as a
-                        sequence, and the exact second is one hover away. */}
-                    <TimeAgo
-                      iso={c.created_at}
-                      className="text-caption text-mute"
-                    />
-                    {c.type !== "comment" && (
-                      <Badge variant="secondary">{c.type}</Badge>
-                    )}
-                  </div>
-                  <div className="mt-1.5 text-copy text-body">
-                    <Markdown>{c.content}</Markdown>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {issue.comments.length === 0 && (
-              <p className="text-copy text-mute">No activity yet.</p>
-            )}
-          </div>
-
-          {/* Comment composer */}
-          <div className="mt-8">
-            <CommentComposer
+      {/* The whole body is one scroll container — the rail is a sticky cell
+          inside it, not a second scroller. Two independent scroll regions meant
+          the rail could scroll away from the issue it describes, and a third
+          one above them both. */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto grid w-full max-w-5xl grid-cols-1 gap-10 px-8 py-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
+          <div className="min-w-0">
+            <IssueTitle
               slug={slug}
               issueKey={issueKey}
-              mentionItems={agentNames}
-              onPosted={refresh}
+              title={issue.title}
+              onSaved={refresh}
             />
+
+            <IssueDescription
+              slug={slug}
+              issueKey={issueKey}
+              description={issue.description}
+              mentionItems={agentNames}
+              onSaved={refresh}
+            />
+
+            <SectionHeading className="mb-3">Activity</SectionHeading>
+            <IssueTimeline comments={issue.comments} />
+
+            <div className="mt-8">
+              <CommentComposer
+                slug={slug}
+                issueKey={issueKey}
+                mentionItems={agentNames}
+                onPosted={refresh}
+              />
+            </div>
           </div>
-        </div>
 
-        {/* Right sidebar */}
-        <div className="w-64 shrink-0 overflow-y-auto border-l border-hairline px-5 py-6">
-          <SectionHeading className="mb-4">Details</SectionHeading>
-          <div className="space-y-5">
-            <Field label="Status">
-              <Select
-                value={issue.status}
-                onValueChange={(v) => changeStatus(v as IssueStatus)}
-              >
-                <SelectTrigger className="h-8 w-full">
-                  <StatusIconLabel status={issue.status} />
-                </SelectTrigger>
-                <SelectContent position="popper" sideOffset={4}>
-                  {ISSUE_STATUSES.map((s) => (
-                    <SelectItem key={s} value={s}>
-                      <StatusIconLabel status={s} />
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
+          <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+            <SectionHeading className="mb-4">Details</SectionHeading>
+            <div className="space-y-5">
+              <Field label="Status">
+                <Select
+                  value={issue.status}
+                  onValueChange={(v) => changeStatus(v as IssueStatus)}
+                >
+                  <SelectTrigger className="h-8 w-full">
+                    <StatusIconLabel status={issue.status} />
+                  </SelectTrigger>
+                  <SelectContent position="popper" sideOffset={4}>
+                    {ISSUE_STATUSES.map((s) => (
+                      <SelectItem key={s} value={s}>
+                        <StatusIconLabel status={s} />
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
 
-            <Field label="Assignee">
-              {issue.assigned_agents.length > 0 ? (
-                <div className="flex flex-wrap gap-1">
-                  {issue.assigned_agents.map((a) => (
-                    <Badge key={a} variant="outline">{a}</Badge>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-copy text-body">Unassigned</p>
-              )}
-            </Field>
+              <Field label="Assignee">
+                {issue.assigned_agents.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {issue.assigned_agents.map((a) => (
+                      <Badge key={a} variant="outline">@{a}</Badge>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-copy text-body">Unassigned</p>
+                )}
+              </Field>
 
-            <Field label="Creator">
-              <p className="text-copy text-body">{issue.creator_name || "—"}</p>
-            </Field>
+              <Field label="Creator">
+                <p className="text-copy text-body">{issue.creator_name || "—"}</p>
+              </Field>
 
-            <IssuePullRequests slug={slug} issue={issue} onChange={refresh} />
+              <IssuePullRequests slug={slug} issue={issue} onChange={refresh} />
 
-            <Field label="Created">
-              <p className="font-mono text-copy text-body">
-                {new Date(issue.created_at).toLocaleString()}
-              </p>
-            </Field>
-          </div>
+              <Field label="Created">
+                <TimeAgo
+                  iso={issue.created_at}
+                  className="text-copy text-body"
+                />
+              </Field>
+
+              {/* The board card leads with this and the page did not show it at
+                  all, which is the wrong way round: the question "has anything
+                  happened since I looked" belongs here. */}
+              <Field label="Updated">
+                <TimeAgo
+                  iso={issue.updated_at}
+                  className="text-copy text-body"
+                />
+              </Field>
+            </div>
+
+            <SectionHeading className="mb-3 mt-6">Actions</SectionHeading>
+            <IssueActions issueKey={issue.issue_key} url={url} />
+          </aside>
         </div>
       </div>
+    </div>
+  );
+}
+
+/** A labelled value in the rail. Local because the rail is not a form. */
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="mb-1.5 text-caption text-mute">{label}</p>
+      {children}
     </div>
   );
 }

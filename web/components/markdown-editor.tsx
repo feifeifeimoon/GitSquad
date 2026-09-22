@@ -178,11 +178,20 @@ interface MentionState {
 }
 
 export function MarkdownEditor({
+  content,
   onChange,
   placeholder,
   className,
   mentionItems = [],
 }: {
+  /**
+   * The markdown to open with, parsed by the editor's own markdown extension.
+   *
+   * It seeds the editor once, at mount: an editor that re-seeded itself on
+   * every change would fight whoever is typing into it. A caller that loads
+   * different content into the same instance passes a `key`.
+   */
+  content?: string;
   onChange?: (md: string) => void;
   placeholder?: string;
   className?: string;
@@ -232,6 +241,10 @@ export function MarkdownEditor({
   }, []);
 
   const editor = useEditor({
+    // `contentType: "markdown"` is what lets this start from stored markdown
+    // rather than ProseMirror JSON, which is the shape the API speaks.
+    content: content ?? "",
+    contentType: "markdown",
     extensions: [
       StarterKit,
       MarkdownExtension,
