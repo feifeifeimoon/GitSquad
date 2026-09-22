@@ -34,6 +34,15 @@ const viewSwitcher = readFileSync(
   new URL("../components/view-switcher.tsx", import.meta.url),
   "utf8",
 );
+const nav = readFileSync(new URL("./nav.ts", import.meta.url), "utf8");
+const sidebarNav = readFileSync(
+  new URL("../components/sidebar-nav.tsx", import.meta.url),
+  "utf8",
+);
+const searchTrigger = readFileSync(
+  new URL("../components/nav-search-trigger.tsx", import.meta.url),
+  "utf8",
+);
 
 test("workspace list renders a card grid by default", () => {
   assert.match(list, /grid-cols-1/);
@@ -98,9 +107,31 @@ test("command palette opens with Cmd/Ctrl+K and searches workspaces", () => {
 });
 
 test("sidebar has a search entry that opens the palette", () => {
+  // The trigger moved into its own component when the list became links — it
+  // opens a modal rather than navigating, so it does not belong among the
+  // destinations. The shell still owns the open state.
   assert.match(shell, /setPaletteOpen/);
-  assert.match(shell, /Search/);
-  assert.match(shell, /kbd/);
+  assert.match(searchTrigger, /Search/);
+  assert.match(searchTrigger, /kbd/);
+  assert.match(searchTrigger, /onOpen/);
+});
+
+test("the sidebar is generated from the nav registry", () => {
+  // One list, two surfaces. The sidebar and the palette each used to keep their
+  // own copy, and they had already drifted.
+  assert.match(nav, /WORKSPACE_PAGES/);
+  assert.match(nav, /PRODUCT_PAGES/);
+  assert.match(sidebarNav, /WORKSPACE_PAGES/);
+  assert.match(sidebarNav, /PRODUCT_PAGES/);
+  assert.match(palette, /NAV_PAGES/);
+});
+
+test("sidebar destinations are links, not buttons that push", () => {
+  assert.match(sidebarNav, /<Link/);
+  assert.match(sidebarNav, /aria-current/);
+  // The call, not the mention: these specs read the file as text, so a comment
+  // that merely names the old approach would fail a bare /router\.push/.
+  assert.doesNotMatch(sidebarNav, /router\.push\(/);
 });
 
 test("command palette searches issues within the active workspace", () => {

@@ -621,10 +621,12 @@ Every button carries `active:translate-y-px` and `focus-visible:ring-3 focus-vis
 ### Navigation
 
 - **`nav-bar`** — the marketing top bar: 64 px tall, `bg-canvas`, hairline bottom border, logo left and a ghost CTA plus account control right.
-- **`app-shell-sidebar`** — the console's left column: `bg-canvas`, `border-r border-hairline`, a 64 px workspace-switcher header with a hairline bottom border, grouped nav rows, and a 64 px user block pinned to the bottom.
-- **`sidebar-section-label`** — `text-xs font-semibold uppercase tracking-wide text-mute`. The only uppercase text in the product.
-- **`app-shell-nav-row`** — `{typography.body-sm}` in `{colors.body}`, `{rounded.sm}`, with the active row indicated by a foreground text colour plus `bg-muted`; hover is a half-strength muted fill.
-- **`kbd-hint`** — `font-mono text-xs` in `{colors.mute}` on a `{colors.muted}` chip with a hairline border, e.g. the ⌘K affordance on the search row.
+- **`app-shell-sidebar`** — the console's left column, in three bands: a **fixed top block** (workspace switcher, then the palette trigger), a **single scrolling middle** (the destinations), and a **fixed footer** (the account). Only the middle scrolls. `bg-chrome`, `border-r border-hairline`, 200–400 px wide, drag-resized and remembered in `localStorage`.
+- **`sidebar-section-label`** — `{typography.micro}` semibold uppercase in `{colors.mute}`. The only uppercase text in the product. It doubles as the group's placeholder: it is drawn whether or not the rows under it can be used.
+- **`app-shell-nav-row`** — a **link**, not a button wired to the router. Middle-click, open-in-new-tab and being announced as a destination all come free, and none of them did before. `{typography.label}` in `{colors.body}`, `{rounded.sm}`, `aria-current="page"` on the active row. Active is a `bg-muted` fill with `{colors.ink}` and a heavier icon stroke; hover is the same fill at half strength, written as a *separate branch* so the active row carries no hover class at all — two greys one step apart are not a distinction. A row whose page needs a workspace and has none renders **disabled**: on screen, in place, not clickable. It used to vanish along with its whole group, taking every row below it along.
+- **`nav-search-trigger`** — the palette's trigger, shaped as a **field** (`Search…` plus a `kbd-hint`) in the fixed top block. It opens a modal rather than navigating, so it must not look like the destinations it sits above.
+- **`account-menu`** — the footer: avatar and handle as the trigger, opening an identity block, **Settings** (`/settings`) and a destructive **Sign out**. The account is not a nav row. The *workspace* settings are a workspace page and sit in that group. Those two used to be one row that rewrote its own href, which made `/settings` unreachable from the sidebar for anyone who had ever opened a workspace.
+- **`kbd-hint`** — `font-mono text-micro` in `{colors.mute}` on a `{colors.muted}` chip with a hairline border, e.g. the ⌘K affordance on the search trigger. Decorative on a control that already has a name: `aria-hidden`, so it does not join the accessible name.
 
 ### Console-Specific Components
 
