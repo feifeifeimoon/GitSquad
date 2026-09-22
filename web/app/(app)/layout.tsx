@@ -3,26 +3,15 @@
 import { useEffect, useState, useCallback, useRef, useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import Image from "next/image";
-import {
-  Monitor,
-  Settings,
-  LogOut,
-  FolderGit2,
-  ChevronsUpDown,
-  Plus,
-  Check,
-  Search,
-  Bot,
-  CircleDot,
-  Gauge,
-  Sparkles,
-} from "lucide-react";
+import { ChevronsUpDown, Plus, Check } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { useApi } from "@/lib/query";
 import { RealtimeProvider } from "@/lib/realtime";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
+import { SidebarNav } from "@/components/sidebar-nav";
+import { NavSearchTrigger } from "@/components/nav-search-trigger";
+import { AccountMenu } from "@/components/account-menu";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -32,6 +21,8 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { CommandPalette } from "@/components/command-palette";
+import { NAV_JUMP, NAV_PAGES } from "@/lib/nav";
+import { clampSidebarWidth, useSidebarWidth } from "@/lib/sidebar-width";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
@@ -47,40 +38,12 @@ interface User {
   avatar_url: string;
 }
 
-const globalNavItems = [
-  { href: "/workspaces", label: "Workspaces", icon: FolderGit2 },
-  { href: "/daemons", label: "Daemons", icon: Monitor },
-  { href: paths.usage(), label: "Usage", icon: Gauge },
-  { href: "/settings", label: "Settings", icon: Settings },
-];
-
-const workspaceNavItems = [
-  { key: "board", label: "Issues", icon: CircleDot },
-  { key: "agents", label: "Agents", icon: Bot },
-  { key: "skills", label: "Skills", icon: Sparkles },
-];
-
-function workspaceHref(ws: string, key: string): string {
-  const w = paths.workspace(ws);
-  if (key === "board") return w.board();
-  if (key === "agents") return w.agents();
-  if (key === "skills") return w.skills();
-  return w.settings();
-}
-
-function isWorkspaceItemActive(pathname: string, ws: string, key: string): boolean {
-  const href = workspaceHref(ws, key);
-  return key === "board" ? pathname === href : pathname.startsWith(href);
-}
-const MIN_WIDTH = 200;
-const MAX_WIDTH = 400;
-const DEFAULT_WIDTH = 240;
 
 export default function ConsoleLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [logoutConfirm, setLogoutConfirm] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_WIDTH);
+  const [sidebarWidth, setSidebarWidth] = useSidebarWidth();
   const dragging = useRef(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const isMac = useSyncExternalStore(emptySubscribe, getIsMac, getIsMacServer);
@@ -129,11 +92,65 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
     document.body.style.userSelect = "none";
   }, []);
 
+  // `g` then a letter jumps to a page. The palette answers "find a thing"; this
+  // answers "go to a place" without opening anything, which is the fastest path
+  // in a console you move around all day.
+  useEffect(() => {
+    let armed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const disarm = () => {
+      armed = false;
+      if (timer) clearTimeout(timer);
+      timer = undefined;
+    };
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.metaKey || event.ctrlKey || event.altKey || event.repeat) return;
+      const target = event.target as HTMLElement | null;
+      // Typing `g` into a field is typing, not a command.
+      if (
+        target &&
+        (target.isContentEditable ||
+          ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName))
+      ) {
+        return;
+      }
+
+      if (!armed) {
+        if (event.key === "g") {
+          armed = true;
+          timer = setTimeout(disarm, 1200);
+        }
+        return;
+      }
+
+      const pageKey = NAV_JUMP[event.key.toLowerCase()];
+      disarm();
+      if (!pageKey) return;
+      const page = NAV_PAGES.find((p) => p.key === pageKey);
+      if (!page) return;
+      event.preventDefault();
+      // A workspace page has nowhere to go without a workspace, so the jump is
+      // a no-op rather than an error — the same answer its disabled row gives.
+      if (page.scope === "workspace") {
+        if (wsId) router.push(page.href(wsId));
+      } else {
+        router.push(page.href());
+      }
+    };
+
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      disarm();
+    };
+  }, [router, wsId]);
+
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
       if (!dragging.current) return;
-      const next = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, e.clientX));
-      setSidebarWidth(next);
+      setSidebarWidth(clampSidebarWidth(e.clientX));
     };
     const onMouseUp = () => {
       dragging.current = false;
@@ -146,7 +163,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
     };
-  }, []);
+  }, [setSidebarWidth]);
 
   // Three planes: the page the content sits on, the chrome framing it, and the
   // surfaces — cards, panels — that sit on top of the page. The sidebar is its
@@ -207,100 +224,26 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Nav */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
-          <button
-            onClick={() => setPaletteOpen(true)}
-            className="flex w-full items-center gap-3 rounded-sm px-3 py-2 text-copy font-medium text-body transition-colors hover:bg-muted hover:text-ink"
-          >
-            <Search className="size-4" />
-            <span>Search</span>
-            <kbd className="pointer-events-none ml-auto inline-flex h-5 select-none items-center gap-0.5 rounded border border-hairline bg-muted px-1.5 font-mono text-caption text-mute">
-              {isMac ? "⌘K" : "Ctrl K"}
-            </kbd>
-          </button>
-          {wsId && (
-            <>
-              <div className="mt-4 mb-1 px-3 text-caption font-semibold uppercase tracking-wide text-mute">
-                Workspace
-              </div>
-              {workspaceNavItems.map((item) => {
-                const active = isWorkspaceItemActive(pathname, wsId, item.key);
-                const href = workspaceHref(wsId, item.key);
-                return (
-                  <button
-                    key={item.key}
-                    onClick={() => router.push(href)}
-                    className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-copy font-medium transition-colors ${
-                      active
-                        ? "bg-muted text-ink"
-                        : "text-body hover:bg-muted hover:text-ink"
-                    }`}
-                  >
-                    {active && (
-                      <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
-                    )}
-                    <item.icon className="size-4" />
-                    {item.label}
-                  </button>
-                );
-              })}
-
-              <div className="my-3 border-t border-hairline" />
-            </>
-          )}
-
-          {globalNavItems.map((item) => {
-            const href =
-              item.href === "/settings" && wsId
-                ? paths.workspace(wsId).settings()
-                : item.href;
-            const active = pathname.startsWith(href);
-            return (
-              <button
-                key={item.href}
-                onClick={() => router.push(href)}
-                className={`relative flex w-full items-center gap-3 rounded-sm px-3 py-2 text-copy font-medium transition-colors ${
-                  active
-                    ? "bg-muted text-ink"
-                    : "text-body hover:bg-muted hover:text-ink"
-                }`}
-              >
-                {active && (
-                  <span className="absolute left-0 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-primary" />
-                )}
-                <item.icon className="size-4" />
-                {item.label}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* User */}
-        <div className="border-t border-hairline px-3 py-4">
-          <div className="flex items-center gap-3">
-            <Avatar className="size-8">
-              <AvatarImage src={me?.avatar_url} />
-              <AvatarFallback className="text-caption">
-                {me?.login?.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-copy font-medium text-ink">
-                @{me?.login}
-              </p>
-            </div>
-            <ThemeToggle />
-            <button
-              onClick={() => setLogoutConfirm(true)}
-              className="text-mute transition-colors hover:text-ink"
-              title="Logout"
-              aria-label="Logout"
-            >
-              <LogOut className="size-4" />
-            </button>
-          </div>
+        {/* The fixed top block: identity above, the palette's trigger below it,
+            both outside the scrolling list. The trigger is shaped like a field
+            because it opens one — it is not a destination, so it does not sit
+            among the destinations. */}
+        <div className="border-b border-hairline px-3 pb-3 pt-2">
+          <NavSearchTrigger
+            onOpen={() => setPaletteOpen(true)}
+            isMac={isMac}
+          />
         </div>
+
+        {/* Destinations. The only region that scrolls. */}
+        <SidebarNav slug={wsId ?? undefined} />
+
+        <AccountMenu
+          login={me?.login}
+          avatarUrl={me?.avatar_url}
+          onSignOut={() => setLogoutConfirm(true)}
+          trailing={<ThemeToggle />}
+        />
 
         {/* Resize handle */}
         <div

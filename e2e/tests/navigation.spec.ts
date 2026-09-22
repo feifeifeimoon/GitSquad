@@ -28,17 +28,17 @@ test.describe("Navigation", () => {
       page.getByRole("button", { name: "New Issue" }),
     ).toBeVisible({ timeout: 20_000 });
 
-    await page.getByRole("button", { name: "Agents" }).click();
+    await page.getByRole("link", { name: "Agents" }).click();
     await expect(page.getByRole("button", { name: "New Agent" })).toBeVisible({
       timeout: 15_000,
     });
 
-    await page.getByRole("button", { name: "Skills" }).click();
+    await page.getByRole("link", { name: "Skills" }).click();
     await expect(page.getByRole("button", { name: "New Skill" })).toBeVisible({
       timeout: 15_000,
     });
 
-    await page.getByRole("button", { name: "Issues" }).click();
+    await page.getByRole("link", { name: "Issues" }).click();
     await expect(page.getByRole("button", { name: "New Issue" })).toBeVisible({
       timeout: 15_000,
     });
@@ -49,8 +49,10 @@ test.describe("Navigation", () => {
   // list, and /usage was missing from it, so that page was read as a workspace
   // named "usage" and the real one was cleared.
   //
-  // The sidebar only renders its workspace section when a workspace is in
-  // context, so those links vanishing is exactly the regression.
+  // Those links vanishing was the visible half of the regression, so their
+  // presence is what this asserts. The rows are unconditional now — with no
+  // workspace they render disabled rather than disappearing — but the hrefs
+  // still have to resolve inside the workspace.
   test("keeps the workspace context on global pages", async ({ page }) => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
@@ -62,7 +64,7 @@ test.describe("Navigation", () => {
       ["Usage", "/usage"],
       ["Daemons", "/daemons"],
     ] as const) {
-      await page.getByRole("button", { name: label, exact: true }).click();
+      await page.getByRole("link", { name: label, exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`${path}$`));
       await expect(
         page.getByRole("heading", { name: label, exact: true }),
@@ -75,7 +77,7 @@ test.describe("Navigation", () => {
       ).toBeVisible();
       for (const section of ["Issues", "Agents", "Skills"]) {
         await expect(
-          page.getByRole("button", { name: section, exact: true }),
+          page.getByRole("link", { name: section, exact: true }),
         ).toBeVisible();
       }
     }
@@ -83,7 +85,7 @@ test.describe("Navigation", () => {
     // And the context is live rather than merely painted: a section link has to
     // resolve inside this workspace. Without the workspace the links still
     // render but point at the global path, so this is what catches them.
-    await page.getByRole("button", { name: "Agents", exact: true }).click();
+    await page.getByRole("link", { name: "Agents", exact: true }).click();
     await expect(page).toHaveURL(new RegExp(`/${workspace.slug}/agents$`));
     await expect(
       page.getByRole("button", { name: "New Agent" }),
@@ -97,7 +99,10 @@ test.describe("Navigation", () => {
       page.getByRole("button", { name: "New Issue" }),
     ).toBeVisible({ timeout: 20_000 });
 
-    await page.getByTitle("Logout").click();
+    // The account menu, not a bare icon: the footer block is the trigger and
+    // the menu holds the labelled items.
+    await page.getByRole("button", { name: /^@/ }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     await page.getByRole("button", { name: "Sign out" }).click();
 
     await page.waitForURL((url) => url.pathname === "/", {

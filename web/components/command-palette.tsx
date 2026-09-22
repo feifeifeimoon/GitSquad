@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { FolderGit2, Monitor, Plus, Settings } from "lucide-react";
+import { Plus, Settings } from "lucide-react";
 import { api, Workspace, Issue, issueApi } from "@/lib/api";
 import { useApi } from "@/lib/query";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
+import { NAV_PAGES } from "@/lib/nav";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { StatusIcon } from "@/components/status-icon";
 import {
@@ -28,6 +29,7 @@ export function CommandPalette({
   const router = useRouter();
   const pathname = usePathname();
   const wsId = workspaceSlugFromPath(pathname);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -52,39 +54,77 @@ export function CommandPalette({
     () => issueApi.list(wsId as string),
   );
 
+  // The Pages group is the nav registry, not a copy of it. It was a
+  // hand-written list of three, and it had already gone stale: Usage was in the
+  // sidebar but unreachable from here, and its "Settings" opened the account
+  // page while the sidebar's opened the workspace one. A page added to the
+  // registry is now reachable from both surfaces, under the same name.
+  const pageItems = useMemo(
+    () =>
+      NAV_PAGES.flatMap((page) => {
+        if (page.scope === "workspace") {
+          if (!wsId) return [];
+          return [
+            { key: page.key, label: page.label, Icon: page.icon, href: page.href(wsId) },
+          ];
+        }
+        return [
+          { key: page.key, label: page.label, Icon: page.icon, href: page.href() },
+        ];
+      }),
+    [wsId],
+  );
+
   const run = (href: string) => {
     onOpenChange(false);
     router.push(href);
   };
 
-  const currentIssues = wsId ? issueList ?? [] : [];
+  // Lists of *things* stay out of the way until asked for. cmdk matches
+  // everything against an empty query, so opening the palette on a workspace
+  // with a few hundred issues used to draw all of them — the fastest surface in
+  // the console, arriving as its longest page.
+  const searching = query.trim() !== "";
+  const currentIssues = wsId ? issueList : [];
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
-      <CommandInput placeholder="Search pages, workspaces, issues…" />
+      <CommandInput
+        value={query}
+        onValueChange={setQuery}
+        placeholder="Search pages, workspaces, issues…"
+      />
       <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
+        <CommandEmpty>
+          Nothing matches. Try a page name, a workspace, or an issue key.
+        </CommandEmpty>
         <CommandGroup heading="Pages">
-          <CommandItem onSelect={() => run(paths.workspaces())}>
-            <FolderGit2 className="size-4" />
-            Workspaces
-          </CommandItem>
-          <CommandItem onSelect={() => run(paths.daemons())}>
-            <Monitor className="size-4" />
-            Daemons
-          </CommandItem>
-          <CommandItem onSelect={() => run(paths.settings())}>
-            <Settings className="size-4" />
-            Settings
-          </CommandItem>
+          {pageItems.map(({ key, label, Icon, href }) => (
+            <CommandItem
+              key={key}
+              value={label}
+              onSelect={() => run(href)}
+            >
+              <Icon className="size-4" />
+              {label}
+            </CommandItem>
+          ))}
         </CommandGroup>
         <CommandGroup heading="Actions">
           <CommandItem onSelect={() => run(paths.newWorkspace())}>
             <Plus className="size-4" />
             New Workspace
           </CommandItem>
+          {/* Not a page of the registry, and deliberately not one: the account
+              settings belong behind the avatar rather than in the product's
+              navigation. But the palette is where you look when you cannot find
+              something, so it has to be reachable here too. */}
+          <CommandItem onSelect={() => run(paths.settings())}>
+            <Settings className="size-4" />
+            Account settings
+          </CommandItem>
         </CommandGroup>
-        {wsId && currentIssues.length > 0 && (
+        {searching && wsId && currentIssues.length > 0 && (
           <>
             <CommandSeparator />
             <CommandGroup heading="Issues">
@@ -106,26 +146,30 @@ export function CommandPalette({
             </CommandGroup>
           </>
         )}
-        <CommandSeparator />
-        <CommandGroup heading="Workspaces">
-          {workspaces.map((w) => (
-            <CommandItem
-              key={w.id}
-              value={`${w.name} ${w.repo_full_name || ""}`}
-              onSelect={() => run(paths.workspace(w.slug).board())}
-            >
-              <WorkspaceAvatar
-                name={w.name}
-                avatarUrl={w.avatar_url}
-                className="size-4"
-              />
-              <span className="min-w-0 flex-1 truncate">{w.name}</span>
-              <span className="shrink-0 font-mono text-caption text-mute">
-                {w.repo_full_name || `${w.repo_owner}/${w.repo_name}`}
-              </span>
-            </CommandItem>
-          ))}
-        </CommandGroup>
+        {searching && workspaces.length > 0 && (
+          <>
+            <CommandSeparator />
+            <CommandGroup heading="Workspaces">
+              {workspaces.map((w) => (
+                <CommandItem
+                  key={w.id}
+                  value={`${w.name} ${w.repo_full_name || ""}`}
+                  onSelect={() => run(paths.workspace(w.slug).board())}
+                >
+                  <WorkspaceAvatar
+                    name={w.name}
+                    avatarUrl={w.avatar_url}
+                    className="size-4"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{w.name}</span>
+                  <span className="shrink-0 font-mono text-caption text-mute">
+                    {w.repo_full_name || `${w.repo_owner}/${w.repo_name}`}
+                  </span>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </>
+        )}
       </CommandList>
     </CommandDialog>
   );
