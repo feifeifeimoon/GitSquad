@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { Plus, Settings } from "lucide-react";
+import { Plus, UserCog } from "lucide-react";
 import { api, Workspace, Issue, issueApi } from "@/lib/api";
 import { useApi } from "@/lib/query";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
@@ -120,7 +120,7 @@ export function CommandPalette({
               navigation. But the palette is where you look when you cannot find
               something, so it has to be reachable here too. */}
           <CommandItem onSelect={() => run(paths.settings())}>
-            <Settings className="size-4" />
+            <UserCog className="size-4" />
             Account settings
           </CommandItem>
         </CommandGroup>
