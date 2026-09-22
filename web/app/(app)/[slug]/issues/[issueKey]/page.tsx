@@ -171,8 +171,18 @@ export default function IssueDetailPage() {
                 scrollerRef={scrollerRef}
               />
 
-              <div className="mt-8">
+              {/* Docked to the bottom of the scroll viewport once the thread is
+                  taller than it — multica does the same, behind a preference.
+                  `sticky bottom-0` asks for exactly that rule with no threshold
+                  to tune: it does nothing at all until the composer's place is
+                  below the fold, which is the same thing as "there are enough
+                  comments to scroll past". The band is opaque because the
+                  comments run underneath it. */}
+              <div className="sticky bottom-0 mt-8 bg-page pb-2 pt-4">
+                {/* Keyed by the issue: the composer holds a draft, and the
+                    route can swap the issue underneath it without unmounting. */}
                 <CommentComposer
+                  key={issueKey}
                   slug={slug}
                   issueKey={issueKey}
                   mentionItems={agentNames}

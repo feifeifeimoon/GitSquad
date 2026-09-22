@@ -180,6 +180,9 @@ interface MentionState {
 export function MarkdownEditor({
   content,
   onChange,
+  onSubmit,
+  autoFocus = false,
+  ariaLabel,
   placeholder,
   className,
   mentionItems = [],
@@ -193,6 +196,28 @@ export function MarkdownEditor({
    */
   content?: string;
   onChange?: (md: string) => void;
+  /**
+   * Sent on `⌘↵` / `Ctrl↵`, for a caller that has something to send.
+   *
+   * `↵` on its own has to stay a newline — this is a markdown box — so the
+   * chord is the send gesture, the way it is in Linear and in multica's
+   * composer.
+   */
+  onSubmit?: () => void;
+  /**
+   * Put the caret in the editor as it mounts. For a caller that clears its
+   * editor by remounting, so the box it just sent from is still where the next
+   * one gets typed.
+   */
+  autoFocus?: boolean;
+  /**
+   * The editor's accessible name.
+   *
+   * A page can hold two of these — an issue's description and its comment box —
+   * and a pair of nameless text boxes is as indistinguishable to a screen
+   * reader as it is to a test.
+   */
+  ariaLabel?: string;
   placeholder?: string;
   className?: string;
   mentionItems?: string[];
@@ -206,6 +231,7 @@ export function MarkdownEditor({
   const mentionRef = useRef<MentionState | null>(null);
   const filteredRef = useRef<string[]>([]);
   const selectedIndexRef = useRef(0);
+  const onSubmitRef = useRef(onSubmit);
 
   // Detect an active `@query` immediately before the caret and surface the
   // suggestion popup. Suppressed inside code (blocks and inline).
@@ -245,6 +271,7 @@ export function MarkdownEditor({
     // rather than ProseMirror JSON, which is the shape the API speaks.
     content: content ?? "",
     contentType: "markdown",
+    autofocus: autoFocus ? "end" : false,
     extensions: [
       StarterKit,
       MarkdownExtension,
@@ -259,7 +286,26 @@ export function MarkdownEditor({
       computeMention(editor);
     },
     editorProps: {
+      // The editable element is the one carrying `role="textbox"`, so the name
+      // has to land here rather than on the caller's wrapper — and `attributes`
+      // *replaces* the editor's defaults rather than merging with them, so the
+      // role has to be restated alongside it.
+      attributes: ariaLabel
+        ? { role: "textbox", "aria-label": ariaLabel }
+        : {},
       handleKeyDown: (_view, event) => {
+        // Handled here rather than by the keymap below: the hard-break
+        // extension claims `Mod-Enter` for itself, so a submit shortcut left to
+        // the extensions would insert a break and send.
+        if (
+          onSubmitRef.current &&
+          (event.metaKey || event.ctrlKey) &&
+          event.key === "Enter"
+        ) {
+          event.preventDefault();
+          onSubmitRef.current();
+          return true;
+        }
         if (!mentionRef.current) return false;
         const items = filteredRef.current;
         if (event.key === "Escape") {
@@ -302,6 +348,12 @@ export function MarkdownEditor({
     selectedIndexRef.current = selectedIndex;
     filteredRef.current = filtered;
   }, [mention, selectedIndex, filtered]);
+
+  // The keydown handler is created once, so a caller's inline send callback
+  // would otherwise be the one captured on the first render.
+  useEffect(() => {
+    onSubmitRef.current = onSubmit;
+  }, [onSubmit]);
 
   if (!editor) {
     return <div className={className} />;

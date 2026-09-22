@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Check, Hash, Link2 } from "lucide-react";
+import { Check, Copy, Link2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -18,6 +18,12 @@ import { cn } from "@/lib/utils";
  * and the accessible name. The key is what gets copied most in practice — it is
  * what goes into a commit message or a chat — so it keeps a button of its own
  * rather than hiding behind "copy link" with a modifier.
+ *
+ * The labels name the thing rather than the act — "Copy issue URL" and "Copy
+ * issue ID". With two copy buttons, "Copy" says nothing about which one you
+ * want, so the words that help are the ones after it. The id's icon was a `#` at
+ * first and that reads as a hashtag; nothing about it said "the issue's id",
+ * which is its whole job.
  */
 export function IssueActions({
   issueKey,
@@ -43,18 +49,18 @@ export function IssueActions({
   return (
     <div className="flex items-center gap-0.5">
       <ActionButton
-        label={copied === "link" ? "Copied" : "Copy link"}
+        label={copied === "link" ? "Copied" : "Copy issue URL"}
         copied={copied === "link"}
         onClick={() => copy("link", url)}
       >
         <Link2 className="size-4" />
       </ActionButton>
       <ActionButton
-        label={copied === "key" ? "Copied" : `Copy ${issueKey}`}
+        label={copied === "key" ? "Copied" : "Copy issue ID"}
         copied={copied === "key"}
         onClick={() => copy("key", issueKey)}
       >
-        <Hash className="size-4" />
+        <Copy className="size-4" />
       </ActionButton>
     </div>
   );

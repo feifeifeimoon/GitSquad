@@ -77,18 +77,32 @@ export function IssueTitle({
 
   if (!editing) {
     return (
-      <div className="mb-3 flex items-start gap-1">
-        <h1 className="min-w-0 text-title font-semibold tracking-[-0.01em] text-ink">
+      <div className="group mb-3 flex items-start gap-1">
+        {/* The words themselves are the control, the way they are in Linear and
+            in multica: the caret is the affordance, and `cursor-text` says so
+            before the click. */}
+        <h1
+          onClick={(event) => {
+            // Selecting the title to copy it is not a request to change it.
+            const selection = window.getSelection();
+            if (selection && !selection.isCollapsed) return;
+            // The heading is not a button, deliberately: a button whose
+            // accessible name is its own text makes the issue's title a name
+            // for every other button on the page.
+            event.preventDefault();
+            open();
+          }}
+          className="min-w-0 cursor-text text-title font-semibold tracking-[-0.01em] text-ink"
+        >
           {title}
         </h1>
-        {/* Beside the heading rather than under it, and always drawn: an
-            issue's title is read far more often than it is changed, so the
-            control stays quiet, but it does not hide behind a pointer. */}
+        {/* Kept for the keyboard, and only then: revealed on hover or on focus,
+            so it is not a second label beside every title. */}
         <button
           type="button"
           onClick={open}
           aria-label="Rename this issue"
-          className="mt-1.5 shrink-0 rounded-md p-1 text-mute transition-colors hover:bg-muted hover:text-ink"
+          className="mt-1.5 shrink-0 rounded-md p-1 text-mute opacity-0 transition-opacity hover:bg-muted hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
         >
           <Pencil className="size-3.5" />
         </button>

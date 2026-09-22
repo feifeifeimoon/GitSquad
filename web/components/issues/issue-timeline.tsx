@@ -39,15 +39,20 @@ interface TimelineEntry {
   createdAt: string;
 }
 
-/** One tick: where it sits on the rail, and whether the reader is there. */
-interface Tick {
-  entry: TimelineEntry;
-  y: number;
-  here: boolean;
+/** What the preview card says about one entry. */
+function preview(entry: TimelineEntry): string {
+  return entry.content
+    .replace(/[#*`>~[\]]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 220);
 }
 
 /** The DOM anchor a tick scrolls to. */
 const anchorId = (id: string) => `activity-${id}`;
+
+/** The rail's preview card, named so a focused tick can describe itself with it. */
+const RAIL_PREVIEW_ID = "activity-rail-preview";
 
 function toEntry(c: IssueComment): TimelineEntry {
   // A row the server wrote is an event however it was typed. `task.go` files
@@ -158,15 +163,22 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
 /**
  * Where you are in the feed, and a way to get somewhere else in it.
  *
- * The rail is the height of the **scroll viewport**, not of the thread, and
- * every tick is placed where its entry really is in the document. Both of those
- * are the point: an earlier version stacked one tick per entry in flow, so on a
- * thread of any length the rail grew to the height of the article and drew a
- * dashed line down the whole page — decoration, since a tick's position said
- * nothing about the entry it stood for.
+ * The shape is multica's `ThreadMinimap`, which is the same problem solved the
+ * same way: the rail is **the scroll viewport** — centred in it, ticks evenly
+ * pitched, spacing shrinking as the thread grows rather than the rail growing
+ * with it. Two earlier versions got this wrong in different directions. The
+ * first stacked one tick per entry in flow, so a long thread drew a dashed line
+ * down the whole page. The second mapped each entry's document position onto a
+ * viewport-tall rail, which is a minimap of the feed but not of anything the
+ * reader is looking at: measured on a six-entry issue it floated from y=323 to
+ * y=785 beside a 900px window, unrelated to the page's edges, and its length
+ * still grew with the thread.
  *
- * A tick in the band is drawn at full strength and the rest recede, so the rail
- * answers "where am I in this" as well as "take me there".
+ * What a tick is *for* here is jumping, so hovering one shows what it leads to.
+ * Without the card the rail is a row of identical dashes and every jump is
+ * blind; multica's version opens a scrollable outline of the whole thread, and
+ * a card with the one entry under the pointer is the part of that which fits
+ * this rail's width.
  *
  * The ticks are a roving focus: the rail is one tab stop and the arrows move
  * between ticks, because twenty comments would otherwise be twenty stops
@@ -180,10 +192,17 @@ function TimelineRail({
   scrollerRef: React.RefObject<HTMLDivElement | null>;
 }) {
   const railRef = useRef<HTMLDivElement | null>(null);
-  const [rail, setRail] = useState<{ height: number; ticks: Tick[] }>({
-    height: 0,
-    ticks: [],
-  });
+  const [rail, setRail] = useState<{
+    height: number;
+    here: string[];
+    offset: number;
+  }>({ height: 0, here: [], offset: 0 });
+  // The entry the pointer (or focus) is on, and how far down the rail its tick
+  // sits — the card is a caption for one tick, so it points at that tick.
+  const [hovered, setHovered] = useState<{
+    entry: TimelineEntry;
+    top: number;
+  } | null>(null);
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -195,51 +214,47 @@ function TimelineRail({
       const box = scroller.getBoundingClientRect();
       if (!box.height) return;
 
-      const rects = entries.flatMap((entry) => {
-        const node = document.getElementById(anchorId(entry.id));
-        return node ? [{ entry, rect: node.getBoundingClientRect() }] : [];
-      });
-      if (rects.length === 0) return;
-
-      // The rail stands for the feed, not for the page. Measuring against the
-      // document put every tick wherever the feed happened to sit in it — the
-      // whole rail's worth of offset, since the feed starts below the header
-      // and the title.
-      let spanTop = Infinity;
-      let spanBottom = -Infinity;
-      for (const { rect } of rects) {
-        spanTop = Math.min(spanTop, rect.top);
-        spanBottom = Math.max(spanBottom, rect.bottom);
-      }
-      const span = spanBottom - spanTop || 1;
-      // As tall as the feed, and never taller than the reader's viewport: a
-      // rail that grows with a long thread is a dashed line down the whole page.
-      const height = Math.max(96, Math.min(box.height - 64, span));
       const bandTop = box.top + box.height * BAND_TOP;
       const bandBottom = box.top + box.height * BAND_BOTTOM;
+      let spanTop = Infinity;
+      let spanBottom = -Infinity;
+      const here = entries.flatMap((entry) => {
+        const node = document.getElementById(anchorId(entry.id));
+        if (!node) return [];
+        const rect = node.getBoundingClientRect();
+        spanTop = Math.min(spanTop, rect.top);
+        spanBottom = Math.max(spanBottom, rect.bottom);
+        return rect.bottom > bandTop && rect.top < bandBottom ? [entry.id] : [];
+      });
+      if (!Number.isFinite(spanTop)) return;
+      // As tall as the reader's viewport, or as the feed when the whole thread
+      // already fits — a rail taller than the thread it describes is a pointer
+      // to nothing.
+      const height = Math.max(96, Math.min(box.height, spanBottom - spanTop));
 
-      const ticks: Tick[] = rects.map(({ entry, rect }) => ({
-        entry,
-        y: Math.min(
-          height - 10,
-          Math.max(10, ((rect.top - spanTop) / span) * height),
-        ),
-        here: rect.bottom > bandTop && rect.top < bandBottom,
-      }));
+      // A sticky element only starts sticking once its own top reaches the
+      // scroller's, so until then a rail taller than the window hangs off the
+      // bottom of it and a centred cluster sits a header-and-description below
+      // the middle. Half the distance still to travel is the correction, and it
+      // is zero the moment the rail is pinned — and zero for a rail the whole
+      // thread already fits inside, which never gets cut off in the first place.
+      const railBox = railRef.current?.getBoundingClientRect();
+      const cutOff = railBox ? railBox.bottom - (box.top + box.height) : 0;
+      const offset =
+        railBox && cutOff > 0
+          ? -Math.round(Math.max(0, railBox.top - box.top) / 2)
+          : 0;
 
-      // Measuring runs on every frame of a scroll, and almost every one of them
-      // produces the same rail: the ticks are pinned to the document, so only
-      // the band moves. Handing React the previous object back lets it skip the
-      // render — the alternative is a state update per frame for a rail that
-      // reads the same.
+      // Measuring runs on every frame of a scroll and almost always produces
+      // the same answer — only the band moves — so handing React the previous
+      // value back lets it skip the render.
       setRail((prev) =>
         prev.height === height &&
-        prev.ticks.length === ticks.length &&
-        prev.ticks.every(
-          (tick, i) => tick.y === ticks[i]?.y && tick.here === ticks[i]?.here,
-        )
+        prev.offset === offset &&
+        prev.here.length === here.length &&
+        prev.here.every((id, i) => id === here[i])
           ? prev
-          : { height, ticks },
+          : { height, here, offset },
       );
     };
 
@@ -266,6 +281,25 @@ function TimelineRail({
       ?.scrollIntoView({ behavior: "smooth", block: "start" });
   }, []);
 
+  /**
+   * Where a tick sits on the rail, for the card that captions it.
+   *
+   * Read off screen rectangles rather than `offsetTop`: the tick's offsetParent
+   * is the transformed cluster rather than the rail, so `offsetTop` answers a
+   * question measured from the wrong origin.
+   */
+  const spot = (
+    event: React.FocusEvent<HTMLButtonElement> | React.PointerEvent<HTMLButtonElement>,
+    entry: TimelineEntry,
+  ) => {
+    const railBox = railRef.current?.getBoundingClientRect();
+    const box = event.currentTarget.getBoundingClientRect();
+    return {
+      entry,
+      top: railBox ? box.top - railBox.top + box.height / 2 : 0,
+    };
+  };
+
   const move = (from: number, delta: number) => {
     const ticks = railRef.current?.querySelectorAll<HTMLButtonElement>("button");
     if (!ticks?.length) return;
@@ -278,9 +312,10 @@ function TimelineRail({
       ref={railRef}
       role="group"
       aria-label="Jump to an entry in the activity"
-      // Sticky inside the feed's full height, but only ever as tall as the
-      // reader's viewport.
-      className="sticky top-4 w-5 shrink-0 self-start"
+      // Sticky so the rail stays the reader's, not the article's: pinned while
+      // the thread it belongs to is on screen, and never taller than the
+      // scroller's viewport.
+      className="sticky top-0 flex w-5 shrink-0 flex-col justify-center self-start py-4"
       style={{ height: rail.height || undefined }}
       onKeyDown={(event) => {
         const ticks = [...(railRef.current?.querySelectorAll("button") ?? [])];
@@ -301,37 +336,81 @@ function TimelineRail({
         }
       }}
     >
-      {rail.ticks.map((tick, index) => (
-        <button
-          key={tick.entry.id}
-          type="button"
-          tabIndex={index === 0 ? 0 : -1}
-          onClick={() => jump(tick.entry.id)}
-          aria-label={`${
-            tick.entry.kind === "event"
-              ? "Update"
-              : `Comment from ${tick.entry.author}`
-          }, ${index + 1} of ${rail.ticks.length}`}
-          title={tick.entry.content.replace(/[#*`>~]/g, "").slice(0, 120)}
-          // The box is the tap target and is deliberately larger than the 2px
-          // dash inside it: a rail you cannot hit is not a rail.
-          style={{ top: tick.y }}
-          className="group absolute right-0 flex size-5 -translate-y-1/2 items-center justify-center outline-none"
+      <div
+        className="flex max-h-full flex-col overflow-hidden"
+        style={{ transform: `translateY(${rail.offset}px)` }}
+      >
+        {entries.map((entry, index) => {
+          const here = rail.here.includes(entry.id);
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              tabIndex={index === 0 ? 0 : -1}
+              onClick={() => jump(entry.id)}
+              onPointerEnter={(event) => setHovered(spot(event, entry))}
+              onPointerLeave={() => setHovered(null)}
+              onFocus={(event) => setHovered(spot(event, entry))}
+              onBlur={() => setHovered(null)}
+              aria-describedby={
+                hovered?.entry.id === entry.id ? RAIL_PREVIEW_ID : undefined
+              }
+              aria-label={`${
+                entry.kind === "event"
+                  ? "Update"
+                  : `Comment from ${entry.author}`
+              }, ${index + 1} of ${entries.length}`}
+              // Shrinkable rather than fixed: past the point where a tick each
+              // fits the rail, flex compresses the pitch instead of overflowing
+              // it. The box is the tap target and is deliberately taller than
+              // the dash inside it.
+              className="flex min-h-[5px] w-5 flex-[0_1_0.875rem] cursor-pointer items-center justify-end outline-none"
+            >
+              {/* Kind is not encoded in the dash: at two pixels tall, the
+                  difference between an agent and a person read as a rendering
+                  artifact. Colour is spent on position instead — where you are,
+                  and where the pointer is. */}
+              <span
+                className={cn(
+                  "h-0.5 origin-right rounded-full transition-[width,background-color] duration-100 ease-out",
+                  here ? "w-4 bg-ink" : "w-2.5 bg-hairline-strong",
+                  hovered?.entry.id === entry.id && "w-5 bg-ink",
+                )}
+              />
+            </button>
+          );
+        })}
+      </div>
+
+      {/* What the tick under the pointer leads to. The rail is otherwise a row
+          of identical dashes and every jump is a guess. */}
+      {hovered && (
+        <div
+          id={RAIL_PREVIEW_ID}
+          role="tooltip"
+          // Kept inside the rail: a card anchored to the first or last tick
+          // would otherwise hang half out of it.
+          style={{
+            top: Math.min(
+              Math.max(hovered.top, 60),
+              Math.max(60, rail.height - 60),
+            ),
+          }}
+          className="pointer-events-none absolute right-6 z-10 w-72 -translate-y-1/2 rounded-lg border border-hairline bg-canvas p-3 shadow-level-4"
         >
-          {/* Kind is not encoded in the dash: at two pixels tall, the
-              difference between an agent and a person read as a rendering
-              artifact. Position is what the rail is for, and colour is spent
-              on it — where you are, and where the pointer is. */}
-          <span
-            className={cn(
-              "h-0.5 rounded-full transition-all",
-              tick.here
-                ? "w-4 bg-ink"
-                : "w-2.5 bg-hairline-strong group-hover:w-4 group-hover:bg-ink",
-            )}
-          />
-        </button>
-      ))}
+          <p className="flex items-center gap-2 text-caption text-mute">
+            <span className="truncate font-medium text-body">
+              {hovered.entry.kind === "agent"
+                ? `@${hovered.entry.author}`
+                : hovered.entry.author}
+            </span>
+            <TimeAgo iso={hovered.entry.createdAt} className="shrink-0" />
+          </p>
+          <p className="mt-1.5 line-clamp-4 text-copy text-body">
+            {preview(hovered.entry)}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

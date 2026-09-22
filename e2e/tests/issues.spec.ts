@@ -51,7 +51,7 @@ test.describe("Issues", () => {
     ).toBeVisible({ timeout: 20_000 });
 
     const comment = `E2E comment ${suffix}`;
-    const editor = page.locator('[contenteditable="true"]');
+    const editor = page.getByRole("textbox", { name: "Write a comment" });
     await editor.click();
     await page.keyboard.type(comment);
     // Exact: the activity rail's jump targets are labelled "Comment from …",
@@ -112,16 +112,16 @@ test.describe("Issues", () => {
       waitUntil: "domcontentloaded",
     });
 
-    // The heading itself is not the control; the pencil beside it is.
-    await expect(
-      page.getByRole("heading", { name: `Old title ${suffix}` }),
-    ).toBeVisible({ timeout: 20_000 });
+    // The words are the control — no pencil to find, and the caret arrives
+    // with the click rather than after a second one.
+    const heading = page.getByRole("heading", { name: `Old title ${suffix}` });
+    await expect(heading).toBeVisible({ timeout: 20_000 });
+    await heading.click();
 
     const renamed = `Renamed ${suffix}`;
-    await page.getByRole("button", { name: "Rename this issue" }).click();
-
     const field = page.locator("textarea");
     await expect(field).toBeVisible();
+    await expect(field).toBeFocused();
     await field.fill(renamed);
     await field.press("Enter");
 
@@ -144,18 +144,23 @@ test.describe("Issues", () => {
       page.getByRole("heading", { name: "Activity" }),
     ).toBeVisible({ timeout: 20_000 });
 
+    // An empty description still has to be offered: there is nothing to click.
     await page.getByRole("button", { name: "Add a description" }).click();
-    const editor = page.locator('[contenteditable="true"]');
-    await editor.click();
+    // Named, not a bare `[contenteditable]`: the page carries two of these
+    // editors, and the comment box is always one of them.
+    const editor = page.getByRole("textbox", { name: "Issue description" });
+    // The click that opened it put the caret in: nothing is typed over.
+    await expect(editor).toBeFocused();
     await page.keyboard.type(`Written after the fact ${suffix}`);
     await page.getByRole("button", { name: "Save" }).click();
 
     await expect(
       page.getByText(`Written after the fact ${suffix}`),
     ).toBeVisible({ timeout: 15_000 });
-    await expect(
-      page.getByRole("button", { name: "Edit description" }),
-    ).toBeVisible();
+
+    // And once it holds prose, the prose is the way back in.
+    await page.getByText(`Written after the fact ${suffix}`).click();
+    await expect(editor).toBeFocused();
   });
 });
 
