@@ -8,12 +8,16 @@ import { cn } from "@/lib/utils";
 /**
  * The handful of things you do *to* an issue rather than *with* it.
  *
- * Both references put these where you can see them — orca keeps a labelled
- * Actions card in the rail rather than hiding them in a menu, and the useful
- * one there is not "copy link" but "copy prompt": the issue as a handoff
- * payload. This is the smaller version of that idea, and the issue key is the
- * part that matters most in practice: it is what you paste into a commit
- * message or a chat.
+ * They are icon buttons in the page's top-right corner, which is where Linear
+ * puts them and what the eye already reads as "actions on this thing". They
+ * were a labelled list in the details rail, where they sat underneath the facts
+ * and read as two more facts — and the rail is for what the issue *is*, not for
+ * what you can do to it.
+ *
+ * Icon-only means the label has to survive somewhere else: it is the tooltip
+ * and the accessible name. The key is what gets copied most in practice — it is
+ * what goes into a commit message or a chat — so it keeps a button of its own
+ * rather than hiding behind "copy link" with a modifier.
  */
 export function IssueActions({
   issueKey,
@@ -22,12 +26,12 @@ export function IssueActions({
   issueKey: string;
   url: string;
 }) {
-  const [copied, setCopied] = useState<string | null>(null);
+  const [copied, setCopied] = useState<"link" | "key" | null>(null);
 
-  const copy = async (label: string, text: string) => {
+  const copy = async (which: "link" | "key", text: string) => {
     try {
       await navigator.clipboard.writeText(text);
-      setCopied(label);
+      setCopied(which);
       window.setTimeout(() => setCopied(null), 2000);
     } catch {
       // The clipboard API needs a secure context; over plain http on a LAN
@@ -37,49 +41,48 @@ export function IssueActions({
   };
 
   return (
-    <div className="space-y-0.5">
-      <ActionRow
-        icon={<Link2 className="size-3.5 shrink-0 text-mute" />}
-        label="Copy link"
+    <div className="flex items-center gap-0.5">
+      <ActionButton
+        label={copied === "link" ? "Copied" : "Copy link"}
         copied={copied === "link"}
         onClick={() => copy("link", url)}
-      />
-      <ActionRow
-        icon={<Hash className="size-3.5 shrink-0 text-mute" />}
-        label={`Copy ${issueKey}`}
+      >
+        <Link2 className="size-4" />
+      </ActionButton>
+      <ActionButton
+        label={copied === "key" ? "Copied" : `Copy ${issueKey}`}
         copied={copied === "key"}
         onClick={() => copy("key", issueKey)}
-      />
+      >
+        <Hash className="size-4" />
+      </ActionButton>
     </div>
   );
 }
 
-function ActionRow({
-  icon,
+function ActionButton({
   label,
   copied,
   onClick,
+  children,
 }: {
-  icon: React.ReactNode;
   label: string;
   copied: boolean;
   onClick: () => void;
+  children: React.ReactNode;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
+      title={label}
+      aria-label={label}
       className={cn(
-        "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-label transition-colors",
-        copied ? "text-mute" : "text-body hover:bg-muted hover:text-ink",
+        "flex size-7 items-center justify-center rounded-md transition-colors",
+        copied ? "text-success" : "text-mute hover:bg-muted hover:text-ink",
       )}
     >
-      {copied ? (
-        <Check className="size-3.5 shrink-0 text-success" />
-      ) : (
-        icon
-      )}
-      {copied ? "Copied" : label}
+      {copied ? <Check className="size-4" /> : children}
     </button>
   );
 }

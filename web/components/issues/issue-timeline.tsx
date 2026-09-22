@@ -18,11 +18,15 @@ import { cn } from "@/lib/utils";
 // multica's version of the rail is 551 lines: a Dock-style proximity
 // magnification wave driven by rAF and direct style writes, 150ms intent and
 // grace delays, markdown flattened into preview cards. The part worth having is
-// the substance — one tick per entry, the viewport position visible, clicking
-// one goes there — so that is what this is.
+// the substance — the rail is the scroll viewport rather than the document, and
+// a tick sits where its entry actually is — so that is what this is.
 
 /** Below this the rail is more furniture than help. */
 const RAIL_MIN_ENTRIES = 4;
+
+/** The slice of the scroller an entry has to be in to count as "here". */
+const BAND_TOP = 0.12;
+const BAND_BOTTOM = 0.4;
 
 type EntryKind = "agent" | "user" | "event";
 
@@ -35,12 +39,27 @@ interface TimelineEntry {
   createdAt: string;
 }
 
+/** One tick: where it sits on the rail, and whether the reader is there. */
+interface Tick {
+  entry: TimelineEntry;
+  y: number;
+  here: boolean;
+}
+
 /** The DOM anchor a tick scrolls to. */
 const anchorId = (id: string) => `activity-${id}`;
 
 function toEntry(c: IssueComment): TimelineEntry {
+  // A row the server wrote is an event however it was typed. `task.go` files
+  // "queued a task" as `type: "comment"` with `author_type: "system"`, so
+  // typing on `type` alone gave that row an author called "system" and set its
+  // one sentence as if somebody had written it.
   const kind: EntryKind =
-    c.type === "comment" ? (c.author_type === "agent" ? "agent" : "user") : "event";
+    c.type === "comment" && c.author_type !== "system"
+      ? c.author_type === "agent"
+        ? "agent"
+        : "user"
+      : "event";
   return {
     id: c.id,
     kind,
@@ -51,7 +70,13 @@ function toEntry(c: IssueComment): TimelineEntry {
   };
 }
 
-export function IssueTimeline({ comments }: { comments: IssueComment[] }) {
+export function IssueTimeline({
+  comments,
+  scrollerRef,
+}: {
+  comments: IssueComment[];
+  scrollerRef: React.RefObject<HTMLDivElement | null>;
+}) {
   // Oldest first, and left that way: `ListCommentsByIssue` orders by
   // `created_at ASC`, which is the order a timeline means — the server writes
   // "queued a task" before the agent answers. The composer sits below the feed,
@@ -69,7 +94,9 @@ export function IssueTimeline({ comments }: { comments: IssueComment[] }) {
           <TimelineRow key={entry.id} entry={entry} />
         ))}
       </div>
-      {entries.length >= RAIL_MIN_ENTRIES && <TimelineRail entries={entries} />}
+      {entries.length >= RAIL_MIN_ENTRIES && (
+        <TimelineRail entries={entries} scrollerRef={scrollerRef} />
+      )}
     </div>
   );
 }
@@ -129,43 +156,109 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
 }
 
 /**
- * One tick per entry, down the right edge of the feed.
+ * Where you are in the feed, and a way to get somewhere else in it.
  *
- * A tick in the viewport is drawn at full strength and the rest recede, so the
- * rail answers "where am I in this" as well as "take me there".
+ * The rail is the height of the **scroll viewport**, not of the thread, and
+ * every tick is placed where its entry really is in the document. Both of those
+ * are the point: an earlier version stacked one tick per entry in flow, so on a
+ * thread of any length the rail grew to the height of the article and drew a
+ * dashed line down the whole page — decoration, since a tick's position said
+ * nothing about the entry it stood for.
+ *
+ * A tick in the band is drawn at full strength and the rest recede, so the rail
+ * answers "where am I in this" as well as "take me there".
  *
  * The ticks are a roving focus: the rail is one tab stop and the arrows move
  * between ticks, because twenty comments would otherwise be twenty stops
  * between the feed and the composer.
  */
-function TimelineRail({ entries }: { entries: TimelineEntry[] }) {
-  const [inView, setInView] = useState<string[]>([]);
-  const railRef = useRef<HTMLDivElement>(null);
+function TimelineRail({
+  entries,
+  scrollerRef,
+}: {
+  entries: TimelineEntry[];
+  scrollerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const railRef = useRef<HTMLDivElement | null>(null);
+  const [rail, setRail] = useState<{ height: number; ticks: Tick[] }>({
+    height: 0,
+    ticks: [],
+  });
 
   useEffect(() => {
-    const nodes = entries
-      .map((e) => document.getElementById(anchorId(e.id)))
-      .filter((n): n is HTMLElement => n !== null);
-    if (nodes.length === 0) return;
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    let frame = 0;
 
-    // The band is the upper-middle of the viewport: an entry counts as "here"
-    // once it is comfortably in view rather than the moment a pixel of it is.
-    const observer = new IntersectionObserver(
-      (records) => {
-        setInView((prev) => {
-          const next = new Set(prev);
-          for (const record of records) {
-            if (record.isIntersecting) next.add(record.target.id);
-            else next.delete(record.target.id);
-          }
-          return [...next];
-        });
-      },
-      { rootMargin: "-15% 0px -70% 0px" },
-    );
-    for (const node of nodes) observer.observe(node);
-    return () => observer.disconnect();
-  }, [entries]);
+    const measure = () => {
+      frame = 0;
+      const box = scroller.getBoundingClientRect();
+      if (!box.height) return;
+
+      const rects = entries.flatMap((entry) => {
+        const node = document.getElementById(anchorId(entry.id));
+        return node ? [{ entry, rect: node.getBoundingClientRect() }] : [];
+      });
+      if (rects.length === 0) return;
+
+      // The rail stands for the feed, not for the page. Measuring against the
+      // document put every tick wherever the feed happened to sit in it — the
+      // whole rail's worth of offset, since the feed starts below the header
+      // and the title.
+      let spanTop = Infinity;
+      let spanBottom = -Infinity;
+      for (const { rect } of rects) {
+        spanTop = Math.min(spanTop, rect.top);
+        spanBottom = Math.max(spanBottom, rect.bottom);
+      }
+      const span = spanBottom - spanTop || 1;
+      // As tall as the feed, and never taller than the reader's viewport: a
+      // rail that grows with a long thread is a dashed line down the whole page.
+      const height = Math.max(96, Math.min(box.height - 64, span));
+      const bandTop = box.top + box.height * BAND_TOP;
+      const bandBottom = box.top + box.height * BAND_BOTTOM;
+
+      const ticks: Tick[] = rects.map(({ entry, rect }) => ({
+        entry,
+        y: Math.min(
+          height - 10,
+          Math.max(10, ((rect.top - spanTop) / span) * height),
+        ),
+        here: rect.bottom > bandTop && rect.top < bandBottom,
+      }));
+
+      // Measuring runs on every frame of a scroll, and almost every one of them
+      // produces the same rail: the ticks are pinned to the document, so only
+      // the band moves. Handing React the previous object back lets it skip the
+      // render — the alternative is a state update per frame for a rail that
+      // reads the same.
+      setRail((prev) =>
+        prev.height === height &&
+        prev.ticks.length === ticks.length &&
+        prev.ticks.every(
+          (tick, i) => tick.y === ticks[i]?.y && tick.here === ticks[i]?.here,
+        )
+          ? prev
+          : { height, ticks },
+      );
+    };
+
+    // Measured one frame after the effect, never during it: the first frame
+    // after a paint is the first one with geometry to read, and it keeps the
+    // effect from setting state synchronously.
+    frame = requestAnimationFrame(measure);
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure);
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    const resize = new ResizeObserver(onScroll);
+    resize.observe(scroller);
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      scroller.removeEventListener("scroll", onScroll);
+      resize.disconnect();
+    };
+  }, [entries, scrollerRef]);
 
   const jump = useCallback((id: string) => {
     document
@@ -185,7 +278,10 @@ function TimelineRail({ entries }: { entries: TimelineEntry[] }) {
       ref={railRef}
       role="group"
       aria-label="Jump to an entry in the activity"
-      className="w-6 shrink-0"
+      // Sticky inside the feed's full height, but only ever as tall as the
+      // reader's viewport.
+      className="sticky top-4 w-5 shrink-0 self-start"
+      style={{ height: rail.height || undefined }}
       onKeyDown={(event) => {
         const ticks = [...(railRef.current?.querySelectorAll("button") ?? [])];
         const index = ticks.indexOf(document.activeElement as HTMLButtonElement);
@@ -205,37 +301,37 @@ function TimelineRail({ entries }: { entries: TimelineEntry[] }) {
         }
       }}
     >
-      <div className="sticky top-2 flex flex-col items-center gap-1 py-1">
-        {entries.map((entry, index) => {
-          const here = inView.includes(anchorId(entry.id));
-          return (
-            <button
-              key={entry.id}
-              type="button"
-              tabIndex={index === 0 ? 0 : -1}
-              onClick={() => jump(entry.id)}
-              aria-label={`${entry.kind === "event" ? "Update" : `Comment from ${entry.author}`}, ${index + 1} of ${entries.length}`}
-              title={entry.content.replace(/[#*`>~]/g, "").slice(0, 120)}
-              // The box is the tap target and is deliberately larger than the
-              // 2px dash inside it: a rail you cannot hit is not a rail.
-              className="group flex size-6 items-center justify-center outline-none"
-            >
-              {/* Kind is not encoded in the dash: at two pixels tall the
-                  difference between an agent and a person read as a rendering
-                  artifact. Position is what the rail is for, and color is spent
-                  on it — where you are, and where the pointer is. */}
-              <span
-                className={cn(
-                  "h-0.5 rounded-full transition-all",
-                  here
-                    ? "w-5 bg-ink"
-                    : "w-3 bg-hairline-strong group-hover:w-5 group-hover:bg-ink",
-                )}
-              />
-            </button>
-          );
-        })}
-      </div>
+      {rail.ticks.map((tick, index) => (
+        <button
+          key={tick.entry.id}
+          type="button"
+          tabIndex={index === 0 ? 0 : -1}
+          onClick={() => jump(tick.entry.id)}
+          aria-label={`${
+            tick.entry.kind === "event"
+              ? "Update"
+              : `Comment from ${tick.entry.author}`
+          }, ${index + 1} of ${rail.ticks.length}`}
+          title={tick.entry.content.replace(/[#*`>~]/g, "").slice(0, 120)}
+          // The box is the tap target and is deliberately larger than the 2px
+          // dash inside it: a rail you cannot hit is not a rail.
+          style={{ top: tick.y }}
+          className="group absolute right-0 flex size-5 -translate-y-1/2 items-center justify-center outline-none"
+        >
+          {/* Kind is not encoded in the dash: at two pixels tall, the
+              difference between an agent and a person read as a rendering
+              artifact. Position is what the rail is for, and colour is spent
+              on it — where you are, and where the pointer is. */}
+          <span
+            className={cn(
+              "h-0.5 rounded-full transition-all",
+              tick.here
+                ? "w-4 bg-ink"
+                : "w-2.5 bg-hairline-strong group-hover:w-4 group-hover:bg-ink",
+            )}
+          />
+        </button>
+      ))}
     </div>
   );
 }

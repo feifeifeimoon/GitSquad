@@ -160,7 +160,20 @@ test("issue detail edits its own title and description", () => {
 
 test("the activity rail is a way through a long feed", () => {
   assert.match(timeline, /scrollIntoView/);
-  assert.match(timeline, /IntersectionObserver/);
+  // Every tick is placed from the measured rectangle of the entry it stands
+  // for, and the rail is bounded by the reader's viewport rather than by the
+  // thread. Stacking one tick per entry in flow is what made it a dashed line
+  // down the whole page, saying nothing about any of the entries it stood for.
+  assert.match(timeline, /getBoundingClientRect/);
+  assert.match(timeline, /box\.height - 64/);
+  assert.match(timeline, /scrollerRef/);
   // Only worth its pixels once there is something to move through.
   assert.match(timeline, /RAIL_MIN_ENTRIES/);
+});
+
+test("a row written by the server is not given an author", () => {
+  // `task.go` files "queued a task" as `type: "comment"` with
+  // `author_type: "system"`, so typing on `type` alone set one server sentence
+  // as prose above the name "system".
+  assert.match(timeline, /author_type !== "system"/);
 });
