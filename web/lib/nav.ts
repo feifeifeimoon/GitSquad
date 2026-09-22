@@ -4,7 +4,7 @@ import {
   FolderGit2,
   Gauge,
   Monitor,
-  SlidersHorizontal,
+  Settings,
   Sparkles,
   type LucideIcon,
 } from "lucide-react";
@@ -69,13 +69,13 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
     href: (slug) => paths.workspace(slug).skills(),
   },
   {
-    // Its own row, in the group whose scope it belongs to. It used to be the
-    // product group's "Settings" row silently rewriting its own href to this
-    // page whenever a workspace was in view — which made the account settings
-    // unreachable from the sidebar for anyone who had ever opened a workspace.
+    // Just "Settings", because of where it sits: inside the workspace group
+    // there is only one thing it could be setting. The account's settings are
+    // behind the avatar and keep the longer name, so the two never read as the
+    // same thing.
     key: "workspace-settings",
-    label: "Workspace settings",
-    icon: SlidersHorizontal,
+    label: "Settings",
+    icon: Settings,
     scope: "workspace",
     href: (slug) => paths.workspace(slug).settings(),
   },

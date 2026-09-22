@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronsUpDown, Settings } from "lucide-react";
+import { ChevronsUpDown, UserCog } from "lucide-react";
 import { paths } from "@/lib/paths";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -80,8 +80,8 @@ export function AccountMenu({
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>
               <Link href={paths.settings()}>
-                <Settings className="size-4" />
-                Settings
+                <UserCog className="size-4" />
+                Account settings
               </Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />

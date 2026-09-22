@@ -30,7 +30,8 @@ import {
  * It no longer opens with the account's Profile and Daemon Tokens. Those are
  * account-scoped, they belong on `/settings`, and rendering them here made this
  * page two scopes in one scroll with the wrong one first — the page you reach
- * from "Workspace settings" led with someone else's settings.
+ * from the workspace's own "Settings" row led with settings that were not the
+ * workspace's.
  */
 export default function WorkspaceSettingsPage() {
   const { slug } = useParams<{ slug: string }>();
@@ -122,7 +123,7 @@ export default function WorkspaceSettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Workspace settings" />
+      <PageHeader title="Settings" />
 
       <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8 pt-6">
         <SettingSection title="General">
