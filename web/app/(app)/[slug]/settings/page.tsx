@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { PageHeader } from "@/components/page-header";
-import { Field } from "@/components/form-field";
 import { ErrorState } from "@/components/error-state";
-import { UserSettings } from "@/components/settings/user-settings";
+import {
+  SettingRow,
+  SettingSection,
+} from "@/components/settings/settings-layout";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +24,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 
+/**
+ * The workspace's own settings.
+ *
+ * It no longer opens with the account's Profile and Daemon Tokens. Those are
+ * account-scoped, they belong on `/settings`, and rendering them here made this
+ * page two scopes in one scroll with the wrong one first — the page you reach
+ * from "Workspace settings" led with someone else's settings.
+ */
 export default function WorkspaceSettingsPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
@@ -112,80 +122,84 @@ export default function WorkspaceSettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Settings" />
+      <PageHeader title="Workspace settings" />
 
       <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8 pt-6">
-        <UserSettings />
+        <SettingSection title="General">
+          <SettingRow label="Name">
+            <span className="text-copy text-ink">{workspace.name}</span>
+          </SettingRow>
+          <SettingRow
+            label="URL"
+            description="Where this workspace lives in the console."
+          >
+            <span className="truncate font-mono text-caption text-body">
+              {url}
+            </span>
+          </SettingRow>
+          <SettingRow
+            label="Repository"
+            description="The GitHub repository its agents work in."
+          >
+            <span className="truncate font-mono text-caption text-body">
+              {workspace.repo_full_name ||
+                `${workspace.repo_owner}/${workspace.repo_name}`}
+            </span>
+          </SettingRow>
+        </SettingSection>
 
-        {/* General */}
-        <section className="mb-8">
-          <h2 className="mb-3 text-label font-semibold text-ink">General</h2>
-          <div className="space-y-4 rounded-lg border border-hairline bg-canvas p-5 shadow-level-2">
-            <Field label="Workspace Name">
-              <div className="text-copy text-ink">{workspace.name}</div>
-            </Field>
-            <Field label="URL">
-              <div className="truncate font-mono text-caption text-body">{url}</div>
-            </Field>
-          </div>
-        </section>
-
-        {/* Avatar */}
-        <section className="mb-8">
-          <h2 className="mb-3 text-label font-semibold text-ink">Avatar</h2>
-          <div className="flex items-center gap-4 rounded-lg border border-hairline bg-canvas p-5 shadow-level-2">
-            <WorkspaceAvatar
-              name={workspace.name}
-              avatarUrl={workspace.avatar_url}
-              className="size-14"
-            />
-            <div className="space-y-2">
-              <div className="flex gap-2">
+        <SettingSection title="Avatar">
+          <SettingRow
+            leading={
+              <WorkspaceAvatar
+                name={workspace.name}
+                avatarUrl={workspace.avatar_url}
+                className="size-10"
+              />
+            }
+            label={workspace.name}
+            description={avatarError || "PNG, JPG or SVG, up to 1MB"}
+            align="center"
+          >
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={uploading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {uploading ? "Uploading…" : "Upload"}
+              </Button>
+              {workspace.avatar_url && (
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={uploading}
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={handleRemoveAvatar}
                 >
-                  {uploading ? "Uploading…" : "Upload"}
+                  Remove
                 </Button>
-                {workspace.avatar_url && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={uploading}
-                    onClick={handleRemoveAvatar}
-                  >
-                    Remove
-                  </Button>
-                )}
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={handleFileChange}
-              />
-              {avatarError ? (
-                <p className="text-caption text-destructive">{avatarError}</p>
-              ) : (
-                <p className="text-caption text-mute">PNG, JPG or SVG, up to 1MB</p>
               )}
             </div>
-          </div>
-        </section>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </SettingRow>
+        </SettingSection>
 
-        {/* Danger zone */}
-        <section>
-          <h2 className="mb-3 text-label font-semibold text-destructive">Danger Zone</h2>
-          <div className="flex items-center justify-between gap-4 rounded-lg border border-hairline bg-canvas p-5 shadow-level-2">
-            <div>
-              <p className="text-copy font-medium text-ink">Delete Project</p>
-              <p className="mt-0.5 text-caption text-mute">
-                Deleting a workspace cannot be undone.
-              </p>
-            </div>
+        <SettingSection
+          title="Danger Zone"
+          tone="destructive"
+          description="These cannot be undone."
+        >
+          <SettingRow
+            label={<span className="text-destructive">Delete workspace</span>}
+            description="Permanently remove this workspace and every issue, agent and skill in it."
+          >
             <Dialog
               open={deleteOpen}
               onOpenChange={(v) => {
@@ -199,7 +213,7 @@ export default function WorkspaceSettingsPage() {
                   className="shrink-0 border-destructive text-destructive hover:bg-destructive/10"
                 >
                   <Trash2 className="size-4" />
-                  Delete Project
+                  Delete
                 </Button>
               </DialogTrigger>
               <DialogContent className="sm:max-w-md">
@@ -238,8 +252,8 @@ export default function WorkspaceSettingsPage() {
                 </div>
               </DialogContent>
             </Dialog>
-          </div>
-        </section>
+          </SettingRow>
+        </SettingSection>
       </div>
     </div>
   );

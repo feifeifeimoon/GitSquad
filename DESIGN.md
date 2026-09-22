@@ -612,7 +612,9 @@ Every button carries `active:translate-y-px` and `focus-visible:ring-3 focus-vis
 ### Surfaces
 
 - **`card`** — `bg-card border border-hairline rounded-lg shadow-level-2`. The workhorse: workspace cards, daemon cards, skill rows, runtime rows.
-- **`panel-settings`** — the card chrome at `p-5`, used for grouped settings sections with a heading and a description.
+- **`panel-settings`** — one card per **section**, not per setting: `rounded-lg border border-hairline bg-canvas shadow-level-2`, with `divide-y divide-hairline` between the rows inside it. `SettingSection` draws it.
+- **`setting-row`** — `flex gap-4 px-5 py-3.5`: what it is on the left (label in `{colors.ink}`, description in `{colors.mute}`), how to change it on the right. The stacked label-above-value form cost a card and two gaps per fact and turned a four-fact page into four screens. `leading` is for a row whose value *is* a picture (an avatar reads as part of the label); `align` centres a label against a button and pins it to the top against a description that wraps.
+- A settings page holds **one scope**. The workspace's settings and the account's are two pages with two titles; nothing renders one inside the other, and the account's own sections never appear at the top of a page reached from the workspace's.
 - **`table-container`** — `overflow-hidden rounded-lg border border-hairline shadow-level-2` wrapping a full-width table. Header cells are `{typography.caption-mono}` uppercase in `{colors.mute}` on a `{colors.canvas-soft}` row; body cells are `{typography.body-sm}` with `border-b border-hairline` rows.
 - **`modal-card`** — `bg-card rounded-lg shadow-level-5`, used for dialogs and the sign-out confirmation.
 - **`dropdown-surface`** — `bg-card rounded-md shadow-level-4`, used for the workspace switcher, the account menu and the repository picker.
