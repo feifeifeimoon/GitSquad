@@ -67,14 +67,14 @@ export default function IssueDetailPage() {
     return (
       <div className="flex h-full flex-col">
         <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto w-full max-w-5xl px-8">
+          <div className="w-full px-8">
             <div className="flex items-center gap-1.5 border-b border-hairline py-4">
               <Skeleton className="h-4 w-16" />
               <Skeleton className="h-4 w-4" />
               <Skeleton className="h-4 w-24" />
             </div>
-            <div className="grid grid-cols-1 gap-10 py-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
-              <div className="min-w-0">
+            <div className="grid grid-cols-1 gap-10 py-6 lg:grid-cols-[minmax(0,42rem)_15rem] lg:justify-between xl:grid-cols-[minmax(0,52rem)_15rem]">
+              <div className="min-w-0 xl:pl-40">
                 <Skeleton className="h-6 w-3/4" />
                 <div className="mt-4 space-y-2">
                   <Skeleton className="h-3 w-full" />
@@ -121,13 +121,15 @@ export default function IssueDetailPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* The whole page scrolls as one — the header row and the body are the
-          same container, not a full-width bar above a centred column. They were
-          two different left edges, which is what "it does not look centred"
-          actually was: on a wide screen the breadcrumb started 50px left of the
-          title it belongs to. */}
+      {/* The whole page scrolls as one, and it is as wide as every other page:
+          `PageHeader`'s `px-8` row, not a centred column. A `max-w-5xl` here
+          meant the breadcrumb sat 320px right of the title on the page next
+          door — the chrome has to land in the same place wherever the sidebar
+          navigates to — and it bought two 350px gutters on a wide screen for
+          nothing. What stays narrow is the prose, and what takes the width is
+          the gap in the middle. */}
       <div ref={scrollerRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-5xl px-8">
+        <div className="w-full px-8">
           {/* Breadcrumb — a path, so it stays quiet and leaves the title to the
               heading below. The key is mono here because it is an identifier,
               and the only one on the page. */}
@@ -148,8 +150,17 @@ export default function IssueDetailPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-10 py-6 lg:grid-cols-[minmax(0,1fr)_15rem]">
-            <div className="min-w-0">
+          {/* Reading measure on the left, facts on the right edge, and the
+              width the window has left over goes between them: the prose is
+              capped at ~48 characters a line, so the spare width lands on the
+              gutter rather than on the line length.
+              From `xl` the prose column also carries an inset. Linear puts its
+              issue body ~193px from the nav and multica ~205px — neither hugs
+              it — and the inset is the whole difference; the track grows by the
+              same amount so the *measure* is unchanged. The header above stays
+              at the page's own padding, which is where every other page's is. */}
+          <div className="grid grid-cols-1 gap-10 py-6 lg:grid-cols-[minmax(0,42rem)_15rem] lg:justify-between xl:grid-cols-[minmax(0,52rem)_15rem]">
+            <div className="min-w-0 xl:pl-40">
               <IssueTitle
                 slug={slug}
                 issueKey={issueKey}
