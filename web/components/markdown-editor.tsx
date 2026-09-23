@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   EditorContent,
   Extension,
   InputRule,
   useEditor,
+  type ChainedCommands,
   type Editor,
 } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
@@ -26,9 +28,19 @@ import {
   ListOrdered,
   SquareCode,
   Quote,
+  Minus,
+  Type,
+  type LucideIcon,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { mentionQueryAt } from "@/lib/mention";
+import {
+  filterSlashCommands,
+  groupSlashCommands,
+  slashQueryAt,
+  type SlashCommandId,
+  type SlashGroup,
+} from "@/lib/slash-commands";
 import {
   markdownMarkerAt,
   markerListName,
@@ -139,6 +151,86 @@ const MarkdownMarkers = Extension.create({
   },
 });
 
+/** The menu never grows past this; the upward flip is measured against it. */
+const MENU_MAX_HEIGHT = 240;
+
+/**
+ * Where the popup is mounted, and whose box its coordinates are relative to.
+ *
+ * Inside a dialog it has to stay within the dialog's DOM: Radix counts a pointer
+ * down outside the content as a dismissal, so a popup portaled past it would
+ * close the dialog the moment someone picked a command. Everywhere else it goes
+ * to the body, which is what keeps the composer's rounded `overflow-hidden` box
+ * from clipping it.
+ */
+function menuHost(editor: Editor): HTMLElement {
+  return editor.view.dom.closest('[role="dialog"]') ?? document.body;
+}
+
+/**
+ * The caret's position and the flip, in the host's coordinate space.
+ *
+ * A dialog is a transformed element — that is how it is centred — and a
+ * transform makes it the containing block for the `fixed` popup, so the caret's
+ * viewport coordinates have to be made relative to the host box either way. The
+ * create dialog's `p-0` keeps its border box and padding box the same thing.
+ */
+function placeMenu(editor: Editor, anchorPos: number) {
+  const box = menuHost(editor).getBoundingClientRect();
+  const caret = editor.view.coordsAtPos(anchorPos);
+  return {
+    x: caret.left - box.left,
+    y: caret.bottom - box.top,
+    above: box.bottom - caret.bottom < MENU_MAX_HEIGHT,
+  };
+}
+
+/** The mark each slash command shows; the names come from lib/slash-commands.ts. */
+const SLASH_ICONS: Record<string, LucideIcon> = {
+  text: Type,
+  "heading-1": Heading1,
+  "heading-2": Heading2,
+  "heading-3": Heading3,
+  "bullet-list": List,
+  "ordered-list": ListOrdered,
+  code: SquareCode,
+  quote: Quote,
+  divider: Minus,
+};
+
+/** Queue the block a slash item stands for; the caller runs the chain. */
+function applySlashCommand(chain: ChainedCommands, id: SlashCommandId): void {
+  switch (id) {
+    case "text":
+      chain.setParagraph();
+      return;
+    case "heading1":
+      chain.toggleHeading({ level: 1 });
+      return;
+    case "heading2":
+      chain.toggleHeading({ level: 2 });
+      return;
+    case "heading3":
+      chain.toggleHeading({ level: 3 });
+      return;
+    case "bulletList":
+      chain.toggleBulletList();
+      return;
+    case "orderedList":
+      chain.toggleOrderedList();
+      return;
+    case "codeBlock":
+      chain.toggleCodeBlock();
+      return;
+    case "quote":
+      chain.toggleBlockquote();
+      return;
+    case "divider":
+      chain.setHorizontalRule();
+      return;
+  }
+}
+
 function BubbleButton({
   active,
   onClick,
@@ -169,12 +261,34 @@ function BubbleDivider() {
   return <span className="mx-0.5 h-4 w-px bg-hairline" />;
 }
 
-interface MentionState {
+interface Suggestion {
+  kind: "slash" | "mention";
   query: string;
+  /** Document range of the trigger character plus the query, replaced on pick. */
   from: number;
   to: number;
+  /** Caret position, in the popup's host box (see placeMenu). */
   x: number;
   y: number;
+  /** Not enough room below the caret: the menu hangs above it instead. */
+  above: boolean;
+}
+
+interface MenuItem {
+  /** Unique within the menu: a command id, or a mention name. */
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+  /** Set for slash items; mention items carry their name in `id` instead. */
+  command?: SlashCommandId;
+}
+
+interface MenuSection {
+  /** Slash commands are drawn in sections; a mention list is a single one. */
+  group: SlashGroup | null;
+  items: MenuItem[];
+  /** Where this section starts in the flat list the keyboard walks. */
+  offset: number;
 }
 
 export function MarkdownEditor({
@@ -222,49 +336,98 @@ export function MarkdownEditor({
   className?: string;
   mentionItems?: string[];
 }) {
-  const [mention, setMention] = useState<MentionState | null>(null);
+  const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   // Refs so the ProseMirror keydown handler (created once) always sees the
-  // latest suggestion state without recreating the editor.
+  // latest menu state without recreating the editor.
   const editorRef = useRef<Editor | null>(null);
-  const mentionRef = useRef<MentionState | null>(null);
-  const filteredRef = useRef<string[]>([]);
+  const suggestionRef = useRef<Suggestion | null>(null);
+  const itemsRef = useRef<MenuItem[]>([]);
   const selectedIndexRef = useRef(0);
   const onSubmitRef = useRef(onSubmit);
 
-  // Detect an active `@query` immediately before the caret and surface the
-  // suggestion popup. Suppressed inside code (blocks and inline).
-  const computeMention = useCallback((editor: Editor) => {
+  // Detect an active `@query` or `/query` immediately before the caret and
+  // surface the menu. Suppressed inside code (blocks and inline).
+  const computeSuggestion = useCallback((editor: Editor) => {
     const { from, empty } = editor.state.selection;
     if (!empty || editor.isActive("codeBlock") || editor.isActive("code")) {
-      setMention(null);
+      setSuggestion(null);
       return;
     }
     const before = editor.state.doc.textBetween(0, from, "\n", " ");
-    const query = mentionQueryAt(before);
+    // Both triggers cannot match at once: each needs its own character right
+    // before the query, and that character is not a query character.
+    const slash = slashQueryAt(before);
+    const query = slash ?? mentionQueryAt(before);
     if (query === null) {
-      setMention(null);
+      setSuggestion(null);
       return;
     }
-    const atPos = from - query.length - 1;
-    const coords = editor.view.coordsAtPos(atPos);
-    setMention({ query, from: atPos, to: from, x: coords.left, y: coords.bottom });
+    const triggerPos = from - query.length - 1;
+    setSuggestion({
+      kind: slash === null ? "mention" : "slash",
+      query,
+      from: triggerPos,
+      to: from,
+      ...placeMenu(editor, triggerPos),
+    });
     setSelectedIndex(0);
   }, []);
 
-  const selectMention = useCallback((name: string) => {
+  const applyItem = useCallback((item: MenuItem) => {
     const editor = editorRef.current;
-    const m = mentionRef.current;
-    if (!editor || !m) return;
-    editor
+    const current = suggestionRef.current;
+    if (!editor || !current) return;
+    const chain = editor
       .chain()
       .focus()
-      .deleteRange({ from: m.from, to: m.to })
-      .insertContent("@" + name + " ")
-      .run();
-    setMention(null);
+      .deleteRange({ from: current.from, to: current.to });
+    if (item.command) {
+      applySlashCommand(chain, item.command);
+    } else {
+      chain.insertContent("@" + item.id + " ");
+    }
+    chain.run();
+    setSuggestion(null);
   }, []);
+
+  // The sections the popup draws, plus the same items flattened in that order —
+  // which is what the keyboard walks, so arrow keys cross sections seamlessly.
+  const menu = useMemo<{ sections: MenuSection[]; items: MenuItem[] }>(() => {
+    if (!suggestion) return { sections: [], items: [] };
+    if (suggestion.kind === "mention") {
+      const q = suggestion.query.toLowerCase();
+      const items = mentionItems
+        .filter((name) => name.toLowerCase().includes(q))
+        .map((name) => ({ id: name, label: `@${name}` }));
+      return { sections: [{ group: null, items, offset: 0 }], items };
+    }
+    let offset = 0;
+    const sections = groupSlashCommands(filterSlashCommands(suggestion.query)).map(
+      (section) => {
+        const items = section.commands.map((command) => {
+          const Icon = SLASH_ICONS[command.icon] ?? Type;
+          return {
+            id: command.id,
+            label: command.label,
+            icon: <Icon className="size-4 shrink-0 text-mute" />,
+            command: command.id,
+          };
+        });
+        const placed = { group: section.group, items, offset };
+        offset += items.length;
+        return placed;
+      },
+    );
+    return { sections, items: sections.flatMap((section) => section.items) };
+  }, [suggestion, mentionItems]);
+
+  useEffect(() => {
+    suggestionRef.current = suggestion;
+    selectedIndexRef.current = selectedIndex;
+    itemsRef.current = menu.items;
+  }, [suggestion, selectedIndex, menu]);
 
   const editor = useEditor({
     // `contentType: "markdown"` is what lets this start from stored markdown
@@ -280,10 +443,10 @@ export function MarkdownEditor({
     ],
     onUpdate: ({ editor }) => {
       onChange?.(editor.getMarkdown());
-      computeMention(editor);
+      computeSuggestion(editor);
     },
     onSelectionUpdate: ({ editor }) => {
-      computeMention(editor);
+      computeSuggestion(editor);
     },
     editorProps: {
       // The editable element is the one carrying `role="textbox"`, so the name
@@ -306,26 +469,28 @@ export function MarkdownEditor({
           onSubmitRef.current();
           return true;
         }
-        if (!mentionRef.current) return false;
-        const items = filteredRef.current;
+        if (!suggestionRef.current) return false;
+        const list = itemsRef.current;
         if (event.key === "Escape") {
-          setMention(null);
+          setSuggestion(null);
           return true;
         }
-        if (items.length === 0) return false;
+        if (list.length === 0) return false;
         if (event.key === "ArrowDown") {
           event.preventDefault();
-          setSelectedIndex((i) => (i + 1) % items.length);
+          setSelectedIndex((i) => (i + 1) % list.length);
           return true;
         }
         if (event.key === "ArrowUp") {
           event.preventDefault();
-          setSelectedIndex((i) => (i - 1 + items.length) % items.length);
+          setSelectedIndex((i) => (i - 1 + list.length) % list.length);
           return true;
         }
         if (event.key === "Enter" || event.key === "Tab") {
+          const item = list[selectedIndexRef.current];
+          if (!item) return false;
           event.preventDefault();
-          selectMention(items[selectedIndexRef.current]);
+          applyItem(item);
           return true;
         }
         return false;
@@ -336,18 +501,6 @@ export function MarkdownEditor({
   useEffect(() => {
     editorRef.current = editor;
   }, [editor]);
-
-  const filtered = useMemo(() => {
-    if (!mention) return [];
-    const q = mention.query.toLowerCase();
-    return mentionItems.filter((n) => n.toLowerCase().includes(q));
-  }, [mention, mentionItems]);
-
-  useEffect(() => {
-    mentionRef.current = mention;
-    selectedIndexRef.current = selectedIndex;
-    filteredRef.current = filtered;
-  }, [mention, selectedIndex, filtered]);
 
   // The keydown handler is created once, so a caller's inline send callback
   // would otherwise be the one captured on the first render.
@@ -450,31 +603,49 @@ export function MarkdownEditor({
       </BubbleMenu>
       <EditorContent editor={editor} className={cn("tiptap-content", className)} />
 
-      {mention && filtered.length > 0 && (
-        <div
-          className="fixed z-50 max-h-56 w-56 overflow-y-auto rounded-md border border-hairline bg-canvas py-1 shadow-level-4"
-          style={{ left: mention.x, top: mention.y }}
-        >
-          {filtered.map((name, i) => (
-            <button
-              key={name}
-              type="button"
-              onMouseDown={(e) => {
-                e.preventDefault();
-                selectMention(name);
-              }}
-              className={cn(
-                "flex w-full items-center px-3 py-1.5 text-left text-copy transition-colors",
-                i === selectedIndex
-                  ? "bg-muted text-ink"
-                  : "text-body hover:bg-muted/50",
-              )}
-            >
-              @{name}
-            </button>
-          ))}
-        </div>
-      )}
+      {suggestion &&
+        menu.items.length > 0 &&
+        createPortal(
+          <div
+            data-testid="caret-menu"
+            className={cn(
+              "fixed z-50 max-h-56 w-56 overflow-y-auto rounded-md border border-hairline bg-canvas py-1 shadow-level-4",
+              suggestion.above && "-translate-y-full",
+            )}
+            style={{ left: suggestion.x, top: suggestion.y }}
+          >
+            {menu.sections.map((section, sectionIndex) => (
+              <Fragment key={section.group ?? "mention"}>
+                {sectionIndex > 0 && (
+                  <div
+                    data-testid="caret-menu-separator"
+                    className="my-1 border-t border-hairline"
+                  />
+                )}
+                {section.items.map((item, i) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      applyItem(item);
+                    }}
+                    className={cn(
+                      "flex w-full items-center gap-2 px-3 py-1.5 text-left text-copy transition-colors",
+                      section.offset + i === selectedIndex
+                        ? "bg-muted text-ink"
+                        : "text-body hover:bg-muted/50",
+                    )}
+                  >
+                    {item.icon}
+                    <span className="truncate">{item.label}</span>
+                  </button>
+                ))}
+              </Fragment>
+            ))}
+          </div>,
+          menuHost(editor),
+        )}
     </div>
   );
 }
