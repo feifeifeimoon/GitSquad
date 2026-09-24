@@ -7,18 +7,21 @@ import {
   IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi, agentApi, type Agent,
 } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
 import { SectionHeading } from "@/components/page-header";
+import { AgentPicker } from "@/components/issues/agent-picker";
+import { AssigneePicker } from "@/components/issues/assignee-picker";
 import { CommentComposer } from "@/components/issues/comment-composer";
 import { IssueActions } from "@/components/issues/issue-actions";
 import { IssueDescription } from "@/components/issues/issue-description";
 import { IssueTimeline } from "@/components/issues/issue-timeline";
 import { IssueTitle } from "@/components/issues/issue-title";
+import { ROW_TRIGGER } from "@/components/issues/property-row";
 import { StatusIconLabel } from "@/components/status-icon";
 import { IssuePullRequests } from "@/components/issues/issue-pull-requests";
 import { TimeAgo } from "@/components/time-ago";
@@ -210,7 +213,9 @@ export default function IssueDetailPage() {
                     value={issue.status}
                     onValueChange={(v) => changeStatus(v as IssueStatus)}
                   >
-                    <SelectTrigger className="h-8 w-full">
+                    {/* The same row grammar as Assignee and Agents below: the
+                        whole row is the control, and nothing draws a box. */}
+                    <SelectTrigger className={cn(ROW_TRIGGER, "justify-between border-0")}>
                       <StatusIconLabel status={issue.status} />
                     </SelectTrigger>
                     <SelectContent position="popper" sideOffset={4}>
@@ -223,18 +228,25 @@ export default function IssueDetailPage() {
                   </Select>
                 </Field>
 
+                {/* One person accountable, then the agents doing the work: two
+                    axes, because a set of names could never answer "who owns
+                    this". */}
                 <Field label="Assignee">
-                  {issue.assigned_agents.length > 0 ? (
-                    <div className="flex flex-wrap gap-1">
-                      {issue.assigned_agents.map((a) => (
-                        <Badge key={a} variant="outline">
-                          @{a}
-                        </Badge>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-copy text-body">Unassigned</p>
-                  )}
+                  <AssigneePicker
+                    slug={slug}
+                    issueKey={issueKey}
+                    assignee={issue.assignee}
+                    onSaved={refresh}
+                  />
+                </Field>
+
+                <Field label="Agents">
+                  <AgentPicker
+                    slug={slug}
+                    issueKey={issueKey}
+                    agents={issue.agents}
+                    onSaved={refresh}
+                  />
                 </Field>
 
                 <Field label="Creator">

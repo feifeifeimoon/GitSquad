@@ -1,5 +1,10 @@
 import { test, expect } from "@playwright/test";
-import { TestApiClient, type TestWorkspace } from "../fixtures";
+import {
+  TestApiClient,
+  type TestDaemon,
+  type TestUser,
+  type TestWorkspace,
+} from "../fixtures";
 import { loginAsE2E } from "../helpers";
 
 test.describe("Issues", () => {
@@ -321,5 +326,158 @@ test.describe("Issue pull requests · link form", () => {
       timeout: 10_000,
     });
     await expect(input).toHaveValue("not-a-pull-request", { timeout: 10_000 });
+  });
+});
+
+// Who is on an issue, in two axes: one person accountable (Assignee) and the
+// agents doing the work (Agents). Both are edited where the issue is read —
+// the board card only ever shows them, because a card is a drag handle.
+test.describe("Issue assignment", () => {
+  let api: TestApiClient;
+  let workspace: TestWorkspace;
+  let daemon: TestDaemon;
+  let user: TestUser;
+  let suffix: string;
+
+  test.beforeEach(async () => {
+    suffix = Date.now().toString(36);
+    api = new TestApiClient();
+    user = await api.login("E2E User");
+    workspace = await api.seedWorkspace({
+      name: `E2E Assign ${suffix}`,
+      slug: `e2e-assign-${suffix}`,
+    });
+    daemon = await api.seedDaemon({ name: `E2E Assign Mac ${suffix}` });
+  });
+
+  test.afterEach(async () => {
+    await api.cleanup();
+  });
+
+  const newAgent = (name: string, enabled?: boolean) =>
+    api.createAgent(workspace.id, {
+      name: `${name}-${suffix}`,
+      daemon_id: daemon.id,
+      provider: "claude",
+      enabled,
+    });
+
+  test("assigns and unassigns an agent from the issue page", async ({ page }) => {
+    const agent = await newAgent("planner");
+    const issue = await api.createIssue(workspace.id, `Assign target ${suffix}`);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    const agentsRow = page.getByRole("button", { name: /^Agents:/ });
+    await expect(agentsRow).toContainText("No agents", { timeout: 20_000 });
+
+    await agentsRow.click();
+    await page.getByRole("menuitemcheckbox", { name: agent.name }).click();
+    // The menu stays open for the next toggle; closing it is what commits.
+    await page.keyboard.press("Escape");
+
+    await expect(agentsRow).toContainText(agent.name, { timeout: 10_000 });
+
+    // Reloaded, not just re-rendered: the assignment came back from the server.
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("button", { name: /^Agents:/ })).toContainText(
+      agent.name,
+      { timeout: 20_000 },
+    );
+
+    // And it can be taken off again. The clear row is a plain menu item — it
+    // clears the set rather than toggling a member of it.
+    await page.getByRole("button", { name: /^Agents:/ }).click();
+    await page.getByRole("menuitem", { name: "No agents" }).click();
+    await expect(page.getByRole("button", { name: /^Agents:/ })).toContainText(
+      "No agents",
+      { timeout: 10_000 },
+    );
+  });
+
+  test("lists a disabled agent but will not pick it", async ({ page }) => {
+    const disabled = await newAgent("sleeper", false);
+    const issue = await api.createIssue(workspace.id, `Disabled agent ${suffix}`);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    await page.getByRole("button", { name: /^Agents:/ }).click();
+    const row = page.getByRole("menuitemcheckbox", { name: disabled.name });
+    // Present, with the reason inline — hiding an agent that exists reads as
+    // "where did it go".
+    await expect(row).toBeVisible({ timeout: 20_000 });
+    await expect(row).toHaveAttribute("data-disabled", "");
+    await expect(row).toContainText("disabled");
+  });
+
+  test("shows the accountable person and lets them be unassigned", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `Owner ${suffix}`);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    // A new issue is owned by whoever opened it, so "my issues" has an answer
+    // from the first second.
+    const assigneeRow = page.getByRole("button", { name: /^Assignee:/ });
+    await expect(assigneeRow).toContainText(user?.login ?? "", { timeout: 20_000 });
+
+    await assigneeRow.click();
+    await page.getByRole("menuitemradio", { name: "Unassigned" }).click();
+    await expect(page.getByRole("button", { name: /^Assignee:/ })).toContainText(
+      "Unassigned",
+      { timeout: 10_000 },
+    );
+  });
+
+  test("draws an avatar per agent on the board card, and none when unassigned", async ({
+    page,
+  }) => {
+    const agent = await newAgent("reviewer");
+    const assigned = await api.createIssue(workspace.id, `Card agents ${suffix}`);
+    const bare = await api.createIssue(workspace.id, `Card bare ${suffix}`);
+    await api.assignAgents(workspace.id, assigned.issue_key, [agent.id]);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByText(assigned.title)).toBeVisible({ timeout: 20_000 });
+    // The monogram carries the name, which the old joined string only did as
+    // text — and the card for the unassigned issue carries no avatar at all.
+    await expect(page.getByRole("img", { name: agent.name })).toHaveCount(1);
+    expect(bare.title).not.toEqual(assigned.title);
+  });
+
+  test("drops an agent from the issue when the agent is deleted", async ({ page }) => {
+    const agent = await newAgent("temp");
+    const issue = await api.createIssue(workspace.id, `Deleted agent ${suffix}`);
+    await api.assignAgents(workspace.id, issue.issue_key, [agent.id]);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(page.getByRole("button", { name: /^Agents:/ })).toContainText(
+      agent.name,
+      { timeout: 20_000 },
+    );
+
+    await api.removeAgent(workspace.id, agent.id);
+    await page.reload({ waitUntil: "domcontentloaded" });
+
+    // The cascade took the row, and the page still renders: no dangling name,
+    // no error screen.
+    await expect(page.getByRole("button", { name: /^Agents:/ })).toContainText(
+      "No agents",
+      { timeout: 20_000 },
+    );
+    await expect(page.getByRole("heading", { name: "Activity" })).toBeVisible();
   });
 });

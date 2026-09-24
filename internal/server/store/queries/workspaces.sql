@@ -49,3 +49,14 @@ WHERE i.installation_id = $1 AND r.owner = $2 AND r.name = $3
   AND w.status != 'archived'
 ORDER BY w.created_at ASC
 LIMIT 1;
+
+-- name: ListWorkspaceMembers :many
+-- The people an issue can be assigned to. Today a workspace has exactly one
+-- member — the user it belongs to — so this returns one row. It is an endpoint
+-- rather than a hardcoded "me" so that collaboration is a change here, not a
+-- change to every caller.
+SELECT u.id, u.login, COALESCE(u.avatar_url, '') AS avatar_url
+FROM workspaces w
+JOIN users u ON u.id = w.user_id
+WHERE w.id = $1
+ORDER BY u.login;

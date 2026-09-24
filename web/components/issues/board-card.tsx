@@ -5,6 +5,7 @@ import { useDraggable } from "@dnd-kit/core";
 import { MessageSquare } from "lucide-react";
 import type { Issue } from "@/lib/api";
 import { TimeAgo } from "@/components/time-ago";
+import { AgentStack } from "@/components/issues/agent-chip";
 import { IssuePullRequestBadge } from "@/components/issues/issue-pull-requests";
 import { STATUS_TONE } from "@/components/status-icon";
 
@@ -21,6 +22,11 @@ import { STATUS_TONE } from "@/components/status-icon";
 // heads — and a column head that has scrolled out of view, or a card mid-drag,
 // says nothing at all. A 2px edge carries it without a fill, so the colour
 // never becomes the surface.
+//
+// The agents are avatars, not a joined list of names: a name is as wide as it
+// is long and pushed the rest of the row around, while a stack is the same
+// width for one agent or four — and it is how every other screen in the console
+// shows who an agent is.
 export const IssueCard = memo(function IssueCard({
   issue,
   className,
@@ -28,8 +34,6 @@ export const IssueCard = memo(function IssueCard({
   issue: Issue;
   className?: string;
 }) {
-  const assignees = issue.assigned_agents.join(", ");
-
   return (
     <div
       className={`relative overflow-hidden rounded-lg border border-hairline bg-canvas p-3 pl-3.5 shadow-level-1 transition-shadow hover:shadow-level-2 ${
@@ -49,13 +53,9 @@ export const IssueCard = memo(function IssueCard({
         <span className="shrink-0 font-mono text-micro text-mute">
           {issue.issue_key}
         </span>
-        {assignees && (
-          <span className="min-w-0 truncate text-micro text-body">
-            {assignees}
-          </span>
-        )}
 
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          <AgentStack agents={issue.agents} />
           <IssuePullRequestBadge issue={issue} />
           {issue.comments_count > 0 && (
             <span className="flex items-center gap-1 text-micro tabular-nums text-mute">

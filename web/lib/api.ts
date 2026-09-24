@@ -87,6 +87,24 @@ export { ApiError };
 
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "blocked" | "cancelled";
 
+export type AgentState = "running" | "queued" | "idle";
+
+/** An agent working on an issue, with what it is doing on it right now. */
+export interface IssueAgent {
+  id: string;
+  name: string;
+  avatar_url: string;
+  /** Derived per (issue, agent) from the task queue by the server. */
+  state: AgentState;
+}
+
+/** The one person accountable for an issue. */
+export interface IssueAssignee {
+  id: string;
+  login: string;
+  avatar_url: string;
+}
+
 export interface Issue {
   id: string;
   number: number;
@@ -94,7 +112,10 @@ export interface Issue {
   title: string;
   description: string;
   status: IssueStatus;
-  assigned_agents: string[];
+  /** Who is working on it. */
+  agents: IssueAgent[];
+  /** Who owns it; null while nobody has claimed it. */
+  assignee?: IssueAssignee | null;
   /** Only populated on the issue detail endpoint, newest first. */
   pull_requests?: PullRequest[];
   /** The active PR's number, or 0/absent when the issue has none. */
@@ -136,7 +157,7 @@ export interface IssueComment {
   id: string;
   author_type: "user" | "agent" | "system";
   author_name: string;
-  type: "comment" | "status_change" | "system";
+  type: "comment" | "status_change" | "system" | "agents_change" | "assignee_change";
   content: string;
   created_at: string;
 }
@@ -163,10 +184,24 @@ export const issueApi = {
   list: (workspaceId: string) => api.get<Issue[]>(`/api/v1/workspaces/${workspaceId}/issues`),
   get: (workspaceId: string, issueId: string) =>
     api.get<IssueDetail>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`),
-  create: (workspaceId: string, body: { title: string; description?: string; status?: IssueStatus }) =>
-    api.post<Issue>(`/api/v1/workspaces/${workspaceId}/issues`, body),
-  update: (workspaceId: string, issueId: string, body: { status?: IssueStatus; title?: string; description?: string }) =>
-    api.patch<Issue>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`, body),
+  create: (workspaceId: string, body: {
+    title: string;
+    description?: string;
+    status?: IssueStatus;
+    /** Assigned on creation. Does not start a run — a mention in the
+     * description does. */
+    agents?: string[];
+    assignee_id?: string;
+  }) => api.post<Issue>(`/api/v1/workspaces/${workspaceId}/issues`, body),
+  update: (workspaceId: string, issueId: string, body: {
+    status?: IssueStatus;
+    title?: string;
+    description?: string;
+    /** Replaces the whole assignment; [] clears it. Absent leaves it alone. */
+    agents?: string[];
+    /** A user id to set, "" to unassign. Absent leaves it alone. */
+    assignee_id?: string;
+  }) => api.patch<Issue>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`, body),
   addComment: (workspaceId: string, issueId: string, content: string) =>
     api.post<IssueComment>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/comments`, { content }),
   linkPullRequest: (workspaceId: string, issueId: string, ref: string) =>
@@ -175,6 +210,17 @@ export const issueApi = {
     api.delete(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests/${prId}`),
   restorePullRequest: (workspaceId: string, issueId: string, prId: string) =>
     api.post(`/api/v1/workspaces/${workspaceId}/issues/${issueId}/pull-requests/${prId}/restore`, {}),
+};
+
+/** A person an issue in this workspace can be assigned to. */
+export interface Member {
+  id: string;
+  login: string;
+  avatar_url: string;
+}
+
+export const memberApi = {
+  list: (workspaceId: string) => api.get<Member[]>(`/api/v1/workspaces/${workspaceId}/members`),
 };
 
 // ── Workspaces ─────────────────────────────────────────────────────────

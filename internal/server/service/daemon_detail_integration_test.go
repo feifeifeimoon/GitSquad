@@ -108,7 +108,7 @@ func TestDaemonDetailAndAgentStatusIntegration(t *testing.T) {
 		t.Errorf("idle agent current task = %+v, want nil", listed[0].CurrentTask)
 	}
 
-	issue, err := issueSvc.CreateIssue(ctx, ws.ID, user.ID, user.Login, "Fix the thing", "", "")
+	issue, err := issueSvc.CreateIssue(ctx, ws.ID, user.ID, user.Login, IssueCreate{Title: "Fix the thing"})
 	if err != nil {
 		t.Fatalf("CreateIssue: %v", err)
 	}

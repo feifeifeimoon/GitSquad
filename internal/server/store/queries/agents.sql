@@ -78,6 +78,14 @@ DELETE FROM agents WHERE id = $1 AND workspace_id = $2;
 -- name: ListAgentNamesByWorkspace :many
 SELECT name FROM agents WHERE workspace_id = $1 AND enabled = true ORDER BY name;
 
+-- name: ListWorkspaceAgentsForAssignment :many
+-- Everything the assignment paths need before they can act: the id to store,
+-- the name to match an @mention against, the avatar for the response, and
+-- whether the agent is enabled. One read serves the roster, the id validation
+-- and the mention resolution.
+SELECT id, name, COALESCE(avatar_url, '') AS avatar_url, enabled
+FROM agents WHERE workspace_id = $1 ORDER BY created_at;
+
 -- name: ListAgentsByDaemon :many
 SELECT a.*, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
        d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,

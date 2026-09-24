@@ -14,13 +14,31 @@ import {
 // Status is shown as a dot plus a written label, never colour alone — the label
 // is what carries the state for anyone who cannot separate the two hues.
 
-function Dot({ tone }: { tone: StatusTone }) {
+/** The dot on its own, for callers that position it (the avatar chip) or pair
+ * it with their own text. `tone` decides the colour, and there is one map for
+ * it. A `label` makes the dot speak for itself; without one it is decoration
+ * beside text that already says the same thing. */
+export function StatusDot({
+  tone,
+  label,
+  className,
+}: {
+  tone: StatusTone;
+  label?: string;
+  className?: string;
+}) {
   return (
     <span
-      className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[tone])}
-      aria-hidden="true"
+      className={cn("size-1.5 shrink-0 rounded-full", STATUS_DOT[tone], className)}
+      role={label ? "img" : undefined}
+      aria-label={label}
+      aria-hidden={label ? undefined : true}
     />
   );
+}
+
+function Dot({ tone }: { tone: StatusTone }) {
+  return <StatusDot tone={tone} />;
 }
 
 export function AgentStatusBadge({

@@ -415,6 +415,47 @@ func (q *Queries) ListAgentsByWorkspace(ctx context.Context, workspaceID uuid.UU
 	return items, nil
 }
 
+const listWorkspaceAgentsForAssignment = `-- name: ListWorkspaceAgentsForAssignment :many
+SELECT id, name, COALESCE(avatar_url, '') AS avatar_url, enabled
+FROM agents WHERE workspace_id = $1 ORDER BY created_at
+`
+
+type ListWorkspaceAgentsForAssignmentRow struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	AvatarUrl string    `json:"avatar_url"`
+	Enabled   bool      `json:"enabled"`
+}
+
+// Everything the assignment paths need before they can act: the id to store,
+// the name to match an @mention against, the avatar for the response, and
+// whether the agent is enabled. One read serves the roster, the id validation
+// and the mention resolution.
+func (q *Queries) ListWorkspaceAgentsForAssignment(ctx context.Context, workspaceID uuid.UUID) ([]ListWorkspaceAgentsForAssignmentRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceAgentsForAssignment, workspaceID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListWorkspaceAgentsForAssignmentRow
+	for rows.Next() {
+		var i ListWorkspaceAgentsForAssignmentRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Name,
+			&i.AvatarUrl,
+			&i.Enabled,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateAgent = `-- name: UpdateAgent :one
 UPDATE agents SET name = $3, description = $4, instructions = $5, model = $6, runtime_id = $7, enabled = $8, avatar_url = $9, updated_at = now()
 WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, created_by, created_at, updated_at

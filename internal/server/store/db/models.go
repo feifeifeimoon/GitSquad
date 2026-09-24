@@ -106,10 +106,15 @@ type Issue struct {
 	Description         string     `json:"description"`
 	Status              string     `json:"status"`
 	CreatorUserID       *uuid.UUID `json:"creator_user_id"`
-	AssignedAgents      []string   `json:"assigned_agents"`
+	AssigneeUserID      *uuid.UUID `json:"assignee_user_id"`
 	SourceUpstreamIssue *string    `json:"source_upstream_issue"`
 	CreatedAt           time.Time  `json:"created_at"`
 	UpdatedAt           time.Time  `json:"updated_at"`
+}
+
+type IssueAgent struct {
+	IssueID uuid.UUID `json:"issue_id"`
+	AgentID uuid.UUID `json:"agent_id"`
 }
 
 type IssueComment struct {

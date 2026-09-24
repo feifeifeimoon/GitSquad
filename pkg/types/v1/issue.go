@@ -35,13 +35,20 @@ func ValidIssueStatus(s string) bool {
 // Issue is an issue as the console sees it. IssueKey is the human reference
 // (e.g. "GTS-42"); Number is the per-workspace sequence behind it.
 type Issue struct {
-	ID             uuid.UUID `json:"id"`
-	Number         int32     `json:"number"`
-	IssueKey       string    `json:"issue_key"`
-	Title          string    `json:"title"`
-	Description    string    `json:"description"`
-	Status         string    `json:"status"` // one of the IssueStatus* values
-	AssignedAgents []string  `json:"assigned_agents"`
+	ID          uuid.UUID `json:"id"`
+	Number      int32     `json:"number"`
+	IssueKey    string    `json:"issue_key"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	Status      string    `json:"status"` // one of the IssueStatus* values
+	// Agents are the agents working on this issue, in roster order. The
+	// identities arrive resolved: the console renders a chip from the payload
+	// rather than looking each one up in a roster it would have to fetch twice.
+	Agents []IssueAgent `json:"agents"`
+	// Assignee is the one person accountable for the issue, or nil when nobody
+	// has claimed it. Single by design: two owners is no owner. It is separate
+	// from Agents — a person owns the work, agents do it.
+	Assignee *IssueAssignee `json:"assignee"`
 	// PullRequests is the issue's PR history, newest first. The active one is
 	// the open PR that declares closing intent, if any; the rest are how the
 	// issue got here. Only populated on the detail endpoint.
@@ -54,6 +61,33 @@ type Issue struct {
 	CommentsCount           int       `json:"comments_count"`
 	CreatedAt               time.Time `json:"created_at"`
 	UpdatedAt               time.Time `json:"updated_at"`
+}
+
+// IssueAgent is one agent assigned to work on an issue, together with what it
+// is doing on it right now.
+type IssueAgent struct {
+	ID        uuid.UUID `json:"id"`
+	Name      string    `json:"name"`
+	AvatarURL string    `json:"avatar_url"`
+	// State is derived per (issue, agent) from the task queue: "running" while a
+	// task is dispatched or running, "queued" while one waits to start, "idle"
+	// when the agent has nothing in flight here. One of the AgentState* values.
+	State string `json:"state"`
+}
+
+// The per-issue agent states. Mirrored by lib/agent-status.ts on the console.
+const (
+	AgentStateRunning = "running"
+	AgentStateQueued  = "queued"
+	AgentStateIdle    = "idle"
+)
+
+// IssueAssignee is the person accountable for an issue. Users are named by
+// their login everywhere in this product, so that is what carries the display.
+type IssueAssignee struct {
+	ID        uuid.UUID `json:"id"`
+	Login     string    `json:"login"`
+	AvatarURL string    `json:"avatar_url"`
 }
 
 // PullRequest is one pull request linked to an issue.

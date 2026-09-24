@@ -368,12 +368,41 @@ export class TestApiClient {
   /** Create an agent via the real API (requires a seeded daemon). */
   async createAgent(
     workspaceId: string,
-    body: { name: string; daemon_id: string; provider: string; description?: string },
+    body: {
+      name: string;
+      daemon_id: string;
+      provider: string;
+      description?: string;
+      /** false seeds an agent that exists but cannot run, which is what the
+       * assignment picker has to render as unpickable. */
+      enabled?: boolean;
+    },
   ): Promise<{ id: string; name: string }> {
     return this.authedFetch(`/api/v1/workspaces/${workspaceId}/agents`, {
       method: "POST",
       body: JSON.stringify(body),
     });
+  }
+
+  /** Delete an agent through the real API — the path that cascades an agent out
+   * of every issue it was assigned to. */
+  async removeAgent(workspaceId: string, agentId: string): Promise<void> {
+    await this.authedFetch(
+      `/api/v1/workspaces/${workspaceId}/agents/${agentId}`,
+      { method: "DELETE" },
+    );
+  }
+
+  /** Assign agents to an issue through the real API. */
+  async assignAgents(
+    workspaceId: string,
+    issueRef: string,
+    agentIds: string[],
+  ): Promise<void> {
+    await this.authedFetch(
+      `/api/v1/workspaces/${workspaceId}/issues/${issueRef}`,
+      { method: "PATCH", body: JSON.stringify({ agents: agentIds }) },
+    );
   }
 
   /** Post an issue comment through the real API (used to trigger realtime pushes). */

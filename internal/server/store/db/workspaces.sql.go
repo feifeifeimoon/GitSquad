@@ -208,6 +208,44 @@ func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWo
 	return i, err
 }
 
+const listWorkspaceMembers = `-- name: ListWorkspaceMembers :many
+SELECT u.id, u.login, COALESCE(u.avatar_url, '') AS avatar_url
+FROM workspaces w
+JOIN users u ON u.id = w.user_id
+WHERE w.id = $1
+ORDER BY u.login
+`
+
+type ListWorkspaceMembersRow struct {
+	ID        uuid.UUID `json:"id"`
+	Login     string    `json:"login"`
+	AvatarUrl string    `json:"avatar_url"`
+}
+
+// The people an issue can be assigned to. Today a workspace has exactly one
+// member — the user it belongs to — so this returns one row. It is an endpoint
+// rather than a hardcoded "me" so that collaboration is a change here, not a
+// change to every caller.
+func (q *Queries) ListWorkspaceMembers(ctx context.Context, id uuid.UUID) ([]ListWorkspaceMembersRow, error) {
+	rows, err := q.db.Query(ctx, listWorkspaceMembers, id)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListWorkspaceMembersRow
+	for rows.Next() {
+		var i ListWorkspaceMembersRow
+		if err := rows.Scan(&i.ID, &i.Login, &i.AvatarUrl); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWorkspacesByUser = `-- name: ListWorkspacesByUser :many
 SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
 `

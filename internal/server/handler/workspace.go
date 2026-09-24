@@ -114,6 +114,32 @@ func (h *WorkspaceHandler) Get(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(workspace, 0))
 }
 
+// Members handles GET /api/v1/workspaces/:id/members — the people an issue in
+// this workspace can be assigned to. The roster holds the workspace's owner
+// today; it is an endpoint rather than a client-side assumption so that
+// collaboration lands here instead of in every caller.
+func (h *WorkspaceHandler) Members(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("login required"))
+		return
+	}
+
+	workspace, err := h.workspaces.ResolveWorkspace(c.Request.Context(), user.ID, c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
+		return
+	}
+
+	members, err := h.workspaces.ListMembers(c.Request.Context(), workspace.ID)
+	if err != nil {
+		slog.Error("list members", "error", err)
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to list members"))
+		return
+	}
+	c.JSON(http.StatusOK, v1.SuccessResponse(members, len(members)))
+}
+
 // Archive handles DELETE /api/v1/workspaces/:id (id = UUID or slug).
 func (h *WorkspaceHandler) Archive(c *gin.Context) {
 	user := middleware.GetUser(c)

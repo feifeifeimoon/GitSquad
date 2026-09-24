@@ -32,3 +32,12 @@ type Workspace struct {
 	LastCommitAuthor  string `json:"last_commit_author"`
 	LastCommitAt      string `json:"last_commit_at"`
 }
+
+// Member is a person an issue in this workspace can be assigned to. A workspace
+// belongs to exactly one user today, so the roster holds one row; the endpoint
+// exists so that collaboration changes here rather than in every caller.
+type Member struct {
+	ID        uuid.UUID `json:"id"`
+	Login     string    `json:"login"`
+	AvatarURL string    `json:"avatar_url"`
+}
