@@ -304,3 +304,18 @@ func (s *WorkspaceService) UpdateWorkspaceAvatar(ctx context.Context, id uuid.UU
 		AvatarUrl: avatarURL,
 	})
 }
+
+// ListMembers returns the people an issue in this workspace can be assigned to.
+// Today that is the user the workspace belongs to, and only them — but callers
+// ask for a roster rather than assume, so collaboration is a change here.
+func (s *WorkspaceService) ListMembers(ctx context.Context, workspaceID uuid.UUID) ([]v1.Member, error) {
+	rows, err := s.store.ListWorkspaceMembers(ctx, workspaceID)
+	if err != nil {
+		return nil, fmt.Errorf("list members: %w", err)
+	}
+	members := make([]v1.Member, len(rows))
+	for i, r := range rows {
+		members[i] = v1.Member{ID: r.ID, Login: r.Login, AvatarURL: r.AvatarUrl}
+	}
+	return members, nil
+}

@@ -63,7 +63,7 @@ func TestUsageIntegration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAgent: %v", err)
 	}
-	issue, err := issueSvc.CreateIssue(ctx, ws.ID, user.ID, user.Login, "Fix the parser", "", "")
+	issue, err := issueSvc.CreateIssue(ctx, ws.ID, user.ID, user.Login, IssueCreate{Title: "Fix the parser"})
 	if err != nil {
 		t.Fatalf("CreateIssue: %v", err)
 	}

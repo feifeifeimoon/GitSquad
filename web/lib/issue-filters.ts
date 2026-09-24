@@ -2,14 +2,16 @@ import type { Issue, IssueStatus } from "@/lib/api";
 
 export interface IssueFilters {
   statuses: IssueStatus[];
-  assignees: string[];
+  /** Agent ids, not names: the roster is the source of names, and a name can
+   * change while an id cannot. */
+  agents: string[];
   creators: string[];
   search: string;
 }
 
 export const EMPTY_FILTERS: IssueFilters = {
   statuses: [],
-  assignees: [],
+  agents: [],
   creators: [],
   search: "",
 };
@@ -27,8 +29,8 @@ export function filterIssues(issues: Issue[], f: IssueFilters): Issue[] {
   const q = f.search.trim().toLowerCase();
   return issues.filter((issue) => {
     if (f.statuses.length > 0 && !f.statuses.includes(issue.status)) return false;
-    if (f.assignees.length > 0) {
-      const matched = f.assignees.some((a) => issue.assigned_agents.includes(a));
+    if (f.agents.length > 0) {
+      const matched = f.agents.some((id) => issue.agents.some((a) => a.id === id));
       if (!matched) return false;
     }
     if (f.creators.length > 0 && !f.creators.includes(issue.creator_name)) return false;
@@ -58,17 +60,21 @@ export function sortIssues(issues: Issue[], sort: SortState): Issue[] {
 }
 
 export function collectFilterOptions(issues: Issue[]): {
-  assignees: string[];
+  agents: { id: string; name: string }[];
   creators: string[];
 } {
-  const assignees = new Set<string>();
+  // Keyed by id, labelled from the payload: the filter is about the agent, not
+  // about whatever it happened to be called on the day.
+  const agents = new Map<string, string>();
   const creators = new Set<string>();
   for (const issue of issues) {
-    for (const a of issue.assigned_agents) assignees.add(a);
+    for (const a of issue.agents) agents.set(a.id, a.name);
     if (issue.creator_name) creators.add(issue.creator_name);
   }
   return {
-    assignees: [...assignees].sort(),
+    agents: [...agents.entries()]
+      .map(([id, name]) => ({ id, name }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
     creators: [...creators].sort(),
   };
 }

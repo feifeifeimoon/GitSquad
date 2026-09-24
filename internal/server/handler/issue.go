@@ -48,6 +48,23 @@ type CreateIssueRequest struct {
 	Title       string `json:"title"`
 	Description string `json:"description"`
 	Status      string `json:"status"`
+	// Agents are assigned when the issue is created, alongside whatever the
+	// description mentions. Assigning an agent does not start a run — only a
+	// mention does.
+	Agents []string `json:"agents"`
+	// AssigneeID is the person accountable for the issue. Omitted means the
+	// creator, which is the only member a workspace has today.
+	AssigneeID string `json:"assignee_id"`
+}
+
+// parseUUIDOr writes the 400 itself and reports whether the id was usable.
+func parseUUIDOr(c *gin.Context, ref, message string) (uuid.UUID, bool) {
+	id, err := uuid.Parse(ref)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse(message))
+		return uuid.Nil, false
+	}
+	return id, true
 }
 
 // Create handles POST /api/v1/workspaces/:id/issues.
@@ -61,14 +78,36 @@ func (h *IssueHandler) Create(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid request body"))
 		return
 	}
+	agentIDs, ok := parseAgentIDs(c, req.Agents)
+	if !ok {
+		return
+	}
+	var assigneeID *uuid.UUID
+	if req.AssigneeID != "" {
+		id, ok := parseUUIDOr(c, req.AssigneeID, "invalid assignee id")
+		if !ok {
+			return
+		}
+		assigneeID = &id
+	}
 	user := middleware.GetUser(c)
-	issue, err := h.issues.CreateIssue(c.Request.Context(), workspace.ID, user.ID, user.Login, req.Title, req.Description, req.Status)
+	issue, err := h.issues.CreateIssue(c.Request.Context(), workspace.ID, user.ID, user.Login, service.IssueCreate{
+		Title:       req.Title,
+		Description: req.Description,
+		Status:      req.Status,
+		AgentIDs:    agentIDs,
+		AssigneeID:  assigneeID,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrEmptyTitle):
 			c.JSON(http.StatusBadRequest, v1.ErrorResponse("title is required"))
 		case errors.Is(err, service.ErrInvalidStatus):
 			c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid status"))
+		case errors.Is(err, service.ErrUnknownAgent):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("unknown agent"))
+		case errors.Is(err, service.ErrUnknownMember):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("unknown assignee"))
 		default:
 			slog.Error("create issue", "error", err)
 			c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to create issue"))
@@ -127,6 +166,28 @@ type UpdateIssueRequest struct {
 	Status      *string `json:"status"`
 	Title       *string `json:"title"`
 	Description *string `json:"description"`
+	// Agents replaces the assignment wholesale when present: the ids listed are
+	// the agents on the issue when the request returns, and [] clears it. Absent
+	// leaves it alone, which is what keeps a status edit from touching it.
+	Agents *[]string `json:"agents"`
+	// AssigneeID sets the accountable person: a user id, "" to clear it — an
+	// issue nobody owns — or absent to leave it alone.
+	AssigneeID *string `json:"assignee_id"`
+}
+
+// parseAgentIDs turns the wire's agent ids into UUIDs, writing the 400 itself
+// when one does not parse so callers only branch on ok.
+func parseAgentIDs(c *gin.Context, raw []string) ([]uuid.UUID, bool) {
+	ids := make([]uuid.UUID, 0, len(raw))
+	for _, ref := range raw {
+		id, err := uuid.Parse(ref)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid agent id"))
+			return nil, false
+		}
+		ids = append(ids, id)
+	}
+	return ids, true
 }
 
 // Update handles PATCH /api/v1/workspaces/:id/issues/:issueId.
@@ -150,8 +211,24 @@ func (h *IssueHandler) Update(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid request body"))
 		return
 	}
+	// Absent and empty mean different things here: nil leaves the assignment
+	// alone, an empty list clears it.
+	var agentIDs *[]uuid.UUID
+	if req.Agents != nil {
+		ids, ok := parseAgentIDs(c, *req.Agents)
+		if !ok {
+			return
+		}
+		agentIDs = &ids
+	}
 	user := middleware.GetUser(c)
-	issue, err := h.issues.UpdateIssue(c.Request.Context(), workspace.ID, issueID, user.Login, req.Status, req.Title, req.Description)
+	issue, err := h.issues.UpdateIssue(c.Request.Context(), workspace.ID, issueID, user.Login, service.IssueUpdate{
+		Status:      req.Status,
+		Title:       req.Title,
+		Description: req.Description,
+		AgentIDs:    agentIDs,
+		AssigneeID:  req.AssigneeID,
+	})
 	if err != nil {
 		switch {
 		case errors.Is(err, service.ErrIssueNotFound):
@@ -160,6 +237,10 @@ func (h *IssueHandler) Update(c *gin.Context) {
 			c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid status"))
 		case errors.Is(err, service.ErrEmptyTitle):
 			c.JSON(http.StatusBadRequest, v1.ErrorResponse("title is required"))
+		case errors.Is(err, service.ErrUnknownAgent):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("unknown agent"))
+		case errors.Is(err, service.ErrUnknownMember):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("unknown assignee"))
 		default:
 			slog.Error("update issue", "error", err)
 			c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to update issue"))

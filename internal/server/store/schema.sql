@@ -107,7 +107,11 @@ CREATE TABLE issues (
     status TEXT NOT NULL DEFAULT 'backlog'
         CHECK (status IN ('backlog','todo','in_progress','in_review','done','blocked','cancelled')),
     creator_user_id UUID REFERENCES users(id),
-    assigned_agents TEXT[] NOT NULL DEFAULT '{}',
+    -- The one person accountable for the issue, nil while nobody has claimed
+    -- it. Single by design: two owners is no owner. Deliberately not ON DELETE
+    -- CASCADE — losing a user must not delete issues, and an unowned issue is
+    -- still readable.
+    assignee_user_id UUID REFERENCES users(id),
     source_upstream_issue TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -123,7 +127,7 @@ CREATE TABLE issue_comments (
     author_id UUID,
     author_name TEXT NOT NULL DEFAULT '',
     type TEXT NOT NULL DEFAULT 'comment'
-        CHECK (type IN ('comment','status_change','system')),
+        CHECK (type IN ('comment','status_change','system','agents_change','assignee_change')),
     content TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -158,6 +162,15 @@ CREATE TABLE agents (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (workspace_id, name)
+);
+
+-- Who works on an issue. A join table with real foreign keys rather than an
+-- array of names on issues: renaming or deleting an agent used to leave a
+-- dangling name behind, and a cascade cannot go stale.
+CREATE TABLE issue_agents (
+    issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+    PRIMARY KEY (issue_id, agent_id)
 );
 
 CREATE TABLE skills (

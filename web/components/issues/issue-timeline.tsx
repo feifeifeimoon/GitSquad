@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, Bot, GitBranch, User } from "lucide-react";
+import { Activity, Bot, GitBranch, User, UserCheck, UserRoundPlus } from "lucide-react";
 import type { IssueComment } from "@/lib/api";
 import { Markdown } from "@/components/markdown";
 import { TimeAgo } from "@/components/time-ago";
@@ -116,6 +116,10 @@ function TimelineRow({ entry }: { entry: TimelineEntry }) {
         <span className="flex size-4 shrink-0 items-center justify-center">
           {entry.type === "status_change" ? (
             <GitBranch className="size-3" />
+          ) : entry.type === "agents_change" ? (
+            <UserRoundPlus className="size-3" />
+          ) : entry.type === "assignee_change" ? (
+            <UserCheck className="size-3" />
           ) : (
             <Activity className="size-3" />
           )}

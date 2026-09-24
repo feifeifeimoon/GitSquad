@@ -142,10 +142,14 @@ func seedTaskFixtureOnBranch(t *testing.T, ctx context.Context, s *store.Store, 
 	}
 	issue, err := s.CreateIssue(ctx, db.CreateIssueParams{
 		WorkspaceID: workspace.ID, Number: 1, Title: "fix", Status: "backlog",
-		CreatorUserID: &user.ID, AssignedAgents: []string{"coder"},
+		CreatorUserID: &user.ID,
 	})
 	if err != nil {
 		t.Fatalf("create issue: %v", err)
+	}
+	// Assignment is a row in issue_agents now, not a column on the issue.
+	if err := s.AddIssueAgent(ctx, db.AddIssueAgentParams{IssueID: issue.ID, AgentID: agent.ID}); err != nil {
+		t.Fatalf("assign agent: %v", err)
 	}
 
 	return taskFixture{workspace: workspace, daemon: daemon, agent: agent, issue: issue, installationID: ghInstallationID}

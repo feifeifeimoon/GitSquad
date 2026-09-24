@@ -383,6 +383,38 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// client-side. PR relationships live in pull_requests now.
 		{name: "046_drop_issues_linked_prs", sql: `ALTER TABLE issues
 			DROP COLUMN IF EXISTS linked_prs`},
+		// Who works on an issue. A join table with real foreign keys rather than
+		// issues.assigned_agents (a TEXT[] of names): a rename cannot strand an
+		// old name and a delete cascades instead of leaving a ghost.
+		{name: "047_create_issue_agents", sql: `CREATE TABLE IF NOT EXISTS issue_agents (
+			issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+			agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+			PRIMARY KEY (issue_id, agent_id)
+		)`},
+		// The feed gained two kinds of entry: an assignment change on the agent
+		// side and, later, one on the assignee side. The check is dropped and
+		// re-added on every boot, which is why it stays NOT VALID — the same
+		// reasoning as 041: no scan at startup, and a legacy row can never keep
+		// the server from booting.
+		{name: "048_issue_comment_assignee_types", sql: `DO $$
+			BEGIN
+				ALTER TABLE issue_comments DROP CONSTRAINT IF EXISTS issue_comments_type_check;
+				ALTER TABLE issue_comments ADD CONSTRAINT issue_comments_type_check
+					CHECK (type IN ('comment','status_change','system','agents_change','assignee_change')) NOT VALID;
+			END $$`},
+		// The one person accountable for an issue. Single by design — two owners
+		// is no owner — and separate from issue_agents, which holds the agents
+		// doing the work. No ON DELETE CASCADE: losing a user must not delete
+		// issues, so the column simply goes back to nil.
+		{name: "049_issues_assignee", sql: `ALTER TABLE issues
+			ADD COLUMN IF NOT EXISTS assignee_user_id UUID REFERENCES users(id)`},
+		// Assigned agents are rows in issue_agents now. The name array could
+		// never be renamed or cleared, and it stored names — a rename stranded
+		// the old one. Nothing has read it since 047, and there is no released
+		// version to stay compatible with, so it goes rather than lingering as a
+		// column nobody writes.
+		{name: "050_drop_issues_assigned_agents", sql: `ALTER TABLE issues
+			DROP COLUMN IF EXISTS assigned_agents`},
 	}
 
 	for _, m := range migrations {

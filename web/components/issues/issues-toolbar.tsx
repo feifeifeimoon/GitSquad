@@ -51,12 +51,12 @@ export function IssuesToolbar({
 
   const statusCounts = new Map<IssueStatus, number>();
   for (const s of ISSUE_STATUSES) statusCounts.set(s, 0);
-  const assigneeCounts = new Map<string, number>();
+  const agentCounts = new Map<string, number>();
   const creatorCounts = new Map<string, number>();
   for (const issue of issues) {
     statusCounts.set(issue.status, (statusCounts.get(issue.status) ?? 0) + 1);
-    for (const a of issue.assigned_agents) {
-      assigneeCounts.set(a, (assigneeCounts.get(a) ?? 0) + 1);
+    for (const a of issue.agents) {
+      agentCounts.set(a.id, (agentCounts.get(a.id) ?? 0) + 1);
     }
     if (issue.creator_name) {
       creatorCounts.set(issue.creator_name, (creatorCounts.get(issue.creator_name) ?? 0) + 1);
@@ -64,7 +64,7 @@ export function IssuesToolbar({
   }
 
   const activeCount =
-    filters.statuses.length + filters.assignees.length + filters.creators.length;
+    filters.statuses.length + filters.agents.length + filters.creators.length;
 
   const toggleStatus = (s: IssueStatus) => {
     const statuses = filters.statuses.includes(s)
@@ -72,11 +72,11 @@ export function IssuesToolbar({
       : [...filters.statuses, s];
     onFiltersChange({ ...filters, statuses });
   };
-  const toggleAssignee = (a: string) => {
-    const assignees = filters.assignees.includes(a)
-      ? filters.assignees.filter((x) => x !== a)
-      : [...filters.assignees, a];
-    onFiltersChange({ ...filters, assignees });
+  const toggleAgent = (id: string) => {
+    const agents = filters.agents.includes(id)
+      ? filters.agents.filter((x) => x !== id)
+      : [...filters.agents, id];
+    onFiltersChange({ ...filters, agents });
   };
   const toggleCreator = (c: string) => {
     const creators = filters.creators.includes(c)
@@ -85,7 +85,7 @@ export function IssuesToolbar({
     onFiltersChange({ ...filters, creators });
   };
   const clearFilters = () =>
-    onFiltersChange({ ...filters, statuses: [], assignees: [], creators: [] });
+    onFiltersChange({ ...filters, statuses: [], agents: [], creators: [] });
 
   return (
     <div className="flex items-center gap-2">
@@ -135,20 +135,20 @@ export function IssuesToolbar({
           </DropdownMenuSub>
 
           <DropdownMenuSub>
-            <DropdownMenuSubTrigger>Assignee</DropdownMenuSubTrigger>
+            <DropdownMenuSubTrigger>Agents</DropdownMenuSubTrigger>
             <DropdownMenuSubContent className="w-52">
-              {options.assignees.length === 0 ? (
-                <DropdownMenuItem disabled>No assignees</DropdownMenuItem>
+              {options.agents.length === 0 ? (
+                <DropdownMenuItem disabled>No agents</DropdownMenuItem>
               ) : (
-                options.assignees.map((a) => (
+                options.agents.map((a) => (
                   <DropdownMenuCheckboxItem
-                    key={a}
-                    checked={filters.assignees.includes(a)}
-                    onCheckedChange={() => toggleAssignee(a)}
+                    key={a.id}
+                    checked={filters.agents.includes(a.id)}
+                    onCheckedChange={() => toggleAgent(a.id)}
                   >
-                    {a}
+                    {a.name}
                     <span className="ml-auto text-caption tabular-nums text-mute">
-                      {assigneeCounts.get(a) ?? 0}
+                      {agentCounts.get(a.id) ?? 0}
                     </span>
                   </DropdownMenuCheckboxItem>
                 ))

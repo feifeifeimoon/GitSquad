@@ -53,6 +53,22 @@ const api = readFileSync(
   new URL("./api.ts", import.meta.url),
   "utf8",
 );
+const agentPicker = readFileSync(
+  new URL("../components/issues/agent-picker.tsx", import.meta.url),
+  "utf8",
+);
+const assigneePicker = readFileSync(
+  new URL("../components/issues/assignee-picker.tsx", import.meta.url),
+  "utf8",
+);
+const agentChip = readFileSync(
+  new URL("../components/issues/agent-chip.tsx", import.meta.url),
+  "utf8",
+);
+const assigneeChip = readFileSync(
+  new URL("../components/issues/assignee-chip.tsx", import.meta.url),
+  "utf8",
+);
 
 test("issue board renders all seven status columns", () => {
   assert.match(board, /ISSUE_STATUSES\.map/);
@@ -122,11 +138,44 @@ test("issue mutations surface toast feedback", () => {
 
 test("issue board filters and sorts with counts", () => {
   assert.match(toolbar, /Filter/);
-  assert.match(toolbar, /Assignee/);
+  // The agent filter: named for what it filters, and keyed by id so a rename
+  // does not empty it.
+  assert.match(toolbar, /Agents<\/DropdownMenuSubTrigger>/);
   assert.match(toolbar, /Creator/);
   assert.match(toolbar, /Search issues…/);
   assert.match(toolbar, /SORT_LABELS/);
   assert.match(toolbar, /Clear filters/);
+});
+
+test("the issue page owns who is on it, in two axes", () => {
+  // Assignee (one person, accountable) and Agents (the workers) are separate
+  // rows because a set of names can never answer "who owns this". Both are
+  // editable where the issue is read.
+  assert.match(detail, /AssigneePicker/);
+  assert.match(detail, /AgentPicker/);
+  assert.match(assigneePicker, /memberApi\.list/);
+  assert.match(assigneePicker, /DropdownMenuRadioItem/);
+  assert.match(agentPicker, /DropdownMenuCheckboxItem/);
+  // The call is written across lines, so the assertion allows the break.
+  assert.match(agentPicker, /issueApi\s*\.\s*update\(/);
+  // Radix closes a menu on select unless the event is prevented; the agent
+  // menu has to stay open to be multi-select.
+  assert.match(agentPicker, /event\.preventDefault\(\)/);
+  // Picking records ownership; it never starts a run.
+  assert.match(agentPicker, /mention an agent in a comment to start a/);
+});
+
+test("agents are drawn as identities, not as a list of names", () => {
+  // Everywhere else in the console an agent is a monogram or a picture; the
+  // board card was the last place a joined string stood in for one.
+  assert.match(card, /AgentStack/);
+  assert.doesNotMatch(card, /assigned_agents\.join/);
+  assert.match(agentChip, /WorkspaceAvatar/);
+  // One dot component, one colour map: the chip reuses the console's StatusDot
+  // (blue running / amber queued, the same tones the agents page paints).
+  assert.match(agentChip, /StatusDot/);
+  // A person and an agent are told apart by what the chip draws.
+  assert.match(assigneeChip, /AvatarImage/);
 });
 
 test("status icons use a self-drawn progress-ring family", () => {
