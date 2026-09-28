@@ -28,6 +28,10 @@ const RAIL_MIN_ENTRIES = 4;
 const BAND_TOP = 0.12;
 const BAND_BOTTOM = 0.4;
 
+/** How far below the scrollport's top a jumped-to entry lands — the rows'
+ *  `scroll-mt-6`, which is what a native `block: "start"` scroll would honour. */
+const JUMP_MARGIN = 24;
+
 type EntryKind = "agent" | "user" | "event";
 
 interface TimelineEntry {
@@ -279,11 +283,26 @@ function TimelineRail({
     };
   }, [entries, scrollerRef]);
 
-  const jump = useCallback((id: string) => {
-    document
-      .getElementById(anchorId(id))
-      ?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, []);
+  const jump = useCallback(
+    (id: string) => {
+      const scroller = scrollerRef.current;
+      const node = document.getElementById(anchorId(id));
+      if (!scroller || !node) return;
+      // The position is set directly rather than through
+      // `scrollIntoView({ behavior: "smooth" })`, because smooth scrolling is a
+      // *silent no-op* in a Chromium that has it turned off: the call returns
+      // having done nothing, so every tick was a button that did not move the
+      // feed. A plain div does not animate one either in that build, which is
+      // how the no-op was pinned down. Instant is what `block: "start"` plus
+      // `scroll-mt-6` would have given anyway; the arithmetic here is that same
+      // 24px, applied to the box that actually scrolls.
+      scroller.scrollTop +=
+        node.getBoundingClientRect().top -
+        scroller.getBoundingClientRect().top -
+        JUMP_MARGIN;
+    },
+    [scrollerRef],
+  );
 
   /**
    * Where a tick sits on the rail, for the card that captions it.
