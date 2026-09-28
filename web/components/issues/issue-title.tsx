@@ -21,6 +21,11 @@ import { issueApi } from "@/lib/api";
  *
  * Save is optimistic in the sense that matters: the field stays as the reader
  * left it until the server answers, and goes back if it refuses.
+ *
+ * No margin of its own: the block that holds it owns the spacing. It is the
+ * body's first element on the issue page — the panel's fixed first row is the
+ * *read-only* copy of the same words — and the description below it is what
+ * sets the gap.
  */
 export function IssueTitle({
   slug,
@@ -77,7 +82,7 @@ export function IssueTitle({
 
   if (!editing) {
     return (
-      <div className="group mb-3 flex items-start gap-1">
+      <div className="group flex w-full items-start gap-1">
         {/* The words themselves are the control, the way they are in Linear and
             in multica: the caret is the affordance, and `cursor-text` says so
             before the click. */}
@@ -92,7 +97,7 @@ export function IssueTitle({
             event.preventDefault();
             open();
           }}
-          className="min-w-0 cursor-text text-title font-semibold tracking-[-0.01em] text-ink"
+          className="min-w-0 cursor-text text-display font-semibold tracking-[-0.01em] text-ink"
         >
           {title}
         </h1>
@@ -111,7 +116,7 @@ export function IssueTitle({
   }
 
   return (
-    <div className="mb-3 flex items-start gap-2">
+    <div className="flex w-full items-start gap-2">
       <textarea
         ref={inputRef}
         rows={1}
@@ -132,7 +137,7 @@ export function IssueTitle({
         }}
         // field-sizing lets the box grow with the text, so the heading stays a
         // heading instead of becoming a two-row box with a scrollbar.
-        className="min-w-0 flex-1 resize-none rounded-sm border border-hairline bg-canvas px-2 py-1 text-title font-semibold tracking-[-0.01em] text-ink outline-none focus-visible:border-hairline-strong [field-sizing:content]"
+        className="min-w-0 flex-1 resize-none rounded-sm border border-hairline bg-canvas px-2 py-1 text-display font-semibold tracking-[-0.01em] text-ink outline-none focus-visible:border-hairline-strong [field-sizing:content]"
       />
       <span className="mt-2 flex shrink-0 items-center gap-2 text-caption text-mute">
         {saving ? (

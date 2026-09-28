@@ -8,11 +8,13 @@ import { cn } from "@/lib/utils";
 /**
  * The handful of things you do *to* an issue rather than *with* it.
  *
- * They are icon buttons in the page's top-right corner, which is where Linear
- * puts them and what the eye already reads as "actions on this thing". They
- * were a labelled list in the details rail, where they sat underneath the facts
- * and read as two more facts — and the rail is for what the issue *is*, not for
- * what you can do to it.
+ * They are icon buttons in the details rail's own heading row, which is where
+ * Linear puts them and what the eye already reads as "actions on this thing".
+ * They were a labelled list at the *bottom* of that rail once, where they sat
+ * underneath the facts and read as two more facts; the fix is the top of the
+ * rail rather than outside it — a toolbar over what the issue is, not a row
+ * among it. Because the rail is sticky, they stay on screen while the thread
+ * scrolls.
  *
  * Icon-only means the label has to survive somewhere else: it is the tooltip
  * and the accessible name. The key is what gets copied most in practice — it is

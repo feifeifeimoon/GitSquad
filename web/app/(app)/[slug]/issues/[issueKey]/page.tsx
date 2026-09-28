@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ChevronRight } from "lucide-react";
 import {
   IssueDetail, IssueStatus, ISSUE_STATUSES, issueApi, agentApi, type Agent,
 } from "@/lib/api";
@@ -69,17 +68,17 @@ export default function IssueDetailPage() {
   if (loading || !issue) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex-1 overflow-y-auto">
-          <div className="w-full px-8">
-            <div className="flex items-center gap-1.5 border-b border-hairline py-4">
-              <Skeleton className="h-4 w-16" />
-              <Skeleton className="h-4 w-4" />
-              <Skeleton className="h-4 w-24" />
+        <div className="flex-1 overflow-y-auto lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
+          <div className="mx-auto flex w-full max-w-5xl flex-col px-8 py-8 lg:min-h-0 lg:flex-1">
+            {/* The read-only row and the title below it, the shape the loaded
+                page uses, so the two columns do not shift when it arrives. */}
+            <div className="shrink-0 border-b border-hairline pb-4">
+              <Skeleton className="h-5 w-3/5" />
             </div>
-            <div className="grid grid-cols-1 gap-10 py-6 lg:grid-cols-[minmax(0,42rem)_15rem] lg:justify-between xl:grid-cols-[minmax(0,52rem)_15rem]">
-              <div className="min-w-0 xl:pl-40">
-                <Skeleton className="h-6 w-3/4" />
-                <div className="mt-4 space-y-2">
+            <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,42rem)_15rem] lg:gap-x-12">
+              <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto">
+                <Skeleton className="mb-5 h-8 w-4/5" />
+                <div className="space-y-2">
                   <Skeleton className="h-3 w-full" />
                   <Skeleton className="h-3 w-5/6" />
                   <Skeleton className="h-3 w-2/3" />
@@ -97,8 +96,8 @@ export default function IssueDetailPage() {
                   ))}
                 </div>
               </div>
-              <div className="min-w-0">
-                <Skeleton className="h-3 w-14" />
+              <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto">
+                <Skeleton className="h-6 w-14" />
                 <div className="mt-5 space-y-4">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className="space-y-1.5">
@@ -124,52 +123,71 @@ export default function IssueDetailPage() {
 
   return (
     <div className="flex h-full flex-col">
-      {/* The whole page scrolls as one, and it is as wide as every other page:
-          `PageHeader`'s `px-8` row, not a centred column. A `max-w-5xl` here
-          meant the breadcrumb sat 320px right of the title on the page next
-          door — the chrome has to land in the same place wherever the sidebar
-          navigates to — and it bought two 350px gutters on a wide screen for
-          nothing. What stays narrow is the prose, and what takes the width is
-          the gap in the middle. */}
-      <div ref={scrollerRef} className="flex-1 overflow-y-auto">
-        <div className="w-full px-8">
-          {/* Breadcrumb — a path, so it stays quiet and leaves the title to the
-              heading below. The key is mono here because it is an identifier,
-              and the only one on the page. */}
-          <div className="flex items-center gap-1.5 border-b border-hairline py-4">
-            <button
-              onClick={() => router.push(paths.workspace(slug).board())}
-              className="shrink-0 text-label text-body transition-colors hover:text-ink"
-            >
-              Issues
-            </button>
-            <ChevronRight className="size-3.5 shrink-0 text-mute" />
-            <span className="truncate font-mono text-label text-mute">
-              {issue.issue_key}
-            </span>
-            {/* The corner the eye already reads as "actions on this thing". */}
-            <div className="ml-auto flex shrink-0 items-center pl-2">
-              <IssueActions issueKey={issue.issue_key} url={url} />
-            </div>
+      {/* The page is a panel, not a document with chrome: the issue's own row,
+          then the issue beside the facts about it. There is no breadcrumb —
+          Linear and multica both name the issue by key and title in one line
+          (`GS-1 Fix the thing`) rather than spending a row on the path to it,
+          and the sidebar is already the way back to the board.
+
+          From `lg` the panel is fixed at the top and on the right: the title
+          row stays put and each column scrolls on its own, so only the thread
+          moves. `sticky` alone could not do this. A sticky rail can only travel
+          *inside its own grid row*, so it stopped the moment that row ended and
+          left the screen with the content — which is what "the rail is not
+          fixed" looked like from the reader's side — and a sticky title would
+          have been a second scroll container's worth of new problems for a row
+          that is already outside the moving part. Below `lg` there is one
+          column and one scroll: a document, which is what a phone-width issue
+          is.
+
+          One capped block for the whole page, so the title, the prose and the
+          rail all share a left edge. Left uncapped, the gutter between the two
+          columns was the only thing on the page that grew with the window —
+          68px at 1280, 557px at 1920, 1197px at 2560 — and the two halves read
+          as unrelated. */}
+      <div className="flex-1 overflow-y-auto lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
+        <div className="mx-auto flex w-full max-w-5xl flex-col px-8 py-8 lg:min-h-0 lg:flex-1">
+          {/* The read-only first row, and the panel's only chrome: the issue
+              named the way multica's header leaf names it — `identifier title`,
+              one run of text, one space between them, `font-medium` — and the
+              way Linear names it too. The key is not a badge or a mono prefix
+              here: setting it in another font made two things of one name, and
+              the name is what has to be readable once the thread has scrolled.
+              It is *not* the editable copy: the title the reader changes is the
+              body's first element, the same words once as a label and once as
+              the thing itself. */}
+          <div className="shrink-0 truncate border-b border-hairline pb-4 text-copy font-medium text-ink">
+            {issue.issue_key} {issue.title}
           </div>
 
-          {/* Reading measure on the left, facts on the right edge, and the
-              width the window has left over goes between them: the prose is
-              capped at ~48 characters a line, so the spare width lands on the
-              gutter rather than on the line length.
-              From `xl` the prose column also carries an inset. Linear puts its
-              issue body ~193px from the nav and multica ~205px — neither hugs
-              it — and the inset is the whole difference; the track grows by the
-              same amount so the *measure* is unchanged. The header above stays
-              at the page's own padding, which is where every other page's is. */}
-          <div className="grid grid-cols-1 gap-10 py-6 lg:grid-cols-[minmax(0,42rem)_15rem] lg:justify-between xl:grid-cols-[minmax(0,52rem)_15rem]">
-            <div className="min-w-0 xl:pl-40">
-              <IssueTitle
-                slug={slug}
-                issueKey={issueKey}
-                title={issue.title}
-                onSaved={refresh}
-              />
+          {/* Two columns under the title: the issue on the left, the facts
+              about it on the right. The left track *is* the reading measure —
+              42rem, ~48 characters a line — and the two tracks plus a 48px
+              gutter are the whole block: 42 + 3 + 15 = 60rem of content, which
+              is `max-w-5xl` (64rem) less the container's own `px-8`. Capping at
+              the content width instead also shrinks the prose track, since the
+              tracks are a fixed 42rem and the padding comes out of the same
+              box. */}
+          <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,42rem)_15rem] lg:gap-x-12">
+            {/* The thread is the thing that scrolls, and it owns the ref the
+                activity rail measures against: the rail is the scroll viewport's
+                minimap, so the viewport has to be this box now. */}
+            <div
+              ref={scrollerRef}
+              className="min-w-0 lg:min-h-0 lg:overflow-y-auto"
+            >
+              {/* The issue's own title, at display size and editable where it
+                  is read — the body's first element, so it is what the page
+                  opens on and what the thread is below. 20px under it is
+                  multica's `mt-5` before its description. */}
+              <div className="mb-5">
+                <IssueTitle
+                  slug={slug}
+                  issueKey={issueKey}
+                  title={issue.title}
+                  onSaved={refresh}
+                />
+              </div>
 
               <IssueDescription
                 slug={slug}
@@ -205,8 +223,32 @@ export default function IssueDetailPage() {
               </div>
             </div>
 
-            <aside className="min-w-0 lg:sticky lg:top-6 lg:self-start">
-              <SectionHeading className="mb-4">Details</SectionHeading>
+            {/* Fixed against the thread, not sticky inside it: this column
+                never moves, and scrolls on its own only when the facts are
+                taller than the window. */}
+            <aside className="min-w-0 lg:min-h-0 lg:overflow-y-auto">
+              {/* "Properties", not "Details": those two words are not synonyms
+                  in the tools this page is modelled on. multica keeps
+                  `Properties` for the fields you set — status, assignee,
+                  priority, dates — and spends `Details` on the immutable
+                  provenance (created by, created, updated), which its own notes
+                  call the least-read block in the sidebar. This rail is mostly
+                  the first kind, so it takes the first word; the creator and
+                  the two timestamps at the bottom are the second kind, and
+                  would be a `Details` group of their own if they ever need to
+                  be named. */}
+              <SectionHeading
+                className="mb-4"
+                // The rail's own corner, and pinned with it: what you can do to
+                // the issue sits at the top of what the issue *is*, above the
+                // facts rather than among them, and stays on screen while the
+                // thread scrolls past.
+                actions={
+                  <IssueActions issueKey={issue.issue_key} url={url} />
+                }
+              >
+                Properties
+              </SectionHeading>
               <div className="space-y-5">
                 <Field label="Status">
                   <Select
