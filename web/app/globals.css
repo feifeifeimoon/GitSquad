@@ -151,11 +151,16 @@
   --violet: #7928ca;
   --cyan-deep: #29bc9b;
 
-  --chart-1: #007cf0;
-  --chart-2: #7928ca;
-  --chart-3: #ff0080;
-  --chart-4: #00dfd8;
-  --chart-5: #f9cb28;
+  /* The reserved categorical series, in the order a chart should use them.
+     They were the template's five pastels, which put a palette nobody chose
+     into the one place a future chart would look for one. These are the
+     console's own series colours instead — the same four `usage-series` draws
+     with — plus the brand navy as the neutral for a total or an "other". */
+  --chart-1: #0070f3;
+  --chart-2: #29bc9b;
+  --chart-3: #7928ca;
+  --chart-4: #f5a623;
+  --chart-5: #061029;
 
   --radius: 0.375rem;
   --sidebar: #ffffff;
@@ -217,10 +222,10 @@
   --cyan-soft: #0d2b26;
 
   --chart-1: #3291ff;
-  --chart-2: #a970ff;
-  --chart-3: #ff4d9d;
-  --chart-4: #3dd9b6;
-  --chart-5: #f7b955;
+  --chart-2: #3dd9b6;
+  --chart-3: #a970ff;
+  --chart-4: #f7b955;
+  --chart-5: #ededed;
 
   --sidebar: #171717;
   --sidebar-foreground: #ededed;
@@ -280,15 +285,65 @@
   .shadow-level-4 { box-shadow: inset 0 0 0 1px #00000014, 0 2px 2px #0000000a, 0 8px 16px -4px #0000000a; }
   .shadow-level-5 { box-shadow: inset 0 0 0 1px #00000014, 0 1px 1px #00000005, 0 8px 16px -4px #0000000a, 0 24px 32px -8px #0000000f; }
 
-  /* Multi-color mesh gradient — brand's sole decoration, hero-scale only. */
+  /* Hero atmosphere, in the brand's own colours rather than a template's.
+     The stops are sampled from the two things that already define what GitSquad
+     looks like: the icon — the cyan of its eyes (`#34a6d1`, the average of the
+     45 lit eye pixels in `app/favicon.ico`) and the navy of its shell
+     (`#061029`) — and `docs/assets/banner.png`, whose repository panel supplies
+     the blue and whose machinery supplies the amber.
+     The set it replaces was five pastel stops that came with the page's first
+     template, and none of them belonged to this product.
+     They are composed as a canopy across the top, because the mask below keeps
+     only the first ~300px of the band: two lights over the headline, the amber
+     at its right shoulder, navy deepening the bottom of the wash. */
   .mesh-gradient {
     background:
-      radial-gradient(40% 50% at 18% 28%, #007cf0 0%, transparent 70%),
-      radial-gradient(35% 45% at 78% 18%, #7928ca 0%, transparent 70%),
-      radial-gradient(45% 55% at 62% 82%, #ff0080 0%, transparent 70%),
-      radial-gradient(38% 48% at 28% 72%, #00dfd8 0%, transparent 70%),
-      radial-gradient(30% 40% at 92% 58%, #f9cb28 0%, transparent 70%);
-    filter: blur(60px) saturate(1.1);
+      radial-gradient(52% 72% at 30% 14%, rgba(31, 111, 208, 0.46) 0%, transparent 74%),
+      radial-gradient(46% 64% at 72% 8%, rgba(52, 166, 209, 0.40) 0%, transparent 72%),
+      radial-gradient(26% 36% at 94% 30%, rgba(245, 166, 35, 0.20) 0%, transparent 72%),
+      radial-gradient(46% 40% at 50% 58%, rgba(6, 16, 41, 0.10) 0%, transparent 76%);
+    filter: blur(64px) saturate(1.05);
+  }
+
+  /* Dark keeps the same canopy and turns everything up: on a near-black canvas
+     the blue has to carry the glow, and the navy stop finally has something to
+     darken. */
+  .dark .mesh-gradient {
+    background:
+      radial-gradient(52% 72% at 30% 16%, rgba(31, 111, 208, 0.85) 0%, transparent 74%),
+      radial-gradient(46% 64% at 72% 10%, rgba(52, 166, 209, 0.62) 0%, transparent 72%),
+      radial-gradient(30% 44% at 90% 24%, rgba(245, 166, 35, 0.38) 0%, transparent 72%),
+      radial-gradient(48% 44% at 50% 58%, rgba(6, 16, 41, 0.8) 0%, transparent 78%);
+  }
+
+  /* The banner's setting is a construction site, and a hairline grid is how an
+     engineering surface says so without drawing any of it. Theme-aware through
+     `--hairline`, so it is a grey rule on white and a light one on black. */
+  .blueprint-grid {
+    background-image:
+      linear-gradient(to right, var(--hairline) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--hairline) 1px, transparent 1px);
+    background-size: 64px 64px;
+  }
+
+  /* The squad's work, played on hover — all of it CSS, so the scene stays a
+     server component and ships no JavaScript to animate a decoration.
+     Three gestures rather than one: a render has no moving parts inside it, and
+     a single lift played by all three is three figures doing the same thing,
+     which is what made them read as one figure repeated. The Reviewer scans,
+     the Tester nods, the Planner lifts. Under `prefers-reduced-motion` the
+     global rule above collapses each to a single 0.01ms pass. */
+  @keyframes robot-sweep {
+    0%, 100% { transform: translateX(-3px); }
+    50% { transform: translateX(3px); }
+  }
+  @keyframes robot-nod {
+    0%, 100% { transform: rotate(-1.2deg) translateY(0); }
+    50% { transform: rotate(1.2deg) translateY(-3px); }
+  }
+  @keyframes robot-lift {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-5px); }
   }
 
   /* TipTap editor content — mirrors Markdown read-only typography. */

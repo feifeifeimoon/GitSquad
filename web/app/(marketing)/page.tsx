@@ -1,291 +1,347 @@
-"use client";
-
-import { useState } from "react";
-import Image from "next/image";
-import Link from "next/link";
-import {
-  ArrowRight,
-  Sparkles,
-} from "lucide-react";
+import { ArrowRight, Sparkles } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { LiveAgentLog } from "@/components/live-agent-log";
-import { AuthButton } from "@/components/auth-button";
-import { LoginModal } from "@/components/login-modal";
 import { MeshGradient } from "@/components/mesh-gradient";
+import { ProviderIcon } from "@/components/provider-icon";
+import { DemoBoard } from "@/components/marketing/demo-board";
+import { Squad } from "@/components/marketing/squad";
+import { GetStartedCta } from "@/components/marketing/get-started-cta";
+import { LandingFooter } from "@/components/marketing/landing-footer";
+import { LandingNav } from "@/components/marketing/landing-nav";
+import { anchors, links } from "@/components/marketing/links";
+import { SectionHeading } from "@/components/marketing/section-heading";
 
-const navItems = ["Agents", "Security", "Pricing", "Docs"];
+// A server component on purpose. The page this replaces was `"use client"` from
+// its first line to its last so that one `useState` could open the login modal
+// — the whole landing page was rendered by the browser, html and all, which is
+// the wrong trade for the one page a stranger is most likely to arrive on.
+// Every interactive piece below is its own small client island.
 
-const agents = [
+const CLAIMS = [
   {
-    icon: "🔍",
-    name: "The Reviewer",
-    id: "agent_001",
-    status: "analyzing",
-    task: "Scanning PR #482 for security vulnerabilities",
-    cpu: "14.2%",
-    uptime: "99.9%",
+    title: "You keep your CLI",
+    body: "GitSquad ships no model of its own. It drives the coding CLI already installed and signed in on the host, so the tool loop and the billing stay where they already are.",
   },
   {
-    icon: "🏗️",
-    name: "The Architect",
-    id: "agent_002",
-    status: "refactoring",
-    task: "Implementing microservices interface in /runtime",
-    cpu: "62.8%",
-    uptime: "12d 4h",
+    title: "Work runs on your machine",
+    body: "The daemon dials out, clones the repository into its own work directory and runs the agent there. There is nothing of ours to host, and the checkout is one you picked.",
   },
   {
-    icon: "🧹",
-    name: "The Janitor",
-    id: "agent_003",
-    status: "cleaning",
-    task: "Optimizing build assets and dependencies",
-    cpu: "4.1%",
-    uptime: "158d",
-  },
-  {
-    icon: "⚡",
-    name: "The Deployer",
-    id: "agent_004",
-    status: "monitoring",
-    task: "Watching CI/CD pipelines for staging",
-    cpu: "22.0%",
-    uptime: "24/7",
+    title: "Every step stays on the issue",
+    body: "Progress, decisions and token cost are recorded on the issue itself, so the thread is the audit trail rather than a log somewhere else that you have to go and find.",
   },
 ];
 
+const STEPS = [
+  {
+    title: "Install the app, pair a machine",
+    body: "Choose the repositories your agents can see, then pair the machine that runs them. The daemon dials out, so there is no inbound port to open.",
+    mono: "gitsquad daemon login",
+  },
+  {
+    title: "Mention an agent on an issue",
+    body: "Create an issue and tag an agent. It plans against the repository, edits code in a checkout on your machine, and reports progress on the issue as it goes.",
+    mono: "@coder take this one",
+  },
+  {
+    title: "Review the pull request",
+    body: "The work lands on a branch as a pull request, with the decisions and the token cost sitting on the issue that asked for it.",
+    mono: "gh pr view 212",
+  },
+];
+
+const RUNTIMES = [
+  { provider: "claude", name: "Claude Code", status: "Ready" },
+  { provider: "agy", name: "Antigravity", status: "Ready" },
+  { provider: "codex", name: "Codex", status: "Detected, no adapter yet" },
+];
 
 export default function Home() {
-  const [showLoginModal, setShowLoginModal] = useState(false);
-
   return (
     <main className="min-h-screen overflow-hidden bg-canvas-soft text-ink">
-      {/* Login modal */}
-      <LoginModal
-        mode="modal"
-        open={showLoginModal}
-        onClose={() => setShowLoginModal(false)}
-      />
-
-      {/* Nav bar — 64px, canvas, hairline border */}
-      <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between px-6">
-          <a href="#" className="flex items-center gap-2 text-copy font-semibold">
-            <Image
-              src="/favicon.ico"
-              alt="GitSquad logo"
-              width={20}
-              height={20}
-              className="size-5 rounded-sm"
-              priority
-            />
-            GitSquad
-          </a>
-
-          <nav className="hidden items-center gap-1 md:flex">
-            {navItems.map((item) => (
-              <a
-                key={item}
-                href="#"
-                className="rounded-full px-3 py-1.5 text-copy text-body transition-colors hover:bg-muted hover:text-ink"
-              >
-                {item}
-              </a>
-            ))}
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <AuthButton onLoginClick={() => setShowLoginModal(true)} />
-          </div>
-        </div>
-      </header>
-
-      {/* Hero band — mesh gradient backdrop */}
-      <section className="relative overflow-hidden border-b border-hairline bg-canvas">
-        <MeshGradient className="pointer-events-none absolute inset-x-0 top-0 h-[480px] opacity-50" />
-        <div className="relative mx-auto flex max-w-[1200px] flex-col items-center px-6 pb-24 pt-24 text-center sm:pt-32">
-          <Badge
-            variant="secondary"
-            className="mb-6 rounded-full bg-canvas px-3 py-1 text-caption text-body shadow-level-1"
-          >
-            <Sparkles className="size-3" />
-            Autonomous Developer Network is Live
-          </Badge>
-
-          <div className="mb-7 flex size-14 items-center justify-center rounded-md border border-hairline bg-canvas shadow-level-2">
-            <Image
-              src="/favicon.ico"
-              alt="GitSquad mark"
-              width={48}
-              height={48}
-              className="size-11 rounded-sm"
-              priority
-            />
-          </div>
-
-          <h1 className="max-w-4xl text-balance text-4xl font-semibold leading-[1.05] tracking-[-0.04em] text-ink sm:text-5xl lg:text-6xl">
-            Your autonomous developer team on GitHub.
-          </h1>
-
-          <p className="mt-6 max-w-xl text-pretty text-lg leading-7 text-body">
-            Git Squad is a collection of autonomous AI agents that live in your
-            repository. They review code, fix bugs, and refactor architecture
-            while you sleep.
-          </p>
-
-          <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
-            <Button size="pill" onClick={() => setShowLoginModal(true)}>
-              Get started free
-              <ArrowRight className="size-4" />
-            </Button>
-            <Button variant="secondary" size="pill" asChild>
-              <Link href="/docs">
-                Read the docs
-                <ArrowRight className="size-3.5" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Showcase band dark — control center. Pinned to the dark palette
-          whatever the reader's theme: it is a mockup of a terminal, and
-          `bg-primary` was only standing in for "dark" — primary inverts with
-          the theme, so in dark mode this band drew white text on near-white. */}
-      <section className="dark bg-canvas-soft text-ink">
-        <div className="mx-auto max-w-[1200px] px-6 py-16">
-          <div className="w-full rounded-md bg-[#0a0a0a] p-3 text-left shadow-level-3">
-            <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
-              <div className="flex gap-2">
-                <span className="size-2.5 rounded-full bg-white/20" />
-                <span className="size-2.5 rounded-full bg-white/20" />
-                <span className="size-2.5 rounded-full bg-white/20" />
-              </div>
-              <p className="font-mono text-caption uppercase tracking-[0.28em] text-white/40">
-                Squad control center v2.4.0
-              </p>
-            </div>
-
-            <div className="grid border-b border-white/10 text-caption font-semibold uppercase tracking-[0.18em] text-white/40 sm:grid-cols-3">
-              <div className="border-b border-white/10 bg-white/5 px-6 py-4 text-white sm:border-b-0 sm:border-r sm:px-8">
-                Active agents
-              </div>
-              <div className="border-b border-white/10 px-6 py-4 sm:border-b-0 sm:border-r sm:px-8">
-                Repos monitored
-              </div>
-              <div className="px-6 py-4 sm:px-8">Squad config</div>
-            </div>
-
-            <div className="border-b border-white/10">
-              <div>
-                <div className="grid grid-cols-[1.1fr_0.8fr_1.5fr_0.45fr_0.45fr] border-b border-white/10 px-5 py-3 font-mono text-caption uppercase tracking-[0.16em] text-white/40 max-md:hidden">
-                  <span>Agent identity</span>
-                  <span>Status</span>
-                  <span>Current task</span>
-                  <span>CPU</span>
-                  <span>Uptime</span>
-                </div>
-
-                {agents.map((agent) => {
-                  return (
-                    <div
-                      key={agent.id}
-                      className="grid grid-cols-[1.1fr_0.8fr_1.5fr_0.45fr_0.45fr] items-center border-b border-white/10 px-5 py-4 last:border-b-0 max-md:grid-cols-1 max-md:gap-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex size-9 items-center justify-center rounded-sm bg-white/10 text-base">
-                          {agent.icon}
-                        </span>
-                        <div>
-                          <p className="text-copy font-semibold text-white">{agent.name}</p>
-                          <p className="font-mono text-caption uppercase text-white/40">{agent.id}</p>
-                        </div>
-                      </div>
-                      <span className="w-fit rounded-full bg-link/15 px-2.5 py-1 font-mono text-caption font-semibold uppercase text-link">
-                        <span className="mr-1 inline-block size-2 rounded-full bg-link" />
-                        {agent.status}
-                      </span>
-                      <p className="truncate font-mono text-caption text-white/80">{agent.task}</p>
-                      <p className="font-mono text-caption font-semibold text-white">{agent.cpu}</p>
-                      <p className="font-mono text-caption font-semibold text-white">{agent.uptime}</p>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <LiveAgentLog />
-
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-5 py-3 font-mono text-caption uppercase tracking-[0.18em] text-white/40">
-              <span>
-                Status: <b className="text-link">nominal</b>
-              </span>
-              <span>Squad net uptime: 1,482 hours</span>
-              <span>Latency: 12ms</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Showcase band light — how it works */}
-      <section className="bg-canvas-soft">
-        <div className="mx-auto max-w-[1200px] px-6 py-24">
-          <div className="mb-12 text-center">
-            <p className="font-mono text-caption uppercase tracking-[0.2em] text-mute">
-              How it works
-            </p>
-            <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-ink sm:text-4xl">
-              From issue to pull request in minutes.
-            </h2>
-            <p className="mt-3 text-copy text-body">
-              Set up in 60 seconds. Your first AI teammate ships code today.
-            </p>
-          </div>
-
-          <div className="grid gap-6 sm:grid-cols-3">
-            <div className="rounded-md border border-hairline bg-canvas p-6 shadow-level-3">
-              <span className="mb-4 inline-flex size-8 items-center justify-center rounded-sm bg-primary font-mono text-caption font-semibold text-primary-foreground">
-                1
-              </span>
-              <h3 className="text-base font-semibold text-ink">
-                Install the GitHub App
-              </h3>
-              <p className="mt-2 text-copy leading-6 text-body">
-                Install GitSquad on your repositories in one click. Choose which repos
-                your agents can access, just like you&apos;d connect Vercel.
-              </p>
-            </div>
-
-            <div className="rounded-md border border-hairline bg-canvas p-6 shadow-level-3">
-              <span className="mb-4 inline-flex size-8 items-center justify-center rounded-sm bg-primary font-mono text-caption font-semibold text-primary-foreground">
-                2
-              </span>
-              <h3 className="text-base font-semibold text-ink">
-                @mention an agent
-              </h3>
-              <p className="mt-2 text-copy leading-6 text-body">
-                Create an issue and tag @coder, @reviewer, or @planner. Agents pick up
-                tasks, discuss with you, and get to work.
-              </p>
-            </div>
-
-            <div className="rounded-md border border-hairline bg-canvas p-6 shadow-level-3">
-              <span className="mb-4 inline-flex size-8 items-center justify-center rounded-sm bg-primary font-mono text-caption font-semibold text-primary-foreground">
-                3
-              </span>
-              <h3 className="text-base font-semibold text-ink">
-                Merge the pull request
-              </h3>
-              <p className="mt-2 text-copy leading-6 text-body">
-                Agents push code to a branch and open a PR. Review the diff, leave
-                feedback, and merge when it&apos;s ready.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      <LandingNav />
+      <Hero />
+      <ProductBand />
+      <WhyBand />
+      <HowItWorksBand />
+      <ClosingCta />
+      <LandingFooter />
     </main>
+  );
+}
+
+function Hero() {
+  return (
+    <section className="relative overflow-hidden border-b border-hairline bg-canvas">
+      {/* Two layers, one atmosphere: a blueprint grid for the engineering
+          surface the banner puts its robots on, and the brand's own light over
+          it. Both are masked so the band dissolves into the page instead of
+          stopping on the blur's edge — the grid radially from the headline, the
+          glow downward before the lead paragraph. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-0 h-[560px]"
+      >
+        <div className="blueprint-grid absolute inset-0 [mask-image:radial-gradient(72%_64%_at_50%_0%,black,transparent)]" />
+        <MeshGradient className="absolute inset-0 opacity-60 [mask-image:linear-gradient(to_bottom,black_8%,transparent)]" />
+      </div>
+      <div className="relative mx-auto flex max-w-[1200px] flex-col items-center px-6 pb-16 pt-20 text-center sm:pt-28">
+        <Badge
+          variant="secondary"
+          className="rounded-full bg-canvas px-3 py-1 text-caption text-body shadow-level-1"
+        >
+          <Sparkles className="size-3" />
+          Open source · Apache-2.0
+        </Badge>
+
+        <h1 className="mt-6 max-w-4xl text-balance text-4xl font-semibold leading-[1.05] tracking-[-0.04em] text-ink sm:text-5xl lg:text-6xl">
+          Your autonomous developer team on GitHub.
+        </h1>
+
+        <p className="mt-6 max-w-2xl text-pretty text-lg leading-8 text-body">
+          Mention an agent on an issue and it plans against the repository, edits
+          code in a checkout on your machine, and opens a pull request — with the
+          progress, the decisions and the token cost recorded on the issue
+          itself.
+        </p>
+
+        <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row">
+          <GetStartedCta>
+            Get started free
+            <ArrowRight className="size-4" />
+          </GetStartedCta>
+          <SecondaryCta href={links.github}>
+            Star on GitHub
+            <ArrowRight className="size-3.5" />
+          </SecondaryCta>
+        </div>
+
+        {/* Not the claim band's headline a second time: the band below argues
+            that GitSquad is an orchestration shell, and saying it here too read
+            as a copy-paste rather than an echo. This is the fact underneath it. */}
+        <p className="mt-6 font-mono text-caption text-mute">
+          The tool loop stays in the CLI you already have.
+        </p>
+      </div>
+
+      {/* Last in the band, so the robots are on top of the content column rather
+          than under it. The column is a positioned box that spans the whole
+          1200px — a transparent one, but transparent still takes the pointer, so
+          a robot standing in the margin behind it never received a hover. */}
+      <Squad />
+    </section>
+  );
+}
+
+function ProductBand() {
+  return (
+    <section
+      id={anchors.product}
+      className="scroll-mt-16 border-b border-hairline bg-canvas-soft"
+    >
+      <div className="mx-auto max-w-[1200px] px-6 py-20">
+        <SectionHeading
+          eyebrow="Product"
+          title="One issue, from mention to merged."
+          lead="The board is the product. Issues move through it as agents work, and every run leaves its trail on the issue that asked for it."
+        />
+        <div className="mt-12">
+          <DemoBoard />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function WhyBand() {
+  return (
+    <section
+      id={anchors.why}
+      className="scroll-mt-16 border-b border-hairline bg-canvas"
+    >
+      <div className="mx-auto max-w-[1200px] px-6 py-20">
+        <SectionHeading
+          eyebrow="Why GitSquad"
+          title="An orchestration shell, not another agent."
+          lead="The interesting part of an agent is the loop, and the loop already exists in the CLI on your machine. What is missing is everything around it: the board, the routing, the execution environment and the audit trail."
+        />
+
+        <div className="mt-12 grid gap-4 md:grid-cols-3">
+          {CLAIMS.map((claim, index) => (
+            <div
+              key={claim.title}
+              className="rounded-lg border border-hairline bg-canvas p-5 shadow-level-2"
+            >
+              <ClaimVisual index={index} />
+              <h3 className="mt-5 text-title-sm font-semibold text-ink">
+                {claim.title}
+              </h3>
+              <p className="mt-2 text-pretty text-copy leading-6 text-body">
+                {claim.body}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Each claim carries the evidence for itself: the runtimes it can drive, the
+ * two commands it takes to start one, the trail one run leaves behind.
+ *
+ * All three sit in a well of the same height. The runtime list is three rows of
+ * text beside brand marks and the other two are three lines of mono, so sizing
+ * each to its own content left the three claim titles at three different
+ * heights across the row. */
+function ClaimWell({
+  children,
+  className = "",
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`min-h-[6.25rem] rounded-md bg-canvas-soft p-3 ${className}`}>
+      {children}
+    </div>
+  );
+}
+
+function ClaimVisual({ index }: { index: number }) {
+  if (index === 0) {
+    return (
+      <ClaimWell className="space-y-2">
+        {RUNTIMES.map((runtime) => (
+          <div key={runtime.provider} className="flex items-center gap-2">
+            <ProviderIcon provider={runtime.provider} className="size-4" />
+            <span className="text-copy text-ink">{runtime.name}</span>
+            <span className="ml-auto text-caption text-mute">{runtime.status}</span>
+          </div>
+        ))}
+      </ClaimWell>
+    );
+  }
+
+  if (index === 1) {
+    return (
+      <ClaimWell className="space-y-1 font-mono text-[11px] leading-5 text-body">
+        <p>
+          <span className="text-mute">$ </span>gitsquad daemon login
+        </p>
+        <p className="text-mute">paired build-box · linux/amd64</p>
+        <p>
+          <span className="text-mute">$ </span>gitsquad daemon start
+        </p>
+      </ClaimWell>
+    );
+  }
+
+  return (
+    <ClaimWell className="space-y-1 font-mono text-[11px] leading-5">
+      <p className="grid grid-cols-[2.5rem_4rem_minmax(0,1fr)] gap-2">
+        <span className="text-mute">16:27</span>
+        <span className="text-body">coder</span>
+        <span className="truncate text-mute">opened pull request #212</span>
+      </p>
+      <p className="grid grid-cols-[2.5rem_4rem_minmax(0,1fr)] gap-2">
+        <span className="text-mute">16:29</span>
+        <span className="text-body">reviewer</span>
+        <span className="truncate text-mute">requested changes</span>
+      </p>
+      <p className="grid grid-cols-[2.5rem_4rem_minmax(0,1fr)] gap-2">
+        <span className="text-mute">16:41</span>
+        <span className="text-body">coder</span>
+        <span className="truncate text-mute">pushed 2 commits</span>
+      </p>
+    </ClaimWell>
+  );
+}
+
+function HowItWorksBand() {
+  return (
+    <section
+      id={anchors.howItWorks}
+      className="scroll-mt-16 border-b border-hairline bg-canvas-soft"
+    >
+      <div className="mx-auto max-w-[1200px] px-6 py-20">
+        <SectionHeading
+          eyebrow="How it works"
+          title="From issue to pull request."
+          lead="One GitHub App, two commands on the machine that runs the agents, and the first issue can be in a pull request the same afternoon."
+        />
+
+        {/* Hairline grid rather than three shadowed cards: one surface divided
+            into three reads as one process, where three cards read as three
+            products. The rule is the container's own background showing through
+            a one-pixel gap. */}
+        <div className="mt-12 grid gap-px overflow-hidden rounded-xl border border-hairline bg-hairline md:grid-cols-3">
+          {STEPS.map((step, index) => (
+            <div key={step.title} className="flex flex-col bg-canvas p-6">
+              <span className="font-mono text-caption tabular-nums text-mute">
+                {String(index + 1).padStart(2, "0")}
+              </span>
+              <h3 className="mt-3 text-title-sm font-semibold text-ink">
+                {step.title}
+              </h3>
+              <p className="mt-2 text-pretty text-copy leading-6 text-body">
+                {step.body}
+              </p>
+              <p className="mt-5 rounded-sm bg-canvas-soft px-2.5 py-1.5 font-mono text-[11px] text-body">
+                {step.mono}
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ClosingCta() {
+  return (
+    <section className="dark bg-canvas-soft text-ink">
+      <div className="mx-auto max-w-[1200px] px-6 pb-20 pt-24 text-center">
+        <h2 className="mx-auto max-w-2xl text-balance text-3xl font-semibold tracking-[-0.04em] text-ink sm:text-4xl">
+          Put an agent on the next issue.
+        </h2>
+        <p className="mx-auto mt-4 max-w-xl text-pretty text-base leading-7 text-body">
+          Sign in with Google, install the GitHub App on one repository, and
+          mention an agent. The daemon runs where your coding CLI already runs.
+        </p>
+        <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+          <GetStartedCta>
+            Get started free
+            <ArrowRight className="size-4" />
+          </GetStartedCta>
+          <SecondaryCta href={links.documentation}>
+            Read the docs
+            <ArrowRight className="size-3.5" />
+          </SecondaryCta>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** The CTA paired with the primary one.
+ *
+ * Transparent behind a real outline rather than the filled `secondary`: it
+ * stands on a mesh gradient in the hero and on near-black in the closing band,
+ * and a `bg-card` pill is the same colour as its own surface in dark mode —
+ * the button vanished into the band it was supposed to sit on. */
+function SecondaryCta({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Button
+      variant="ghost"
+      size="pill"
+      className="border border-hairline-strong/40 backdrop-blur-sm hover:bg-muted/50"
+      asChild
+    >
+      <a href={href} target="_blank" rel="noreferrer">
+        {children}
+      </a>
+    </Button>
   );
 }

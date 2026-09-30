@@ -30,7 +30,8 @@
 │   │   ├── ci.yml             # CI: gofmt + vet + Staticcheck + go test/coverage + govulncheck + bun test/lint/build + Playwright E2E
 │   │   ├── deploy-backend.yml # Fly.io auto-deploy on main (backend paths)
 │   │   └── release.yml        # GoReleaser on v* tags
-│   └── dependabot.yml         # Auto-deps: gomod + bun + github-actions, weekly
+│   ├── dependabot.yml         # Auto-deps: gomod + bun + github-actions, weekly
+│   └── PULL_REQUEST_TEMPLATE.md # Pre-filled PR body: why, what, verification, screenshots, checklist
 ├── bin/                       # Local build output (gitignored)
 ├── cmd/
 │   ├── server/main.go         # Entrypoint: HTTP API server (Gin)
@@ -78,7 +79,7 @@
 ├── web/                       # Next.js frontend
 │   ├── app/
 │   │   ├── layout.tsx         # Root layout (fonts, metadata, html/body shell)
-│   │   ├── (marketing)/       # Landing/marketing page
+│   │   ├── (marketing)/       # Landing page — hero, demo board, claims, steps, footer
 │   │   ├── (auth)/            # Login, Google OAuth callback, daemon pairing confirm
 │   │   └── (app)/             # Authenticated console (route group + shared layout)
 │   │       ├── workspaces/    # Workspace list + create/configure
@@ -90,6 +91,7 @@
 │   │   ├── ui/                # shadcn/ui primitives (button, card, input, avatar, badge, etc.)
 │   │   ├── issues/            # Issue board (7-column kanban) + detail components
 │   │   ├── settings/          # Settings-related components
+│   │   ├── marketing/         # Landing-page sections (nav, demo board, footer, CTA, links)
 │   │   ├── auth-button.tsx    # Login/logout button with user dropdown
 │   │   ├── login-modal.tsx    # OAuth login modal
 │   │   ├── command-palette.tsx # Cmd/Ctrl+K palette (workspace + issue search)
@@ -102,8 +104,7 @@
 │   │   ├── theme-toggle.tsx   # Dark mode toggle
 │   │   ├── time-ago.tsx       # Relative time formatting
 │   │   ├── workspace-avatar.tsx # Workspace avatar
-│   │   ├── create-workspace-aside.tsx # Create/configure workspace aside
-│   │   └── live-agent-log.tsx # Animated agent activity log
+│   │   └── create-workspace-aside.tsx # Create/configure workspace aside
 │   ├── lib/
 │   │   ├── api.ts             # Typed fetch wrapper with JWT Bearer injection
 │   │   ├── paths.ts           # Route path helpers (slug-based)

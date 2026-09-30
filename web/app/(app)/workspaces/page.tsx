@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import {
   FolderGit2,
   GitCommitHorizontal,
@@ -14,6 +13,7 @@ import { api, Workspace } from "@/lib/api";
 import { useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { TimeAgo } from "@/components/time-ago";
+import { GitHubMark } from "@/components/github-mark";
 import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
 import { ErrorState } from "@/components/error-state";
 import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
@@ -218,13 +218,7 @@ function WorkspaceCard({
       </p>
       <div className="mt-3 flex items-center justify-between gap-2">
         <span className="flex min-w-0 items-center gap-1.5">
-          <Image
-            src="/logo-github-light.svg"
-            alt="GitHub"
-            width={14}
-            height={14}
-            className="size-3.5 shrink-0"
-          />
+          <GitHubMark className="size-3.5 shrink-0" />
           <span className="truncate font-mono text-caption text-mute">
             {workspace.repo_full_name ||
               `${workspace.repo_owner}/${workspace.repo_name}`}
@@ -289,13 +283,7 @@ function WorkspaceTable({
                 </td>
                 <td className="px-4 py-3">
                   <span className="flex items-center gap-1.5 font-mono text-caption text-body">
-                    <Image
-                      src="/logo-github-light.svg"
-                      alt="GitHub"
-                      width={14}
-                      height={14}
-                      className="size-3.5 shrink-0"
-                    />
+                    <GitHubMark className="size-3.5 shrink-0" />
                     <span className="truncate">
                       {w.repo_full_name || `${w.repo_owner}/${w.repo_name}`}
                     </span>

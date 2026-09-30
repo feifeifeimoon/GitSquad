@@ -6,10 +6,9 @@ import { Monitor } from "lucide-react";
 //
 // The Antigravity asset must have a transparent background. It previously
 // shipped as an opaque near-black tile, which read as a black box on the light
-// canvas and disappeared entirely in dark mode. The same glyph also sits at
-// docs/assets/agents/antigravity.png, beside the other marks the README uses,
-// because Next serves this one from /public and nothing can bridge the two — a
-// replacement has to be copied to both.
+// canvas and disappeared entirely in dark mode. It used to be duplicated at
+// docs/assets/agents/ for a README table that has since been rewritten as text —
+// that copy is gone, so `web/public/antigravity-logo.png` is now the only one.
 
 function ClaudeIcon({ className }: { className?: string }) {
   return (

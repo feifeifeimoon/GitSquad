@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, LayoutDashboard } from "lucide-react";
 import { api } from "@/lib/api";
@@ -30,7 +30,17 @@ function subscribeToken(listener: () => void): () => void {
 const readHasToken = () => !!localStorage.getItem("gitsquad_token");
 const serverHasToken = () => false;
 
-export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
+export function AuthButton({
+  onLoginClick,
+  size = "sm",
+  signedOutLabel = "Login",
+}: {
+  onLoginClick?: () => void;
+  /** `pill-sm` on a marketing bar, where the CTAs are pills; the console default is `sm`. */
+  size?: ComponentProps<typeof Button>["size"];
+  /** "Get started" on the landing page, where every visitor is new. */
+  signedOutLabel?: string;
+}) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -114,7 +124,7 @@ export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
 
   return (
     <Button
-      size="sm"
+      size={size}
       onClick={() => {
         if (onLoginClick) {
           onLoginClick();
@@ -123,7 +133,7 @@ export function AuthButton({ onLoginClick }: { onLoginClick?: () => void }) {
         }
       }}
     >
-      Login
+      {signedOutLabel}
     </Button>
   );
 }
