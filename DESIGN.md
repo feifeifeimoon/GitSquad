@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: gitsquad-design-system
-description: The design language for the GitSquad web console — a stark ink-on-canvas engineering surface, broken at hero scale by a multi-colour mesh gradient that is the entire decorative system, paired with a geometric sans for narrative text and a monospaced face for technical labels, status data, and code.
+description: The design language for the GitSquad web console — a stark ink-on-canvas engineering surface, broken at hero scale by a mesh gradient in the brand's own colours (the mark's navy and cyan, the banner's blue and amber) that is the entire decorative system, paired with a geometric sans for narrative text and a monospaced face for technical labels, status data, and code.
 
 colors:
   primary: "#171717"
@@ -29,11 +29,13 @@ colors:
   violet-soft: "#d8ccf1"
   cyan-soft: "#aaffec"
   cyan-deep: "#29bc9b"
-  gradient-blue: "#007cf0"
-  gradient-violet: "#7928ca"
-  gradient-magenta: "#ff0080"
-  gradient-teal: "#00dfd8"
-  gradient-amber: "#f9cb28"
+  # The hero's four lights, sampled from the two things that already define the
+  # brand: the icon (navy shell, cyan eyes) and docs/assets/banner.png (its
+  # repository blue, its machinery amber).
+  brand-navy: "#061029"
+  brand-blue: "#1f6fd0"
+  brand-cyan: "#34a6d1"
+  brand-amber: "#f5a623"
   # ::selection is {colors.ink} on {colors.canvas}, so it inverts with the
   # theme instead of staying dark-on-dark.
   selection-bg: "{colors.ink}"
@@ -324,16 +326,71 @@ components:
     textColor: "{colors.ink}"
     typography: "{typography.display-xl}"
     padding: "{spacing.5xl} {spacing.lg}"
-  showcase-band-light:
+    decoration: "mesh gradient + blueprint grid, top 560px, both masked to transparent"
+  squad:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    typography: "{typography.caption-mono}"
+    note: "three figures cut out of the banner, scattered in the hero's margins"
+    motion: "a lift on hover, CSS only"
+  robot:
+    source: "generated renders with a real alpha channel"
+    note: "the banner's own renders on transparency — no drawing, nothing at runtime"
+    files: "web/public/robots/v2/{inspector,tester,planner}.png"
+  product-band:
     backgroundColor: "{colors.canvas-soft}"
     textColor: "{colors.ink}"
     typography: "{typography.display-lg}"
     padding: "{spacing.5xl} {spacing.lg}"
-  showcase-band-dark:
-    backgroundColor: "{colors.primary}"
-    textColor: "{colors.on-primary}"
+  why-band:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
     typography: "{typography.display-lg}"
     padding: "{spacing.5xl} {spacing.lg}"
+  how-it-works-band:
+    backgroundColor: "{colors.canvas-soft}"
+    textColor: "{colors.ink}"
+    typography: "{typography.display-lg}"
+    padding: "{spacing.5xl} {spacing.lg}"
+    structure: "one hairline grid of 3 steps, not 3 shadowed cards"
+  closing-band:
+    backgroundColor: "{colors.canvas-soft}"
+    textColor: "{colors.ink}"
+    typography: "{typography.display-lg}"
+    padding: "{spacing.5xl} {spacing.lg}"
+    note: "pinned dark with a `dark` wrapper, never `bg-primary`"
+  marketing-footer:
+    backgroundColor: "{colors.canvas-soft}"
+    textColor: "{colors.ink}"
+    typography: "{typography.body-sm}"
+    note: "pinned dark; three link columns and a clamp() wordmark"
+  demo-board:
+    backgroundColor: "{colors.canvas}"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline}"
+    rounded: "{rounded.xl}"
+    shadow: "Level 3"
+    note: "window chrome, board row on {colors.page}, then one issue's thread and run"
+  cta-primary-pill:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button-lg}"
+    rounded: "{rounded.full}"
+    height: 48px
+  cta-secondary-pill:
+    backgroundColor: "transparent"
+    textColor: "{colors.ink}"
+    borderColor: "{colors.hairline-strong}"
+    typography: "{typography.button-lg}"
+    rounded: "{rounded.full}"
+    height: 48px
+  nav-cta-pill:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.on-primary}"
+    typography: "{typography.button-md}"
+    rounded: "{rounded.full}"
+    height: 32px
   code-editor-mockup:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.on-primary}"
@@ -341,14 +398,6 @@ components:
     rounded: "{rounded.md}"
     padding: "{spacing.lg}"
     shadow: "Level 3"
-  nav-cta-ghost:
-    backgroundColor: "{colors.canvas}"
-    textColor: "{colors.ink}"
-    borderColor: "{colors.hairline}"
-    typography: "{typography.body-sm-strong}"
-    rounded: "{rounded.sm}"
-    padding: "0px {spacing.xs}"
-    height: 28px
   link-inline:
     textColor: "{colors.link}"
     typography: "{typography.body-md}"
@@ -362,11 +411,13 @@ Type carries the second half of the job. Headlines are set in a geometric sans a
 
 Surfaces use a four-step ladder: `{colors.canvas}` for cards and dialogs, `{colors.canvas-soft}` for the page body, `{colors.canvas-soft-2}` for inset regions (sidebar hovers, code blocks, table headers), and `{colors.primary}` for the polarity-flipped dark band. Elevation is built from stacked small shadows plus an inset hairline ring, never a single heavy drop-shadow — cards sit *on* the page rather than floating above it.
 
-> **Provenance.** This visual language is an interpretation of the design language Vercel publishes on its marketing site — the surface ladder, the ink-primary CTA, the stacked-shadow elevation levels, the mesh gradient and the Geist type family all originate there. GitSquad adapts it to a console rather than a marketing site. The token names below are GitSquad's own (`web/app/globals.css` is the source of truth); nothing here should be read as an official Vercel specification.
+> **Provenance.** This visual language is an interpretation of the design language Vercel publishes on its marketing site — the surface ladder, the ink-primary CTA, the stacked-shadow elevation levels and the Geist type family all originate there. GitSquad adapts it to a console rather than a marketing site. The token names below are GitSquad's own (`web/app/globals.css` is the source of truth); nothing here should be read as an official Vercel specification.
+>
+> The hero's gradient used to come from there too, as a set of five pastels. It no longer does: the four lights are now sampled from GitSquad's own icon and banner (see *Primitives & Gradient*), which is the one part of this language that is not an interpretation of somebody else's.
 
 **Key Characteristics:**
 - A single ink primary `{colors.primary}` carries every affirmative action. There is no sixth accent colour and no green "success" hue — `{colors.success}` aliases the link blue.
-- The multi-stop mesh gradient (blue / violet / magenta / teal / amber) is the only decorative chrome, and it appears at hero scale only.
+- The mesh gradient (the mark's navy and cyan, the banner's blue and amber) is the only decorative chrome, and it appears at hero scale only, over a blueprint grid.
 - Status is never communicated by colour alone. Every status renders as a dot plus a written label so it survives colour-blindness and grayscale.
 - Every machine-reported value is set in `{typography.caption-mono}` or `{typography.code}`; every narrative sentence is set in the geometric sans.
 - Elevation is stacked (three or four small offsets at 4–12 % black) with an inset hairline ring, never one heavy drop-shadow.
@@ -410,8 +461,16 @@ Three planes, back to front. A card `{colors.canvas}` sits on a page `{colors.pa
 - **Link Deep** (`{colors.link-deep}` — `#0761d1`) / **Link Bg Soft** (`{colors.link-bg-soft}` — `#d3e5ff`): Pressed link tone and soft informational fill.
 
 ### Primitives & Gradient
-- **Blue** (`{colors.gradient-blue}` — `#007cf0`), **Violet** (`{colors.gradient-violet}` — `#7928ca`), **Magenta** (`{colors.gradient-magenta}` — `#ff0080`), **Teal** (`{colors.gradient-teal}` — `#00dfd8`), **Amber** (`{colors.gradient-amber}` — `#f9cb28`): The five mesh-gradient stops. Treated as one object — never cropped to a single colour, never reordered, never miniaturised to a swatch or icon.
-- The same five values are exposed as `--chart-1`…`--chart-5` so a future charting library inherits the brand palette.
+- **Blue** (`{colors.brand-blue}` — `#1f6fd0`), **Cyan** (`{colors.brand-cyan}` — `#34a6d1`), **Navy** (`{colors.brand-navy}` — `#061029`), **Amber** (`{colors.brand-amber}` — `#f5a623`): The four hero lights. They are not a palette anyone picked off a colour wheel — each one is already in the product's own artwork:
+
+  - **Navy** is the shell of the mark in `web/app/favicon.ico`, and the wordmark in `docs/assets/banner.png`.
+  - **Cyan** is the mark's eyes. It is the average of the 45 lit pixels of `app/favicon.ico`'s single 32×32 frame, and it is the only saturated colour in the icon.
+  - **Blue** is the banner's repository panel and the robots' caps.
+  - **Amber** is the banner's machinery — crane, conveyor, scissor lift. It is the same value as `{colors.warning}`, which the console already uses for `in_progress`, so the warm note is not a new colour either.
+
+  Treated as one object: composed as a canopy across the top of the hero, never cropped to a single stop, never reordered, never miniaturised to a swatch or an icon. The set they replace was five pastels (blue / violet / magenta / teal / amber) that arrived with the page's first template, and the page now has none of them.
+
+- `--chart-1`…`--chart-5` are the reserved categorical series, in the order a chart should use them: the four colours `usage-series` already draws with — `{colors.success}`, `{colors.cyan-deep}`, `{colors.violet}`, `{colors.warning}` — plus `{colors.brand-navy}` as the neutral for a total or an "other". They were the template's five pastels, which put a palette nobody chose into the one place a future chart would look for one. Nothing consumes them yet; the console's chart draws its series from the tokens directly.
 
 ### Dark Mode
 
@@ -491,7 +550,7 @@ The page used to have two sizes and no hierarchy: a page title and a sidebar nav
 ### Spacing System
 - **Base unit**: 4 px. Tailwind v4's `--spacing` is `0.25rem`, and every value in the system is a multiple of it.
 - **Tokens**: `{spacing.xxs}` 4 px (`1`) · `{spacing.xs}` 8 px (`2`) · `{spacing.sm}` 12 px (`3`) · `{spacing.md}` 16 px (`4`) · `{spacing.lg}` 24 px (`6`) · `{spacing.xl}` 32 px (`8`) · `{spacing.2xl}` 40 px (`10`) · `{spacing.3xl}` 48 px (`12`) · `{spacing.4xl}` 64 px (`16`) · `{spacing.5xl}` 96 px (`24`).
-- **Marketing bands**: `{spacing.5xl}` (96 px) top and bottom — `px-6 pb-24 pt-24 sm:pt-32` on the hero. The gradient needs that room.
+- **Marketing bands**: `{spacing.5xl}` (96 px) top and bottom — `px-6 pb-20 pt-20 sm:pt-28` on the hero. The gradient needs that room.
 - **Card interior padding**: `{spacing.md}` to `{spacing.lg}`. Settings panels use `p-5`; the marketing feature cards use `p-6`.
 - **Inline gaps**: `{spacing.xs}` to `{spacing.sm}` between siblings in a button row, nav row or chip row.
 
@@ -531,7 +590,8 @@ The `button-default` size is 32 px tall and the `button-lg` size 36 px, both bel
 - **Tables**: the workspace and daemon lists switch to a card grid below `md` via an explicit view switcher the user can also drive manually.
 
 #### Imagery
-- **Mesh gradient**: rendered as one absolutely-positioned element (`MeshGradient`, `aria-hidden`) with `h-[480px] opacity-50` at the top of the hero. It scales with the container and is never cropped to a frame or tiled.
+- **Mesh gradient**: rendered as one absolutely-positioned element (`MeshGradient`, `aria-hidden`) with `h-[560px] opacity-60` at the top of the hero, masked to transparent before the lead paragraph, over a `blueprint-grid` layer masked radially from the headline. The masks are not decoration: without the first, the wash covers the whole band and stops on the edge of its own blur, and the subhead and CTAs read through a filter; without the second, a 64 px grid runs to the page's edges and reads as graph paper. Both scale with the container and are never cropped to a frame or tiled.
+- **Blueprint grid**: the banner's setting is a construction site, and a hairline grid is how an engineering surface says so without drawing any of it. It is `1px` lines at `64px` pitch in `{colors.hairline}`, so it is a grey rule on white and a light one on black without a second set of values.
 - **Code editor mockup**: a dark `{colors.primary}` rectangle (`bg-[#0a0a0a]`) with mono text inside, treated as a single layout object rather than as real editable UI.
 - **Provider marks**: monochrome brand SVGs (`provider-icon.tsx`) and the Google/GitHub marks at consistent optical size. Brand assets are third-party trademarks used nominatively; see the notices requirement in the review notes.
 
@@ -622,7 +682,7 @@ Every button carries `active:translate-y-px` and `focus-visible:ring-3 focus-vis
 
 ### Navigation
 
-- **`nav-bar`** — the marketing top bar: 64 px tall, `bg-canvas`, hairline bottom border, logo left and a ghost CTA plus account control right.
+- **`nav-bar`** — the marketing top bar: 64 px tall, `bg-canvas`, hairline bottom border, the logo in `{colors.ink}` left, the in-page destinations centred and hidden below `md`, then three controls right. The **GitHub mark** is an icon rather than a fourth nav word: it is the one destination in this bar that leaves the page, and its label names the artifact (`GitSquad on GitHub`) because the word alone leaves a screen reader guessing at what the link is for. `GitHubMark` is inlined in `currentColor` for a measured reason — the SVG asset it replaces had `fill="black"` baked in, and a mark loaded through `<img>` cannot inherit `currentColor`, so it was black on a near-black card in dark mode. Then the theme control (`ThemeToggle`), the console's own button wearing the nav's shape: the page has followed `prefers-color-scheme` from the start, but a visitor had no way to say otherwise without changing an operating-system setting. Then the `nav-cta-pill`, which is the account control: signed out it says "Get started" and opens the Google flow, signed in it is the reader's avatar and the way back to the console. One control rather than a sign-in link and a sign-up button that do the same thing.
 - **`app-shell-sidebar`** — the console's left column, in three bands: a **fixed top block** (workspace switcher, then the palette trigger), a **single scrolling middle** (the destinations), and a **fixed footer** (the account). Only the middle scrolls. `bg-chrome`, `border-r border-hairline`, 200–400 px wide, drag-resized and remembered in `localStorage`.
 - **`sidebar-section-label`** — `{typography.micro}` semibold uppercase in `{colors.mute}`. The only uppercase text in the product. It doubles as the group's placeholder: it is drawn whether or not the rows under it can be used.
 - **`app-shell-nav-row`** — a **link**, not a button wired to the router. Middle-click, open-in-new-tab and being announced as a destination all come free, and none of them did before. `{typography.label}` in `{colors.body}`, `{rounded.sm}`, `aria-current="page"` on the active row. Active is a `bg-muted` fill with `{colors.ink}` and a heavier icon stroke; hover is the same fill at half strength, written as a *separate branch* so the active row carries no hover class at all — two greys one step apart are not a distinction. A row whose page needs a workspace and has none renders **disabled**: on screen, in place, not clickable. It used to vanish along with its whole group, taking every row below it along.
@@ -648,9 +708,26 @@ Every button carries `active:translate-y-px` and `focus-visible:ring-3 focus-vis
 
 ### Marketing Components
 
-- **`hero-band`** — `bg-canvas` with the mesh gradient behind the top ~480 px. Contents: a `badge-secondary` pill announcement, a 56 px logo tile at Level 2, the headline in `{typography.display-xl}` (sentence-case, period-terminated), a lead paragraph in `{typography.body-lg}` capped at `max-w-xl`, then a CTA row of a `pill` primary plus a `pill-sm` secondary.
-- **`showcase-band-dark`** — `bg-primary text-white`, holding the control-centre mock: a `code-editor-mockup` panel alongside status rows.
-- **`showcase-band-light`** — `bg-canvas-soft`, holding the 3-up "how it works" feature row.
+- **`squad`** — the hero's second half, and the banner's other half: the banner does not only say what the squad is made of, it shows them at work. Three figures stand in the hero's margins — two on the left, one on the right, at different heights — each captioned with what it is doing in `{typography.caption-mono}` on a `{colors.canvas}` pill. **They are scattered, not lined up**: a belt with one robot per station was tried first and rejected. **Hover plays a gesture, and a different one each** — a scan, a nod, a lift. A render is one flat layer with no magnifier inside it to sweep, but the gesture still has to differ per figure: one lift shared by three reads as one figure repeated, which is the same mistake a single crop size made.
+- **`robot`** — the artwork itself, and the end of a long attempt to make one. The three are **generated renders on a real alpha channel**, in `web/public/robots/`: the **Inspector** (a cap, a magnifying glass — hunting a bug), the **Tester** (a white helmet, a multimeter and a circuit board — checking the build) and the **Planner** (a hard hat with an antenna, a clipboard — drawing a screen). The job is read off the prop, which is why these three, and why they are cut a little below the waist: cutting them at the chest to dodge scenery produced three heads under the same hat, and three heads is one figure.
+
+  **What was tried before, and what each attempt established.** `docs/assets/banner.png` is the source of the first pair: a flattened 2688×1520 render with no alpha, standing in front of a photograph. Its robots *can* be taken off that background — `scripts/alpha-key.mjs` walks in from the border and accepts a neighbour when the local step between them is small, which crosses sky, haze and steel and stops at the figure — but the matte keeps a few percent of leftover, worst where a figure stands in front of a **white** UI panel, because a white robot against a white panel has no edge for any of it to find. Hand-drawn SVG characters (`robots.tsx`) and a Three.js scene (`squad-3d.tsx`) were tried and deleted: the first had the right palette and no volume, the second cost 140 KB gzipped to show a model that was still home-made.
+
+  **Two traps worth keeping, both found the hard way.** The display widths are solved from the **head**, not the crop: the three figures are drawn at one scale — their heads measure 336 / 332 / 339 source pixels — but their crops are framed differently, so equal *widths* render equal heads at three different sizes, and the widest crop reads as the smallest robot. And **the path carries a version** (`web/public/robots/v2/`): the image optimizer keys on the source path with a four-hour `max-age`, so replacing a file's contents under the same name leaves the old bytes served, in the browser and on the CDN alike. Changing the path is what changes the URL.
+
+  **And the crop keeps the figure it was aimed at, not every pixel in the rectangle.** A box drawn around one robot on a three-robot sheet clips its neighbours — a sliver of a magnifier on the right, the top of a head below — and those slivers are untouched by the key, so the tight box stretches to reach them and the file ends up wider than the robot in it. The Planner shipped that way for an afternoon: three fragments (1382, 556 and 14 px) sitting in its bottom-right corner on the live page. They are *disconnected* from the figure, which is the whole test, so the crop now keeps the largest connected component and drops the rest.
+  **The lesson is about the input, not the algorithm.** The same generators will happily draw a checkerboard to mean "transparent" — and a checkerboard's light square is pure white, the same as the robot's shell, so no threshold separates them and JPEG noise takes away the pattern test that otherwise would. A JPEG cannot carry alpha; it can carry a flat keyable colour. **Ask for a transparent PNG, and if that is not available, one flat colour that appears nowhere on the figure (`#ff00ff`) — and the whole cutting problem disappears.** `scripts/alpha-key.mjs` handles all three cases; on a file that already has alpha it is only a cropping tool.
+- **`hero-band`** — `bg-canvas` with the masked mesh gradient and the blueprint grid behind the top 560 px. Contents: a `badge-secondary` pill announcement, the headline in `{typography.display-xl}` (sentence-case, period-terminated), a lead paragraph in `{typography.body-lg}` capped at `max-w-2xl`, a CTA row of a `cta-primary-pill` plus a `cta-secondary-pill`, one line in `{typography.caption-mono}`, and the `squad` around it. There is no logo tile, and the mark is not used as a portrait: it lives in the nav at 20 px.
+- **`demo-board`** — the product band's centrepiece, and it is set in **this repository**: the workspace is GitSquad, the repo is `feifeifeimoon/GitSquad`, and the issue keys follow from the name (`deriveIssuePrefix` takes its first three letters, so GIT-*). An example the reader can go and read beats an invented one. The chrome is the workspace avatar, the name, the repo and the running agent's status badge; then a board row on `{colors.page}` holding real `board-column` wells with a hand-built card each; then one issue split into its thread and its run — tool log, branch, tokens, elapsed. Selecting a card swaps the issue below it.
+
+  **Its columns are 272 px, not the console board's 288.** Four of 288 do not divide into this frame, so the fourth column came out sliced through a card and read as a layout bug. The console's board is free to scroll because it *is* a board; this is a picture of one, and a picture should not look broken. At 272, four fit with a sliver of the fifth showing — the same "there is more" cue the console gives, without cutting a card in half.
+
+  **The agents wear the faces the hero shows**, cut from the same renders, so the squad above and the workers below are the same three characters rather than two unrelated sets of initials. The thread draws a person as a monogram and an agent as a portrait: one avatar per *kind* — every agent the same Bot glyph, every person the same User glyph — says nothing in a thread whose whole point is who said what. Avatars are `rounded-sm`, which is what `WorkspaceAvatar` uses everywhere else in the console; a circle clips the corners off a square portrait, and on a 24 px robot head the corners are the hat and the chin, the two things that say which robot it is.
+- **`why-band`** — `bg-canvas`, a 3-up grid of claims (1-up below `md`). Each claim is a well of fixed height, a `{typography.title-sm}` heading and a `{typography.copy}` paragraph. The wells share a minimum height so the three headings land on one line across the row.
+- **`how-it-works-band`** — `bg-canvas-soft`, three steps in one surface divided by hairlines (`grid gap-px bg-hairline`) rather than three shadowed cards: one process, not three products. Each step numbers itself `01`–`03` in `{typography.caption-mono}` and closes on the command it needs.
+- **`closing-band`** — the polarity flip, pinned dark, holding the last ask. It and the footer share one dark region with a hairline between them.
+- **`marketing-footer`** — pinned dark: brand and tagline, three link columns under `{typography.micro}` uppercase labels, a hairline, the licence and pre-1.0 status, and a wordmark at `clamp(3.5rem, 14vw, 10rem)` in `{colors.ink}` at 10 % — decoration that says so, with no link and no label.
+- **`cta-primary-pill` / `cta-secondary-pill`** — the pair every band closes on. The secondary is transparent behind a `{colors.hairline-strong}` outline, not the filled `secondary` button: it stands on a mesh gradient in the hero and on near-black in the closing band, and `bg-card` is the same colour as both surfaces in dark mode, so the button disappeared into the band it was sitting on.
 - **`code-editor-mockup`** — `bg-[#0a0a0a] rounded-md shadow-level-3` containing mono text. The one place the system goes darker than `{colors.primary}`.
 - **`badge-secondary`** — the rounded-full announcement pill with `{typography.caption}` text on `{colors.canvas}` at Level 1.
 - **`link-inline`** — `{colors.link}` text, underlined on hover.
