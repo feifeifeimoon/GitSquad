@@ -2,13 +2,13 @@
 
 import { useEffect, useState, useCallback, useRef, useSyncExternalStore } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import Image from "next/image";
 import { ChevronsUpDown, Plus, Check } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { useApi } from "@/lib/query";
 import { RealtimeProvider } from "@/lib/realtime";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
+import { GitSquadMark } from "@/components/gitsquad-mark";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { NavSearchTrigger } from "@/components/nav-search-trigger";
 import { AccountMenu } from "@/components/account-menu";
@@ -193,7 +193,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
                 </>
               ) : (
                 <>
-                  <Image src="/favicon.ico" alt="GitSquad" width={20} height={20} className="size-5 rounded-sm" />
+                  <GitSquadMark className="size-6" />
                   <span className="min-w-0 flex-1 text-copy font-semibold tracking-tight">GitSquad</span>
                 </>
               )}

@@ -1,11 +1,11 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { Check, Loader2, ArrowRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { GitSquadMark } from "@/components/gitsquad-mark";
 import { api } from "@/lib/api";
 
 function DaemonAuthContent() {
@@ -78,7 +78,7 @@ function DaemonAuthContent() {
             </Avatar>
             <ArrowRight className="size-5 text-hairline-strong" />
             <div className="flex size-14 items-center justify-center rounded-md bg-muted ring-2 ring-hairline ring-offset-2 ring-offset-canvas-soft-2">
-              <Image src="/favicon.ico" alt="GitSquad" width={28} height={28} className="size-7" />
+              <GitSquadMark className="size-8" />
             </div>
           </div>
           <h1 className="text-center text-xl font-semibold tracking-[-0.04em] text-ink">Device Activation</h1>

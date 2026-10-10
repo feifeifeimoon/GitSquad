@@ -127,7 +127,15 @@ test("the page ends with the project's terms and its source", () => {
 });
 
 test("the marketing page keeps the brand and the metadata", () => {
-  assert.match(nav, /alt="GitSquad logo"/);
+  // The brand is drawn, not scaled: the mark is inline paths and the name is
+  // the identity's two-voice wordmark, in the bar and again in the footer. What
+  // it replaced was a 32 px favicon.ico stretched to 20.
+  assert.match(nav, /<GitSquadMark className="size-6" \/>/);
+  assert.match(nav, /<GitSquadWordmark \/>/);
+  assert.doesNotMatch(nav, /src="\/favicon\.ico"/);
+  assert.match(footer, /<GitSquadMark className="size-6" \/>/);
+  assert.match(footer, /<GitSquadWordmark \/>/);
+  assert.doesNotMatch(footer, /src="\/favicon\.ico"/);
   assert.match(layout, /GitSquad/);
   assert.doesNotMatch(layout, /Create Next App/);
 });
