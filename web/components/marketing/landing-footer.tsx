@@ -1,4 +1,4 @@
-import Image from "next/image";
+import { GitSquadMark, GitSquadWordmark } from "@/components/gitsquad-mark";
 
 import { anchors, links } from "./links";
 
@@ -48,14 +48,8 @@ export function LandingFooter() {
         <div className="grid gap-10 md:grid-cols-[1.4fr_1fr_1fr_1fr]">
           <div>
             <div className="flex items-center gap-2 text-copy font-semibold text-ink">
-              <Image
-                src="/favicon.ico"
-                alt=""
-                width={20}
-                height={20}
-                className="size-5 rounded-sm"
-              />
-              GitSquad
+              <GitSquadMark className="size-6" />
+              <GitSquadWordmark />
             </div>
             <p className="mt-3 max-w-xs text-copy leading-6 text-body">
               Your autonomous developer team on GitHub. Open source under

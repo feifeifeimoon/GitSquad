@@ -1,11 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 
 import { AuthButton } from "@/components/auth-button";
 import { GitHubMark } from "@/components/github-mark";
+import { GitSquadMark, GitSquadWordmark } from "@/components/gitsquad-mark";
 import { LoginModal } from "@/components/login-modal";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { anchors, links } from "./links";
@@ -30,15 +30,8 @@ export function LandingNav() {
     <header className="sticky top-0 z-40 border-b border-hairline bg-canvas/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-[1200px] items-center justify-between gap-6 px-6">
         <Link href="/" className="flex shrink-0 items-center gap-2 text-copy font-semibold text-ink">
-          <Image
-            src="/favicon.ico"
-            alt="GitSquad logo"
-            width={20}
-            height={20}
-            className="size-5 rounded-sm"
-            priority
-          />
-          GitSquad
+          <GitSquadMark className="size-6" />
+          <GitSquadWordmark />
         </Link>
 
         <nav className="hidden items-center gap-1 md:flex">
