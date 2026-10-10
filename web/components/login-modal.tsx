@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback } from "react";
 import { X } from "lucide-react";
-import Image from "next/image";
+import { GitSquadMark } from "@/components/gitsquad-mark";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8080";
 
@@ -57,14 +57,7 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
     <div className="flex flex-col items-center text-center">
       {/* Logo */}
       <div className="mb-6 flex size-14 items-center justify-center rounded-md border border-hairline bg-canvas shadow-level-2">
-        <Image
-          src="/favicon.ico"
-          alt="GitSquad"
-          width={48}
-          height={48}
-          className="size-11 rounded-sm"
-          priority
-        />
+        <GitSquadMark className="size-11" />
       </div>
 
       {/* Heading */}
