@@ -41,6 +41,11 @@ updates:
       time: "09:15"
       timezone: Asia/Shanghai
     open-pull-requests-limit: 5
+    # `allow` is a whitelist, so `all` looks redundant here and is not: a gomod
+    # job with no `allow` resolves to `dependency-type: direct`, which is how the
+    # advisories behind the red govulncheck job went unseen in x/net and x/text.
+    allow:
+      - dependency-type: all
 
   - package-ecosystem: github-actions
     directory: /
