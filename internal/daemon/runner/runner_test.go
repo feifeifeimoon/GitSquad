@@ -298,9 +298,12 @@ func TestRunnerRunSuccess(t *testing.T) {
 	}
 }
 
+// A provider that dies on the closing turn has usually already produced the
+// answer the task existed for. It rides along with the failure so the work is
+// not lost with the run.
 func TestRunnerRunProviderFailed(t *testing.T) {
 	git := &fakeGit{dirty: true, diff: "diff"}
-	backend := &fakeBackend{res: provider.Result{Status: "failed", Error: "boom"}}
+	backend := &fakeBackend{res: provider.Result{Status: "failed", Error: "provider failed: ERROR", Output: "the analysis"}}
 	rep := &fakeReporter{}
 	r := New(git, backend, rep, t.TempDir())
 
@@ -314,6 +317,9 @@ func TestRunnerRunProviderFailed(t *testing.T) {
 	last := rep.reports[len(rep.reports)-1]
 	if last.Status != v1.TaskReportFailed || last.Error == "" {
 		t.Errorf("last report = %+v, want failed with error", last)
+	}
+	if last.Summary == nil || last.Summary.Output != "the analysis" {
+		t.Errorf("summary = %+v, want the agent output kept on the failure", last.Summary)
 	}
 }
 
@@ -357,6 +363,11 @@ func TestRunnerRunCheckoutError(t *testing.T) {
 	last := rep.reports[len(rep.reports)-1]
 	if last.Status != v1.TaskReportFailed || last.Error == "" {
 		t.Errorf("last report = %+v, want failed with error", last)
+	}
+	// The agent never ran, so there is no output to keep — and no empty summary
+	// for the server to post as an agent comment.
+	if last.Summary != nil {
+		t.Errorf("summary = %+v, want none before the agent ran", last.Summary)
 	}
 }
 

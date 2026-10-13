@@ -1,13 +1,15 @@
 package provider
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
 
 func TestBuildAgyArgs(t *testing.T) {
-	args := buildAgyArgs("fix it", ExecOptions{})
-	want := []string{"-p", "fix it", "--output-format", "stream-json", "--dangerously-skip-permissions"}
+	args := buildAgyArgs("fix it", "/tmp/agy.log", ExecOptions{})
+	want := []string{"-p", "fix it", "--output-format", "stream-json", "--dangerously-skip-permissions", "--log-file", "/tmp/agy.log"}
 	if strings.Join(args, " ") != strings.Join(want, " ") {
 		t.Fatalf("buildAgyArgs() = %v, want %v", args, want)
 	}
@@ -17,12 +19,15 @@ func TestBuildAgyArgs(t *testing.T) {
 		t.Error("buildAgyArgs() must request the structured stream to get usage")
 	}
 
-	args = buildAgyArgs("fix it", ExecOptions{Model: "Claude Opus 4.6 (Thinking)", Cwd: "/tmp/repo"})
+	args = buildAgyArgs("fix it", "", ExecOptions{Model: "Claude Opus 4.6 (Thinking)", Cwd: "/tmp/repo"})
 	joined := strings.Join(args, " ")
 	for _, want := range []string{"--model Claude Opus 4.6 (Thinking)", "--add-dir /tmp/repo"} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("args missing %q: %v", want, args)
 		}
+	}
+	if strings.Contains(joined, "--log-file") {
+		t.Errorf("args must omit --log-file when no path is given: %v", args)
 	}
 }
 
@@ -85,6 +90,75 @@ func TestAgyResultStatus(t *testing.T) {
 	got := (agyResult{Status: "ERROR"}).toResult()
 	if got.Status != "failed" || got.Error != "ERROR" {
 		t.Errorf("ERROR = %+v, want failed with the status surfaced", got)
+	}
+}
+
+// agy writes some terminal provider failures only to its own log — the
+// structured stream and the exit code can both look fine. The log is read after
+// every run so this class is not recorded as a blank success.
+func TestAgyLogFailure(t *testing.T) {
+	dir := t.TempDir()
+
+	path := filepath.Join(dir, "clean.log")
+	if err := os.WriteFile(path, []byte("I0601 10:00:00.000000 1 server.go:1] starting\nI0601 10:00:01.000000 1 server.go:2] CLI app data directory: /tmp/app\n"), 0o600); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+	if got := agyLogFailure(path); got != "" {
+		t.Errorf("agyLogFailure(clean log) = %q, want empty", got)
+	}
+
+	// glog prefixes the line with date, pid and file; only the message matters,
+	// and the LAST one wins: earlier markers can belong to a retried blip.
+	path = filepath.Join(dir, "failed.log")
+	body := "E0601 10:00:00.000000 1 server.go:3] agent executor error: stream error: EOF\n" +
+		"I0601 10:00:01.000000 1 server.go:4] retrying\n" +
+		"E0601 10:00:05.000000 1 server.go:5] agent executor error: User location is not supported\n"
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write log: %v", err)
+	}
+	if got := agyLogFailure(path); got != "User location is not supported" {
+		t.Errorf("agyLogFailure() = %q, want the last marker's reason", got)
+	}
+
+	// A missing log is not a failure: there is simply nothing to add.
+	if got := agyLogFailure(filepath.Join(dir, "absent.log")); got != "" {
+		t.Errorf("agyLogFailure(missing) = %q, want empty", got)
+	}
+	if got := agyLogFailure(""); got != "" {
+		t.Errorf("agyLogFailure(\"\") = %q, want empty", got)
+	}
+}
+
+func TestApplyAgyLogFailure(t *testing.T) {
+	// The silent-failure shape: completed, nothing on stdout, reason in the log.
+	res := Result{Status: "completed"}
+	applyAgyLogFailure(&res, "stream error: EOF")
+	if res.Status != "failed" || !strings.Contains(res.Error, "stream error: EOF") {
+		t.Errorf("res = %+v, want a failure carrying the log's reason", res)
+	}
+
+	// A run that delivered its answer is trusted: the marker can belong to a
+	// blip the CLI retried, and failing a complete run over that would be worse
+	// than missing the guard.
+	res = Result{Status: "completed", Output: "the answer"}
+	applyAgyLogFailure(&res, "stream error: EOF")
+	if res.Status != "completed" || res.Error != "" {
+		t.Errorf("res = %+v, want the completed run untouched", res)
+	}
+
+	// A run that already failed keeps the evidence it has rather than gaining a
+	// second, possibly unrelated cause.
+	res = Result{Status: "failed", Error: "ERROR; exit status 3"}
+	applyAgyLogFailure(&res, "stream error: EOF")
+	if strings.Contains(res.Error, "stream error") {
+		t.Errorf("Error = %q, want the existing failure text kept as-is", res.Error)
+	}
+
+	// No marker, nothing to do.
+	res = Result{Status: "completed"}
+	applyAgyLogFailure(&res, "")
+	if res.Status != "completed" {
+		t.Errorf("res = %+v, want no change without a marker", res)
 	}
 }
 

@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 )
@@ -29,13 +32,17 @@ func newAgyBackend(cfg Config) *agyBackend { return &agyBackend{cfg: cfg} }
 func (b *agyBackend) Kind() string { return "agy" }
 
 // buildAgyArgs assembles the argv for a one-shot agy invocation. The prompt
-// goes in argv (agy has no stream-json input mode wired up here), and
-// --dangerously-skip-permissions is what makes it non-interactive.
-func buildAgyArgs(prompt string, opts ExecOptions) []string {
+// goes in argv (agy has no stream-json input mode wired up here),
+// --dangerously-skip-permissions is what makes it non-interactive, and
+// --log-file pins the CLI's own log to a path this process owns.
+func buildAgyArgs(prompt, logPath string, opts ExecOptions) []string {
 	args := []string{
 		"-p", prompt,
 		"--output-format", "stream-json",
 		"--dangerously-skip-permissions",
+	}
+	if logPath != "" {
+		args = append(args, "--log-file", logPath)
 	}
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
@@ -59,20 +66,33 @@ func (b *agyBackend) Execute(ctx context.Context, prompt string, opts ExecOption
 		ctx, cancel = context.WithTimeout(ctx, opts.Timeout)
 	}
 
-	cmd := exec.CommandContext(ctx, exe, buildAgyArgs(prompt, opts)...)
+	// agy writes some terminal failures only to its own log — a turn can end
+	// with the reason there and nothing on the structured stream — so each run
+	// gets a log file this process owns and reads once the CLI has exited.
+	logFile, err := os.CreateTemp("", "gitsquad-agy-*.log")
+	if err != nil {
+		cancel()
+		return nil, fmt.Errorf("create agy log file: %w", err)
+	}
+	logPath := logFile.Name()
+	_ = logFile.Close()
+
+	cmd := exec.CommandContext(ctx, exe, buildAgyArgs(prompt, logPath, opts)...)
 	cmd.Dir = opts.Cwd
 	cmd.Env = append(os.Environ(), opts.Env...)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		cancel()
+		_ = os.Remove(logPath)
 		return nil, err
 	}
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
+	stderr := newStderrTail(agentStderrTailBytes)
+	cmd.Stderr = io.MultiWriter(newStderrLogWriter(b.cfg.Logger, "agy stderr"), stderr)
 
 	if err := cmd.Start(); err != nil {
 		cancel()
+		_ = os.Remove(logPath)
 		return nil, err
 	}
 
@@ -83,6 +103,7 @@ func (b *agyBackend) Execute(ctx context.Context, prompt string, opts ExecOption
 		defer cancel()
 		defer close(msgs)
 		defer close(result)
+		defer os.Remove(logPath)
 
 		start := time.Now()
 		var out strings.Builder
@@ -119,8 +140,9 @@ func (b *agyBackend) Execute(ctx context.Context, prompt string, opts ExecOption
 		}
 
 		waitErr := cmd.Wait()
-		res := finalizeResult(final, out.String(), waitErr, stderr.String(), ctx.Err(), time.Since(start))
+		res := finalizeResult(final, out.String(), waitErr, stderr.Tail(), "agy", ctx.Err(), time.Since(start))
 		res.Usage = agyUsageForRun(opts.Model, turnUsage, turnsSeen, totalUsage, totalSeen)
+		applyAgyLogFailure(&res, agyLogFailure(logPath))
 		result <- res
 	}()
 
@@ -151,6 +173,48 @@ func agyUsageForRun(configuredModel string, turns TokenUsage, turnsSeen bool, to
 	default:
 		return nil
 	}
+}
+
+// ── log-derived failures ──────────────────────────────────────────────
+
+// agyExecutorErrorRe matches the marker agy writes to its own log when a turn
+// ended on a provider failure. Only the last one is read: earlier markers can
+// belong to a blip the CLI retried, while the final one is the one that ended
+// the run.
+var agyExecutorErrorRe = regexp.MustCompile(`agent executor error:\s*(.+)`)
+
+// agyLogFailure returns the terminal provider failure agy recorded in its
+// per-run log, or "" when the log names none. A missing or unreadable log is
+// not itself a failure — there is simply nothing to add.
+func agyLogFailure(logPath string) string {
+	if logPath == "" {
+		return ""
+	}
+	data, err := os.ReadFile(logPath)
+	if err != nil {
+		return ""
+	}
+	matches := agyExecutorErrorRe.FindAllSubmatch(data, -1)
+	if len(matches) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(string(matches[len(matches)-1][1]))
+}
+
+// applyAgyLogFailure folds a log-only provider failure into the result.
+//
+// A marker on its own does not mean this run failed: the log also carries
+// errors agy retried and recovered from — a dropped request mid-run leaves one
+// behind while the turn finishes fine. So a marker only promotes a run that
+// otherwise looks successful AND produced no output, which is the silent-failure
+// shape this guard exists for. A run that already failed keeps the evidence it
+// has rather than gaining a second, possibly unrelated cause.
+func applyAgyLogFailure(res *Result, reason string) {
+	if reason == "" || res.Status != "completed" || strings.TrimSpace(res.Output) != "" {
+		return
+	}
+	res.Status = "failed"
+	res.Error = "agy provider error: " + sanitizeDiagnostic(reason)
 }
 
 // ── stream-json parsing ────────────────────────────────────────────────

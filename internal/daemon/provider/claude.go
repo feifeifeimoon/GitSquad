@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"strconv"
@@ -100,8 +101,8 @@ func (b *claudeBackend) Execute(ctx context.Context, prompt string, opts ExecOpt
 		cancel()
 		return nil, fmt.Errorf("stdout pipe: %w", err)
 	}
-	var stderr strings.Builder
-	cmd.Stderr = &stderr
+	stderr := newStderrTail(agentStderrTailBytes)
+	cmd.Stderr = io.MultiWriter(newStderrLogWriter(b.cfg.Logger, "claude stderr"), stderr)
 
 	if err := cmd.Start(); err != nil {
 		cancel()
@@ -152,7 +153,7 @@ func (b *claudeBackend) Execute(ctx context.Context, prompt string, opts ExecOpt
 		close(msgs)
 
 		waitErr := cmd.Wait()
-		res := finalizeResult(final, out.String(), waitErr, stderr.String(), ctx.Err(), time.Since(start))
+		res := finalizeResult(final, out.String(), waitErr, stderr.Tail(), "claude", ctx.Err(), time.Since(start))
 		res.Usage = usage.snapshot()
 		result <- res
 	}()
@@ -475,31 +476,4 @@ func toolResultText(raw json.RawMessage) string {
 		}
 	}
 	return b.String()
-}
-
-// finalizeResult produces the final Result from a completed run.
-func finalizeResult(final Result, accumulated string, waitErr error, stderr string, ctxErr error, dur time.Duration) Result {
-	if final.Status == "" {
-		final.Status = "completed"
-	}
-	if ctxErr != nil {
-		final.Status = "timeout"
-		if ctxErr == context.Canceled {
-			final.Status = "cancelled"
-		}
-	}
-	if waitErr != nil && final.Status == "completed" {
-		final.Status = "failed"
-		if final.Error == "" {
-			final.Error = strings.TrimSpace(stderr)
-			if final.Error == "" {
-				final.Error = waitErr.Error()
-			}
-		}
-	}
-	if final.Output == "" {
-		final.Output = accumulated
-	}
-	final.DurationMs = dur.Milliseconds()
-	return final
 }
