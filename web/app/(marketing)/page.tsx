@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { MeshGradient } from "@/components/mesh-gradient";
 import { ProviderIcon } from "@/components/provider-icon";
 import { DemoBoard } from "@/components/marketing/demo-board";
-import { Squad } from "@/components/marketing/squad";
+import { HeroHead } from "@/components/marketing/hero-head";
 import { GetStartedCta } from "@/components/marketing/get-started-cta";
 import { LandingFooter } from "@/components/marketing/landing-footer";
 import { LandingNav } from "@/components/marketing/landing-nav";
@@ -87,6 +87,10 @@ function Hero() {
         <MeshGradient className="absolute inset-0 opacity-60 [mask-image:linear-gradient(to_bottom,black_8%,transparent)]" />
       </div>
       <div className="relative mx-auto flex max-w-[1200px] flex-col items-center px-6 pb-16 pt-20 text-center sm:pt-28">
+        {/* The mark, in the vendored renderer. Hovering it lifts a picker of the
+            nine states it can hold; the page itself never changes it. */}
+        <HeroHead size={210} />
+
         <Badge
           variant="secondary"
           className="rounded-full bg-canvas px-3 py-1 text-caption text-body shadow-level-1"
@@ -124,12 +128,6 @@ function Hero() {
           The tool loop stays in the CLI you already have.
         </p>
       </div>
-
-      {/* Last in the band, so the robots are on top of the content column rather
-          than under it. The column is a positioned box that spans the whole
-          1200px — a transparent one, but transparent still takes the pointer, so
-          a robot standing in the margin behind it never received a hover. */}
-      <Squad />
     </section>
   );
 }

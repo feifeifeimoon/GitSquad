@@ -13,9 +13,9 @@ const footer = read("../components/marketing/landing-footer.tsx");
 const cta = read("../components/marketing/get-started-cta.tsx");
 const layout = read("./layout.tsx");
 const css = read("./globals.css");
-const squad = read("../components/marketing/squad.tsx");
 const toggle = read("../components/theme-toggle.tsx");
 const mark = read("../components/github-mark.tsx");
+const head = read("../components/marketing/hero-head.tsx");
 
 const MARKETING = [page, nav, board, footer, cta];
 
@@ -140,67 +140,7 @@ test("the marketing page keeps the brand and the metadata", () => {
   assert.doesNotMatch(layout, /Create Next App/);
 });
 
-test("the hero scatters the squad through its margins", () => {
-  assert.match(page, /<Squad \/>/);
 
-  // A picture, not content: out of the accessibility tree, out of the flow, and
-  // drawn only where the content column leaves a margin for it.
-  assert.match(squad, /aria-hidden="true"/);
-  assert.match(squad, /absolute inset-0 hidden select-none xl:block/);
-  // The layer covers the band, so the figures take the pointer and not clicks.
-  assert.match(squad, /pointer-events-none/);
-  assert.match(squad, /pointer-events-auto/);
-
-  // Three figures with three jobs.
-  const captions = [...squad.matchAll(/doing: "([^"]+)"/g)].map((m) => m[1]);
-  assert.deepEqual(captions, ["hunting a bug", "checking the build", "drawing a screen"]);
-
-  // Scattered, not lined up: different heights, and both margins used.
-  const xs = [...squad.matchAll(/x: (\d+)/g)].map((m) => Number(m[1]));
-  const ys = [...squad.matchAll(/y: (\d+)/g)].map((m) => Number(m[1]));
-  assert.equal(new Set(xs).size, xs.length, "two share an x position");
-  assert.equal(new Set(ys).size, ys.length, "two share a height");
-  assert.ok(xs.some((x) => x < 20) && xs.some((x) => x > 70), "not on both sides");
-
-  // The display widths *agree* while the crops do not, and that is the point:
-  // each width is solved from the head in that file, so three differently framed
-  // crops render three heads of one size. Equal widths were once the bug — they
-  // made the widest crop read as the smallest robot.
-  const widths = [...squad.matchAll(/width: (\d+)/g)].map((m) => Number(m[1]));
-  assert.equal(widths.length, 3);
-  assert.ok(
-    Math.max(...widths) - Math.min(...widths) <= 4,
-    `display widths should match within a few px: ${widths.join(", ")}`,
-  );
-  const sourceWidths = [...squad.matchAll(/\bw: (\d+)/g)].map((m) => Number(m[1]));
-  assert.equal(new Set(sourceWidths).size, sourceWidths.length, "the crops should differ");
-});
-
-test("the squad is artwork with its own alpha channel", () => {
-  // Three files, one per figure. The takeaway from two days of cut-outs: a
-  // generated render *with alpha* beats anything taken off a flattened image,
-  // because a white robot against a white background has no edge to find.
-  //
-  // The `/v1/` is not decoration. Next serves an optimised image at a URL that
-  // holds only the source *path*, with `max-age=14400` — so replacing a file's
-  // contents under the same name leaves the old bytes served for four hours, in
-  // the browser and on the CDN alike. Changing the path is what changes the URL.
-  for (const name of ["inspector", "tester", "planner"]) {
-    assert.match(squad, new RegExp(`/robots/v2/${name}\\.png`), `${name} is not used`);
-  }
-  assert.doesNotMatch(squad, /favicon\.ico/);
-  // A render is one flat layer, so the hover is a gesture rather than the work —
-  // and a different gesture per figure, because one lift shared by three reads
-  // as one figure, which is the same sameness a single crop size produced.
-  const gestures = [...squad.matchAll(/group-hover\/robot:animate-\[([a-z-]+)_/g)].map(
-    (m) => m[1],
-  );
-  assert.equal(gestures.length, 3, `expected a gesture per figure, found ${gestures.length}`);
-  assert.equal(new Set(gestures).size, 3, "two figures share a gesture");
-  for (const name of gestures) {
-    assert.match(css, new RegExp(`@keyframes ${name} \\{`), `${name} has no keyframes`);
-  }
-});
 
 test("the marketing nav links to GitHub by its mark", () => {
   // An icon rather than a fourth nav word: it is the one destination in the bar
@@ -254,4 +194,26 @@ test("the hero backdrop is the brand's own palette, not the template's", () => {
   for (const pastel of ["#007cf0", "#7928ca", "#ff0080", "#00dfd8", "#f9cb28"]) {
     assert.ok(!gradient.includes(pastel), `mesh gradient still has ${pastel}`);
   }
+});
+
+
+
+test("the hero's head is a control, and only a control", () => {
+  assert.match(page, /<HeroHead size=\{210\} \/>/);
+  // A real button: reachable without a pointer, and it says what it opens.
+  assert.match(head, /aria-haspopup="true"/);
+  assert.match(head, /aria-label="What the mark is doing"/);
+  // Every state carries a glyph and a word, so the row survives a font without
+  // emoji and a reader who cannot see them.
+  for (const label of ["Idle", "Thinking", "Searching", "Listening", "Speaking", "Working", "Happy", "Error", "Sleeping"]) {
+    assert.ok(head.includes(`"${label}"`), `no row for ${label}`);
+  }
+  assert.match(head, /aria-hidden="true"/); // the glyph is decoration; the word is the name
+  // A chosen state is remembered, and read the one way that is neither a
+  // setState in an effect (this repo's lint) nor a hydration mismatch.
+  assert.match(head, /useSyncExternalStore/);
+  assert.match(head, /HELD_KEY/);
+  // The automatic layer is gone: no zones, no timers, no gestures of our own.
+  assert.doesNotMatch(head, /ZONES|IntersectionObserver|setTimeout\(.*greet|prefers-reduced-motion/);
+  assert.doesNotMatch(head, /sim\./);
 });

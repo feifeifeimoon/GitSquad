@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored third-party source, kept as authored (MIT, see the README in
+    // that folder): this repo's style rules do not govern someone else's file.
+    "vendor/**",
   ]),
 ]);
 

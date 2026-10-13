@@ -10,11 +10,17 @@ const CY = 7;
 const OUTER_R = 6;
 const FILL_R = 3.5;
 
+// Trigonometry computed inline is a hydration hazard: the server and the client
+// can disagree in the last decimal of Math.sin, React compares the serialized
+// attribute, and the mismatch "won't be patched up". Nothing here needs more
+// than two decimals — a hundredth of a 14-unit grid is a tenth of a pixel.
+const r2 = (n: number) => Number(n.toFixed(2));
+
 /** Build a pie-wedge SVG path from 12 o'clock, clockwise. */
 function piePath(cx: number, cy: number, r: number, progress: number): string {
   const angle = 2 * Math.PI * progress;
-  const endX = cx + r * Math.sin(angle);
-  const endY = cy - r * Math.cos(angle);
+  const endX = r2(cx + r * Math.sin(angle));
+  const endY = r2(cy - r * Math.cos(angle));
   const largeArc = progress > 0.5 ? 1 : 0;
   return `M${cx},${cy} L${cx},${cy - r} A${r},${r} 0 ${largeArc},1 ${endX},${endY} Z`;
 }
@@ -60,8 +66,8 @@ function BacklogIcon() {
         return (
           <circle
             key={i}
-            cx={CX + OUTER_R * Math.cos(angle)}
-            cy={CY + OUTER_R * Math.sin(angle)}
+            cx={r2(CX + OUTER_R * Math.cos(angle))}
+            cy={r2(CY + OUTER_R * Math.sin(angle))}
             r={dotR}
             fill="currentColor"
           />
@@ -99,10 +105,10 @@ function BlockedIcon() {
   return (
     <ProgressCircle progress={0}>
       <line
-        x1={CX + FILL_R * Math.cos(Math.PI * 0.75)}
-        y1={CY - FILL_R * Math.sin(Math.PI * 0.75)}
-        x2={CX + FILL_R * Math.cos(-Math.PI * 0.25)}
-        y2={CY - FILL_R * Math.sin(-Math.PI * 0.25)}
+        x1={r2(CX + FILL_R * Math.cos(Math.PI * 0.75))}
+        y1={r2(CY - FILL_R * Math.sin(Math.PI * 0.75))}
+        x2={r2(CX + FILL_R * Math.cos(-Math.PI * 0.25))}
+        y2={r2(CY - FILL_R * Math.sin(-Math.PI * 0.25))}
         stroke="currentColor"
         strokeWidth={1.5}
         strokeLinecap="round"
