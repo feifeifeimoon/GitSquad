@@ -443,3 +443,58 @@ func TestTaskServicePostsAgentOutput(t *testing.T) {
 		t.Fatalf("issue status = %q (err=%v), want in_review", issueRow.Status, err)
 	}
 }
+
+// A run can fail after the agent already produced its deliverable — the
+// provider dropped on the closing turn, say. The work is still posted as the
+// agent's own comment so it is not lost with the task, and the failure line
+// says why the task is marked failed.
+func TestHandleFailedKeepsTheAgentsOutput(t *testing.T) {
+	s, pool := openTestStore(t)
+	ctx := context.Background()
+	f := seedTaskFixture(t, ctx, s, pool)
+	task := f.createTask(t, ctx, s)
+	if _, err := s.ClaimNextTask(ctx, &f.daemon.ID); err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+
+	svc := NewTaskService(s, nil)
+
+	if err := svc.Report(ctx, f.daemon.ID, task.ID, v1.TaskReport{Status: v1.TaskReportStarted}); err != nil {
+		t.Fatalf("report started: %v", err)
+	}
+
+	const analysis = "Root cause is a nil deref in the login handler."
+	const failure = `provider failed: ERROR; exit status 3; agy stderr: AGY_ERROR: {"short_error":"EOF"}`
+	if err := svc.Report(ctx, f.daemon.ID, task.ID, v1.TaskReport{
+		Status:  v1.TaskReportFailed,
+		Error:   failure,
+		Summary: &v1.TaskSummary{Output: analysis},
+	}); err != nil {
+		t.Fatalf("report failed: %v", err)
+	}
+
+	comments, err := s.ListCommentsByIssue(ctx, f.issue.ID)
+	if err != nil {
+		t.Fatalf("list comments: %v", err)
+	}
+	var postedOutput, postedFailure bool
+	for _, c := range comments {
+		if strings.Contains(c.Content, analysis) && c.AuthorType == "agent" && c.AuthorName == "coder" {
+			postedOutput = true
+		}
+		if strings.Contains(c.Content, "任务失败") && strings.Contains(c.Content, "exit status 3") {
+			postedFailure = true
+		}
+	}
+	if !postedOutput {
+		t.Errorf("the agent's output was not posted: %+v", comments)
+	}
+	if !postedFailure {
+		t.Errorf("the failure line was not posted: %+v", comments)
+	}
+
+	fresh, err := s.GetTask(ctx, task.ID)
+	if err != nil || fresh.Status != "failed" {
+		t.Fatalf("task = %+v (err=%v), want failed", fresh, err)
+	}
+}

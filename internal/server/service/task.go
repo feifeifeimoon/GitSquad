@@ -531,6 +531,19 @@ func (s *TaskService) handleFailed(ctx context.Context, task db.Task, report v1.
 	if err != nil {
 		return err
 	}
+
+	// A run can fail after the agent produced its deliverable — the provider
+	// dropped on the closing turn, the push was rejected. Post that output the
+	// same way a successful run would, so the work stays visible, and let the
+	// failure line below say why the task is marked failed.
+	if report.Summary != nil {
+		if output := strings.TrimSpace(report.Summary.Output); output != "" {
+			if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name, output); err != nil {
+				return err
+			}
+		}
+	}
+
 	return s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
 		fmt.Sprintf("%s 任务失败: %s", full.Agent.Name, report.Error))
 }

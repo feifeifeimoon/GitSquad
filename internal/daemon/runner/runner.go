@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"path/filepath"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon/execenv"
@@ -49,11 +50,11 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	remoteURL := GitHubCloneURL(task.Repo.Owner, task.Repo.Name)
 	cred := Credential{Token: task.InstallationToken}
 	if err := r.git.CloneOrFetch(ctx, wsDir, remoteURL, cred); err != nil {
-		return r.fail(ctx, task, nil, fmt.Errorf("checkout: %w", err))
+		return r.fail(ctx, task, nil, "", fmt.Errorf("checkout: %w", err))
 	}
 	defaultBranch, err := r.resolveDefaultBranch(ctx, wsDir, task.Repo.DefaultBranch)
 	if err != nil {
-		return r.fail(ctx, task, nil, fmt.Errorf("resolve default branch: %w", err))
+		return r.fail(ctx, task, nil, "", fmt.Errorf("resolve default branch: %w", err))
 	}
 
 	// A task either continues the issue's live line of work or starts a new one.
@@ -67,17 +68,17 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	if continued {
 		branch = task.Repo.Branch
 		if err := r.git.ResetToBranch(ctx, wsDir, branch); err != nil {
-			return r.fail(ctx, task, nil, fmt.Errorf("checkout branch %s: %w", branch, err))
+			return r.fail(ctx, task, nil, "", fmt.Errorf("checkout branch %s: %w", branch, err))
 		}
 		// Changes are measured against the branch the PR is on: its commits are
 		// already the issue's work, so only what this run adds counts.
 		changeBase = "origin/" + branch
 	} else {
 		if err := r.git.ResetToDefault(ctx, wsDir, defaultBranch); err != nil {
-			return r.fail(ctx, task, nil, fmt.Errorf("reset checkout: %w", err))
+			return r.fail(ctx, task, nil, "", fmt.Errorf("reset checkout: %w", err))
 		}
 		if err := r.git.CreateBranch(ctx, wsDir, branch); err != nil {
-			return r.fail(ctx, task, nil, fmt.Errorf("create branch: %w", err))
+			return r.fail(ctx, task, nil, "", fmt.Errorf("create branch: %w", err))
 		}
 	}
 
@@ -90,7 +91,7 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		Issue:       task.Issue,
 		Agent:       task.Agent,
 	}); err != nil {
-		return r.fail(ctx, task, nil, fmt.Errorf("prepare env: %w", err))
+		return r.fail(ctx, task, nil, "", fmt.Errorf("prepare env: %w", err))
 	}
 
 	// The provider gets the same credential: agents routinely run read-only git
@@ -102,7 +103,7 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		Env:     cred.Env(),
 	})
 	if err != nil {
-		return r.fail(ctx, task, nil, fmt.Errorf("execute: %w", err))
+		return r.fail(ctx, task, nil, "", fmt.Errorf("execute: %w", err))
 	}
 
 	for m := range sess.Messages {
@@ -123,12 +124,12 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		if errMsg == "" {
 			errMsg = res.Status
 		}
-		return r.fail(ctx, task, usage, fmt.Errorf("provider %s: %s", res.Status, errMsg))
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
 
 	changed, err := r.git.HasChanges(ctx, wsDir, changeBase)
 	if err != nil {
-		return r.fail(ctx, task, usage, fmt.Errorf("check changes: %w", err))
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("check changes: %w", err))
 	}
 
 	// No code change is a normal outcome (analysis / design / review work), not
@@ -152,15 +153,15 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	}
 
 	if err := r.git.Commit(ctx, wsDir, commitMessage(task)); err != nil {
-		return r.fail(ctx, task, usage, fmt.Errorf("commit: %w", err))
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("commit: %w", err))
 	}
 	// Diff after the commit so work the agent left uncommitted is included.
 	diff, err := r.git.Diff(ctx, wsDir, "origin/"+defaultBranch)
 	if err != nil {
-		return r.fail(ctx, task, usage, fmt.Errorf("diff: %w", err))
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("diff: %w", err))
 	}
 	if err := r.git.Push(ctx, wsDir, branch, cred); err != nil {
-		return r.fail(ctx, task, usage, fmt.Errorf("push: %w", err))
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("push: %w", err))
 	}
 
 	return r.reporter.Report(ctx, task.ID, v1.TaskReport{
@@ -200,13 +201,22 @@ func (r *Runner) resolveDefaultBranch(ctx context.Context, dir, want string) (st
 }
 
 // fail reports a failed terminal state and returns the error. usage is nil for
-// failures that happened before the agent ever ran.
-func (r *Runner) fail(ctx context.Context, task v1.Task, usage []v1.TaskUsage, err error) error {
-	_ = r.reporter.Report(ctx, task.ID, v1.TaskReport{
+// failures that happened before the agent ever ran; output is whatever the
+// agent had produced by then (empty before it ran at all).
+func (r *Runner) fail(ctx context.Context, task v1.Task, usage []v1.TaskUsage, output string, err error) error {
+	report := v1.TaskReport{
 		Status: v1.TaskReportFailed,
 		Error:  err.Error(),
 		Usage:  usage,
-	})
+	}
+	// A run can fail after the agent produced its deliverable — the provider
+	// dropped on the closing turn, the push was rejected, the worktree would
+	// not commit. The text is what the task existed to produce, so it travels
+	// with the failure instead of dying with the task.
+	if strings.TrimSpace(output) != "" {
+		report.Summary = &v1.TaskSummary{Output: output}
+	}
+	_ = r.reporter.Report(ctx, task.ID, report)
 	return err
 }
 
