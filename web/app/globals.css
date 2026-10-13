@@ -326,26 +326,6 @@
     background-size: 64px 64px;
   }
 
-  /* The squad's work, played on hover — all of it CSS, so the scene stays a
-     server component and ships no JavaScript to animate a decoration.
-     Three gestures rather than one: a render has no moving parts inside it, and
-     a single lift played by all three is three figures doing the same thing,
-     which is what made them read as one figure repeated. The Reviewer scans,
-     the Tester nods, the Planner lifts. Under `prefers-reduced-motion` the
-     global rule above collapses each to a single 0.01ms pass. */
-  @keyframes robot-sweep {
-    0%, 100% { transform: translateX(-3px); }
-    50% { transform: translateX(3px); }
-  }
-  @keyframes robot-nod {
-    0%, 100% { transform: rotate(-1.2deg) translateY(0); }
-    50% { transform: rotate(1.2deg) translateY(-3px); }
-  }
-  @keyframes robot-lift {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-5px); }
-  }
-
   /* TipTap editor content — mirrors Markdown read-only typography. */
   .tiptap-content {
     min-height: 8rem;
