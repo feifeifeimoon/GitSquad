@@ -22,6 +22,7 @@ import { CreateWorkspaceAside } from "@/components/create-workspace-aside";
 
 interface Repo {
   id: string;
+  installation_id: string;
   full_name: string;
   owner: string;
   name: string;
@@ -113,8 +114,11 @@ export default function NewWorkspacePage() {
   };
 
   const handleImport = (repo: Repo) => {
+    // The repo's own installation, not the selected account: the list can be
+    // showing accounts[0] while nothing has been selected by hand, and the
+    // configure step refuses a URL whose installation is empty.
     const params = new URLSearchParams({
-      installation: selectedInstallationID,
+      installation: repo.installation_id || activeInstallationID,
       repo: repo.id,
       owner: repo.owner,
       name: repo.name,
