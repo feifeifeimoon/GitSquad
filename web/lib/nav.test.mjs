@@ -1,16 +1,19 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  NAV_GROUP_LABEL,
   NAV_PAGES,
   PRODUCT_PAGES,
-  SCOPE_LABEL,
   WORKSPACE_PAGES,
   isNavPageActive,
+  navPageByJump,
+  navPagesInScope,
   navRowClass,
 } from "./nav.ts";
 
-// The registry is the single list the sidebar and the command palette both read.
-// These are the properties they rely on, asserted rather than assumed.
+// The registry is the single list the sidebar, the command palette and the `g`
+// jumps all read. These are the properties they rely on, asserted rather than
+// assumed.
 
 test("every page is declared once, with a unique key and label", () => {
   const keys = NAV_PAGES.map((p) => p.key);
@@ -20,19 +23,69 @@ test("every page is declared once, with a unique key and label", () => {
   assert.ok(NAV_PAGES.length >= 6, "the registry lost pages");
 });
 
-test("both scopes are declared, and every page belongs to one", () => {
-  assert.deepEqual(Object.keys(SCOPE_LABEL).sort(), ["product", "workspace"]);
+test("every page declares a band and the scopes it is drawn in", () => {
+  assert.deepEqual(Object.keys(NAV_GROUP_LABEL).sort(), ["product", "workspace"]);
   for (const page of NAV_PAGES) {
     assert.ok(
-      page.scope === "workspace" || page.scope === "product",
-      `${page.key} has no scope`,
+      page.group === "workspace" || page.group === "product",
+      `${page.key} has no band`,
     );
+    assert.ok(page.scopes.length > 0, `${page.key} is drawn in no scope at all`);
+    for (const scope of page.scopes) {
+      assert.ok(
+        scope === "all" || scope === "workspace",
+        `${page.key} claims an unknown scope: ${scope}`,
+      );
+    }
   }
   assert.equal(
     NAV_PAGES.length,
     WORKSPACE_PAGES.length + PRODUCT_PAGES.length,
     "a page is missing from NAV_PAGES",
   );
+});
+
+test("All Workspaces draws the list, and nothing that needs a workspace", () => {
+  // The exact set matters: this is the scope the console is in whenever the URL
+  // names no workspace, and every row here has to be a page that exists without
+  // one.
+  assert.deepEqual(
+    navPagesInScope("all").map((p) => p.key),
+    ["workspaces", "daemons", "usage"],
+  );
+});
+
+test("a workspace draws its own pages, and not the list it came from", () => {
+  assert.deepEqual(
+    navPagesInScope("workspace").map((p) => p.key),
+    ["issues", "agents", "skills", "workspace-settings", "daemons", "usage"],
+  );
+  // Leaving a workspace is the switcher's job — Vercel has no Teams row and
+  // multica has no Workspaces row either.
+  assert.ok(
+    !navPagesInScope("workspace").some((p) => p.key === "workspaces"),
+    "the workspace scope still draws the Workspaces row",
+  );
+});
+
+test("the account-level rows are the two that survive a scope change", () => {
+  // A machine is paired to the account and the usage counters are the account's,
+  // which is why these are the rows that do not move when the scope does.
+  assert.deepEqual(
+    NAV_PAGES.filter((p) => p.scopes.length === 2).map((p) => p.key),
+    ["daemons", "usage"],
+  );
+});
+
+test("a jump letter is unique and belongs to a scope that draws it", () => {
+  const jumps = NAV_PAGES.filter((p) => p.jump).map((p) => p.jump);
+  assert.equal(new Set(jumps).size, jumps.length, "two pages share a jump letter");
+  const issues = navPageByJump("i");
+  assert.equal(issues?.key, "issues");
+  // `g i` is a no-op in All Workspaces for the same reason the row is absent:
+  // there is no board there to jump to.
+  assert.ok(!issues.scopes.includes("all"));
+  assert.equal(navPageByJump("z"), undefined);
 });
 
 test("a workspace page resolves under the slug it is given", () => {
@@ -65,6 +118,9 @@ test("the account settings have their own page, not the workspace's", () => {
     !PRODUCT_PAGES.some((p) => p.label === "Settings"),
     "the account settings are not a nav row — they live behind the account menu",
   );
+  // Which is also why All Workspaces has no Settings row at all: its settings
+  // are the account's, and those are behind the avatar.
+  assert.ok(!navPagesInScope("all").some((p) => p.label === "Settings"));
 });
 
 test("a row is active on its own page and anything beneath it", () => {
@@ -82,6 +138,4 @@ test("the active row keeps its own treatment while hovered", () => {
   assert.match(active, /bg-muted/);
   assert.doesNotMatch(active, /hover:/, "hover must not fight the active row");
   assert.match(idle, /hover:bg-muted/);
-  // A row with nowhere to go is neither clickable nor hoverable.
-  assert.doesNotMatch(navRowClass("disabled"), /hover:/);
 });

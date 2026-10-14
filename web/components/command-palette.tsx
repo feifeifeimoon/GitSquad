@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { Plus, UserCog } from "lucide-react";
 import { api, Workspace, Issue, issueApi } from "@/lib/api";
 import { useApi } from "@/lib/query";
-import { paths, workspaceSlugFromPath } from "@/lib/paths";
-import { NAV_PAGES } from "@/lib/nav";
+import { paths } from "@/lib/paths";
+import { navPagesInScope, type NavScope } from "@/lib/nav";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { StatusIcon } from "@/components/status-icon";
 import {
@@ -22,13 +22,18 @@ import {
 export function CommandPalette({
   open,
   onOpenChange,
+  slug,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** The console's scope, from the shell. This used to derive it from the
+      pathname itself, which is how the palette and the sidebar came to
+      disagree about which pages exist. */
+  slug?: string;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
-  const wsId = workspaceSlugFromPath(pathname);
+  const wsId = slug;
+  const scope: NavScope = slug ? "workspace" : "all";
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -58,21 +63,28 @@ export function CommandPalette({
   // hand-written list of three, and it had already gone stale: Usage was in the
   // sidebar but unreachable from here, and its "Settings" opened the account
   // page while the sidebar's opened the workspace one. A page added to the
-  // registry is now reachable from both surfaces, under the same name.
+  // registry is now reachable from both surfaces, under the same name — and
+  // drawn in the same scopes, so "Pages" holds exactly what the sidebar holds.
   const pageItems = useMemo(
     () =>
-      NAV_PAGES.flatMap((page) => {
-        if (page.scope === "workspace") {
-          if (!wsId) return [];
-          return [
-            { key: page.key, label: page.label, Icon: page.icon, href: page.href(wsId) },
-          ];
+      navPagesInScope(scope).flatMap((page) => {
+        if (page.group === "workspace") {
+          return wsId
+            ? [
+                {
+                  key: page.key,
+                  label: page.label,
+                  Icon: page.icon,
+                  href: page.href(wsId),
+                },
+              ]
+            : [];
         }
         return [
           { key: page.key, label: page.label, Icon: page.icon, href: page.href() },
         ];
       }),
-    [wsId],
+    [scope, wsId],
   );
 
   const run = (href: string) => {
