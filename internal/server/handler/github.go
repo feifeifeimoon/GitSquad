@@ -54,20 +54,42 @@ func (h *GitHubHandler) InstallLink(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]string{"url": url}, 0))
 }
 
+// installReturnPath is where the browser lands when the GitHub App setup flow
+// comes back. The install is started from the workspace creator, and that page
+// reads the installation list — which is where the app the user just installed
+// shows up. Every exit from the callback goes here, so the reader never has to
+// guess whether the install worked.
+const installReturnPath = "/workspaces/new"
+
+// returnFromInstall sends the browser back into the console. A failure worth
+// telling the reader about travels as an error code on the query string, which
+// the workspace creator renders as a sentence; "" means it worked. Nothing else
+// is carried — the installation list is read fresh on arrival.
+func (h *GitHubHandler) returnFromInstall(c *gin.Context, errCode string) {
+	target := h.cfg.FrontendURL + installReturnPath
+	if errCode != "" {
+		target += "?error=" + errCode
+	}
+	c.Redirect(http.StatusFound, target)
+}
+
 // Callback handles GET /api/v1/github/callback?installation_id=xxx&state=yyy.
 // This endpoint is public — authentication is via the state parameter.
 func (h *GitHubHandler) Callback(c *gin.Context) {
 	installationIDStr := c.Query("installation_id")
 	state := c.Query("state")
 
+	// No installation came back: the setup was abandoned or is awaiting an org
+	// owner's approval. Nothing was created, and saying so beats returning the
+	// reader to a page that looks untouched.
 	if installationIDStr == "" {
-		c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console")
+		h.returnFromInstall(c, "install_missing")
 		return
 	}
 
 	installationID, err := strconv.ParseInt(installationIDStr, 10, 64)
 	if err != nil {
-		c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console?error=invalid_installation")
+		h.returnFromInstall(c, "invalid_installation")
 		return
 	}
 
@@ -85,19 +107,19 @@ func (h *GitHubHandler) Callback(c *gin.Context) {
 
 	if !ok {
 		slog.Warn("github callback without valid state, refusing to create installation", "installation_id", installationID)
-		c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console?error=invalid_state")
+		h.returnFromInstall(c, "invalid_state")
 		return
 	}
 
 	_, err = h.githubSvc.CreateInstallation(c.Request.Context(), installationID, userID)
 	if err != nil {
 		slog.Error("create installation via callback", "error", err, "installation_id", installationID)
-		c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console?error=install_failed")
+		h.returnFromInstall(c, "install_failed")
 		return
 	}
 
 	slog.Info("installation created via callback", "installation_id", installationID, "user_id", userID)
-	c.Redirect(http.StatusFound, h.cfg.FrontendURL+"/console")
+	h.returnFromInstall(c, "")
 }
 
 // ListInstallations returns installations for the current user.
