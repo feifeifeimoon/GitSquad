@@ -132,6 +132,49 @@ export class TestApiClient {
   }
 
   /**
+   * Seed a GitHub installation with one repository and no workspace — what the
+   * import flow's repository picker reads. seedWorkspace cannot serve this: it
+   * creates the workspace too, and a repo that already has a workspace is not
+   * the one the picker is being asked to import.
+   */
+  async seedImportableRepo(opts: {
+    owner: string;
+    repo: string;
+    private?: boolean;
+  }): Promise<{ installationId: string; repoId: string }> {
+    const client = new pg.Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      const installation = await client.query(
+        `INSERT INTO github_installations
+           (user_id, installation_id, account_login, account_type, repository_selection, status)
+         VALUES ($1, $2, $3, 'User', 'selected', 'active')
+         RETURNING id`,
+        [this.getUserId(), Date.now(), opts.owner],
+      );
+      const installationId: string = installation.rows[0].id;
+
+      const repoRow = await client.query(
+        `INSERT INTO github_repos
+           (installation_id, github_repo_id, owner, name, full_name, private)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING id`,
+        [
+          installationId,
+          Date.now(),
+          opts.owner,
+          opts.repo,
+          `${opts.owner}/${opts.repo}`,
+          opts.private ?? false,
+        ],
+      );
+      return { installationId, repoId: repoRow.rows[0].id as string };
+    } finally {
+      await client.end();
+    }
+  }
+
+  /**
    * Seed a daemon with one runtime per `kind` so the agents page shows it in
    * the daemon/provider selectors. Returns the daemon id.
    *
