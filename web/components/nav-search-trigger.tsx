@@ -22,7 +22,7 @@ export function NavSearchTrigger({
   return (
     <button
       onClick={onOpen}
-      className="flex h-8 w-full items-center gap-2 rounded-md border border-hairline bg-canvas px-2.5 text-left text-label text-mute transition-colors hover:border-hairline-strong hover:text-body"
+      className="flex h-8 w-full items-center gap-2 rounded-md border border-hairline bg-canvas px-2.5 text-left text-copy text-mute transition-colors hover:border-hairline-strong hover:text-body"
     >
       <Search className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate">Search…</span>

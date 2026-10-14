@@ -261,13 +261,20 @@ export type NavRowState = "active" | "idle";
  * The one row treatment, so the sidebar's rows and the palette's rows cannot
  * drift apart.
  *
+ * The size is the body size, not the `label` step one below it. The sidebar is
+ * the most-read text in the console and it sat at 13px with default tracking,
+ * which read as smaller and looser than the console it is modelled on — and
+ * "label" is not a role DESIGN.md defines, while `body-sm` is (14px). Nothing
+ * needs the row to be a step down any more: the hierarchy the 13px was bought
+ * for is carried by the page title in the bar above it, which is 19px.
+ *
  * Active and hover are two branches rather than two sets of utilities on one
  * element on purpose — the active branch carries no hover class at all, so
  * hovering the current page cannot make it look less current.
  */
 export function navRowClass(state: NavRowState): string {
   const base =
-    "flex h-8 items-center gap-2.5 rounded-sm px-2.5 text-label transition-colors";
+    "flex h-8 items-center gap-2.5 rounded-sm px-2.5 text-copy transition-colors";
   return state === "active"
     ? `${base} bg-muted font-medium text-ink`
     : `${base} text-body hover:bg-muted/60 hover:text-ink`;

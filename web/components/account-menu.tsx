@@ -57,7 +57,7 @@ export function AccountMenu({
                   {login?.slice(0, 2)}
                 </AvatarFallback>
               </Avatar>
-              <span className="min-w-0 flex-1 truncate text-label font-medium text-ink">
+              <span className="min-w-0 flex-1 truncate text-copy font-medium text-ink">
                 @{login}
               </span>
               <ChevronsUpDown className="size-3.5 shrink-0 text-mute" />
