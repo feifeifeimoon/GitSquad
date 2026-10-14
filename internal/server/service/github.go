@@ -121,6 +121,15 @@ func (s *GitHubAppService) ListInstallations(ctx context.Context, userID uuid.UU
 	if err != nil {
 		return nil, fmt.Errorf("list installations: %w", err)
 	}
+	// sqlc hands back a nil slice when there are no rows, and that marshals to
+	// null — which is not what any reader expects of an empty list. Every other
+	// list service here builds its result with make() for this reason; this one
+	// passes the store's slice through, so it has to normalize on the way out.
+	// A user with no installations is the common case, not the edge: it is the
+	// first-time reader the workspace creator's install button is for.
+	if list == nil {
+		list = []db.GithubInstallation{}
+	}
 	return list, nil
 }
 
