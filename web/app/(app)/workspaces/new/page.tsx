@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState, useMemo, useRef } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   ChevronLeft,
   ChevronDown,
@@ -36,8 +36,25 @@ interface Installation {
   repos: Repo[];
 }
 
-export default function NewWorkspacePage() {
+// What the GitHub App callback says on the way back (handler/github.go). The
+// browser leaves for github.com and returns by redirect, so a failed setup has
+// no other way to explain itself — without these the reader lands on a page
+// that looks exactly like one they never left.
+const installErrors: Record<string, string> = {
+  install_missing:
+    "GitHub didn't return an installation, so nothing was connected. If you cancelled, start again whenever you're ready.",
+  invalid_installation:
+    "GitHub sent an installation GitSquad couldn't read. Start the installation again.",
+  invalid_state:
+    "That install link expired or was already used. Start the installation again.",
+  install_failed:
+    "The app was authorized, but GitSquad couldn't save the installation. Try again.",
+};
+
+function NewWorkspaceContent() {
   const router = useRouter();
+  const params = useSearchParams();
+  const installError = params.get("error");
   const { data: installations = [], loading } = useApi<Installation[]>(
     "/api/v1/github/installations",
     () => api.get<Installation[]>("/api/v1/github/installations"),
@@ -155,6 +172,16 @@ export default function NewWorkspacePage() {
       <p className="mb-8 text-copy text-body">
         Import a Git repository and configure your agent team.
       </p>
+
+      {installError && (
+        <div
+          role="alert"
+          className="mb-6 rounded-sm border border-destructive/20 bg-destructive/10 px-4 py-2 text-copy text-destructive"
+        >
+          {installErrors[installError] ??
+            "The GitHub App installation didn't finish. Please try again."}
+        </div>
+      )}
 
       {installations.length === 0 ? (
         <div className="rounded-md border border-hairline bg-canvas p-12 text-center shadow-level-2">
@@ -351,6 +378,23 @@ export default function NewWorkspacePage() {
         <CreateWorkspaceAside />
       </div>
     </div>
+  );
+}
+
+// The install error arrives on the query string, so the page reads search
+// params — which a statically rendered client page may only do below a
+// Suspense boundary.
+export default function NewWorkspacePage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex h-full items-center justify-center">
+          <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+        </div>
+      }
+    >
+      <NewWorkspaceContent />
+    </Suspense>
   );
 }
 
