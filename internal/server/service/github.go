@@ -138,6 +138,12 @@ func (s *GitHubAppService) ListRepos(ctx context.Context, installationID uuid.UU
 	if err != nil {
 		return nil, fmt.Errorf("list repos: %w", err)
 	}
+	// Same shape as ListInstallations above, and reachable the same way: an
+	// installation may be granted no repositories, or its post-install sync may
+	// have failed, and the console reads an empty list as [].
+	if repos == nil {
+		repos = []db.GithubRepo{}
+	}
 	return repos, nil
 }
 
