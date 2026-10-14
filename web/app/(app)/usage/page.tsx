@@ -27,7 +27,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { PageHeader } from "@/components/page-header";
+import { PageToolbar } from "@/components/page-toolbar";
 import { invalidateApi, useApi } from "@/lib/query";
 import { ErrorState } from "@/components/error-state";
 import { UsageChart } from "@/components/usage/usage-chart";
@@ -79,7 +79,7 @@ export default function UsagePage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Usage" actions={<RangeSelector value={range} onChange={setRange} />} />
+      <PageToolbar actions={<RangeSelector value={range} onChange={setRange} />} />
 
       <div className="flex-1 px-8 pb-8 pt-6">
         {summaryError || seriesError ? (

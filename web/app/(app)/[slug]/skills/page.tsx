@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
-import { PageHeader } from "@/components/page-header";
+import { PageToolbar } from "@/components/page-toolbar";
 import { ErrorState } from "@/components/error-state";
 import { Field, TextArea } from "@/components/form-field";
 import { InlineConfirm } from "@/components/inline-confirm";
@@ -82,8 +82,7 @@ export default function WorkspaceSkillsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader
-        title="Skills"
+      <PageToolbar
         actions={
           <Button onClick={openCreate}>
             <Plus className="size-4" />

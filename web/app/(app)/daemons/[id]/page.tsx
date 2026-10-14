@@ -115,9 +115,11 @@ export default function DaemonDetailPage() {
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
-              <h1 className="truncate text-lg font-semibold text-ink">
+              {/* An h2: the bar above the page owns the h1 ("Daemons"), and
+                  this is what the page is about. */}
+              <h2 className="truncate text-lg font-semibold text-ink">
                 {daemon.name}
-              </h1>
+              </h2>
               <button
                 onClick={() => setRenaming(true)}
                 className="text-hairline-strong transition-colors hover:text-ink"

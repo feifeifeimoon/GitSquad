@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   Select, SelectContent, SelectItem, SelectTrigger,
 } from "@/components/ui/select";
-import { SectionHeading } from "@/components/page-header";
+import { SectionHeading } from "@/components/page-toolbar";
 import { AgentPicker } from "@/components/issues/agent-picker";
 import { AssigneePicker } from "@/components/issues/assignee-picker";
 import { CommentComposer } from "@/components/issues/comment-composer";

@@ -18,7 +18,7 @@ import { DaemonStatusBadge } from "@/components/status-dot";
 import { paths } from "@/lib/paths";
 import { timeAgo } from "@/lib/time";
 import { ProviderIcon } from "@/components/provider-icon";
-import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
+import { PageToolbar, PageToolbarSkeleton } from "@/components/page-toolbar";
 import { ErrorState } from "@/components/error-state";
 import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
@@ -112,7 +112,7 @@ export default function DaemonsPage() {
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <PageHeaderSkeleton
+        <PageToolbarSkeleton
           actions={
             <>
               <Skeleton className="h-8 w-56" />
@@ -149,8 +149,7 @@ export default function DaemonsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader
-        title="Daemons"
+      <PageToolbar
         actions={
           <>
             <div className="relative">
