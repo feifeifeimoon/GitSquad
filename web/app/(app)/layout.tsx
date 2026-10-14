@@ -13,7 +13,7 @@ import { NavSearchTrigger } from "@/components/nav-search-trigger";
 import { AccountMenu } from "@/components/account-menu";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { CommandPalette } from "@/components/command-palette";
-import { navPageByJump, consoleTitle } from "@/lib/nav";
+import { consoleTitle, navPageByJump, navPageHref } from "@/lib/nav";
 import { clampSidebarWidth, useSidebarWidth } from "@/lib/sidebar-width";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -117,14 +117,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       const page = navPageByJump(event.key.toLowerCase());
       disarm();
       if (!page) return;
-      if (page.group === "workspace") {
-        if (!slug) return;
-        event.preventDefault();
-        router.push(page.href(slug));
-        return;
-      }
+      const href = navPageHref(page, slug ?? null);
+      if (!href) return;
       event.preventDefault();
-      router.push(page.href());
+      router.push(href);
     };
 
     document.addEventListener("keydown", onKeyDown);

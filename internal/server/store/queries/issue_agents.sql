@@ -32,6 +32,23 @@ WHERE i.workspace_id = $1
 GROUP BY ia.issue_id, a.id, a.name, a.avatar_url, a.created_at
 ORDER BY ia.issue_id, a.created_at;
 
+-- name: ListIssueAgentsForUser :many
+-- The All Workspaces board's version of the above: the same read across every
+-- workspace the user owns. Without it the aggregate board would run one query
+-- per card to find out who is on it.
+SELECT ia.issue_id, a.id, a.name, COALESCE(a.avatar_url, '') AS avatar_url,
+       CASE WHEN bool_or(t.status IN ('dispatched','running')) THEN 'running'
+            WHEN bool_or(t.status = 'queued')             THEN 'queued'
+            ELSE 'idle' END::text AS state
+FROM issue_agents ia
+JOIN issues i ON i.id = ia.issue_id
+JOIN workspaces w ON w.id = i.workspace_id
+JOIN agents a ON a.id = ia.agent_id
+LEFT JOIN tasks t ON t.issue_id = ia.issue_id AND t.agent_id = ia.agent_id
+WHERE w.user_id = $1 AND w.status != 'archived'
+GROUP BY ia.issue_id, a.id, a.name, a.avatar_url, a.created_at
+ORDER BY ia.issue_id, a.created_at;
+
 -- name: DeleteIssueAgents :exec
 DELETE FROM issue_agents WHERE issue_id = $1;
 

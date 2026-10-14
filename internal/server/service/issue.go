@@ -245,6 +245,29 @@ func getRowToResponse(row db.GetIssueRow, agents []v1.IssueAgent) v1.Issue {
 	}
 }
 
+// listUserRowToResponse is listRowToResponse for the cross-workspace board,
+// which carries two extra fields: the workspace the issue lives in. They are
+// filled here and nowhere else — see v1.Issue.
+func listUserRowToResponse(row db.ListIssuesForUserRow, agents []v1.IssueAgent) v1.Issue {
+	return v1.Issue{
+		ID:                      row.ID,
+		Number:                  row.Number,
+		IssueKey:                issueKey(row.IssuePrefix, row.Number),
+		Title:                   row.Title,
+		Description:             row.Description,
+		Status:                  row.Status,
+		Agents:                  agents,
+		Assignee:                assigneeFrom(row.AssigneeID, row.AssigneeLogin, row.AssigneeAvatarUrl),
+		ActivePullRequestNumber: row.ActivePrNumber,
+		CreatorName:             row.CreatorName,
+		CommentsCount:           int(row.CommentsCount),
+		CreatedAt:               row.CreatedAt,
+		UpdatedAt:               row.UpdatedAt,
+		WorkspaceSlug:           row.WorkspaceSlug,
+		WorkspaceName:           row.WorkspaceName,
+	}
+}
+
 // issueAgents maps assignment rows to the API shape. The state is already
 // resolved by the query, per (issue, agent).
 func issueAgents(rows []db.ListIssueAgentsRow) []v1.IssueAgent {
@@ -259,6 +282,20 @@ func issueAgents(rows []db.ListIssueAgentsRow) []v1.IssueAgent {
 // so the board resolves every card's agents in one pass instead of a query per
 // card. Issues with no agents are simply absent from the map.
 func groupIssueAgentsByIssue(rows []db.ListIssueAgentsByWorkspaceRow) map[uuid.UUID][]v1.IssueAgent {
+	byIssue := make(map[uuid.UUID][]v1.IssueAgent)
+	for _, r := range rows {
+		byIssue[r.IssueID] = append(byIssue[r.IssueID], v1.IssueAgent{
+			ID: r.ID, Name: r.Name, AvatarURL: r.AvatarUrl, State: r.State,
+		})
+	}
+	return byIssue
+}
+
+// groupIssueAgentsForUserByIssue is the same grouping for the cross-workspace
+// read. sqlc generates a row type per query, and the two queries select the same
+// five columns — so this is eight lines under the other type rather than a
+// conversion loop at both call sites, which would be more code than the copy.
+func groupIssueAgentsForUserByIssue(rows []db.ListIssueAgentsForUserRow) map[uuid.UUID][]v1.IssueAgent {
 	byIssue := make(map[uuid.UUID][]v1.IssueAgent)
 	for _, r := range rows {
 		byIssue[r.IssueID] = append(byIssue[r.IssueID], v1.IssueAgent{
@@ -439,6 +476,43 @@ func (s *IssueService) ListIssues(ctx context.Context, workspaceID uuid.UUID) ([
 			agents = []v1.IssueAgent{}
 		}
 		list[i] = listRowToResponse(row, agents)
+	}
+	return list, nil
+}
+
+// ListAllIssues returns every issue in every workspace the user owns, each
+// carrying the workspace it belongs to.
+//
+// This is the console's first read that crosses workspaces. It exists for the
+// All Workspaces board: the queue does not stop at a workspace boundary, and
+// the alternative — opening each workspace in turn to see what is moving — is
+// exactly what the scope switcher was added to stop doing.
+//
+// Scoped to the workspaces the user *owns*, which is what every other endpoint
+// means by "yours": the workspace-scoped reads are guarded by an owner check,
+// so a member who is not the owner cannot see them one workspace at a time
+// either. If membership ever becomes real, this query is the one to revisit.
+func (s *IssueService) ListAllIssues(ctx context.Context, userID uuid.UUID) ([]v1.Issue, error) {
+	rows, err := s.store.ListIssuesForUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list issues for user: %w", err)
+	}
+	// One read for the whole board's assignments rather than a query per card —
+	// the same shape as ListIssues, across every workspace at once.
+	assigned, err := s.store.ListIssueAgentsForUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list issue agents for user: %w", err)
+	}
+	byIssue := groupIssueAgentsForUserByIssue(assigned)
+
+	list := make([]v1.Issue, len(rows))
+	for i, row := range rows {
+		agents := byIssue[row.ID]
+		if agents == nil {
+			// An empty list, never null: the board maps over this field.
+			agents = []v1.IssueAgent{}
+		}
+		list[i] = listUserRowToResponse(row, agents)
 	}
 	return list, nil
 }

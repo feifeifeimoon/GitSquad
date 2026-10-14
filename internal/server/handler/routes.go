@@ -174,6 +174,13 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.GET("/workspaces/:id/members", workspaceHandler.Members)
 
 			// Issue blackboard
+			//
+			// The unscoped list is the All Workspaces board: every issue in
+			// every workspace the caller owns. It is the one read in this
+			// block whose scope comes from the account rather than from a
+			// workspace in the path — which is what makes it the console's
+			// first cross-workspace read.
+			protected.GET("/issues", issueHandler.ListAll)
 			protected.POST("/workspaces/:id/issues", issueHandler.Create)
 			protected.GET("/workspaces/:id/issues", issueHandler.List)
 			protected.GET("/workspaces/:id/issues/:issueId", issueHandler.Get)

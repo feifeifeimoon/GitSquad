@@ -124,6 +124,14 @@ export interface Issue {
   comments_count: number;
   created_at: string;
   updated_at: string;
+  /**
+   * Which workspace the issue belongs to. Only the All Workspaces board fills
+   * these: a board inside one workspace has nothing to disambiguate, and the
+   * card draws its chip only when they are here. The key alone would not do —
+   * issue numbers are per workspace, so two of them can both be "GS-1".
+   */
+  workspace_slug?: string;
+  workspace_name?: string;
 }
 
 /**
@@ -182,6 +190,11 @@ export const ISSUE_STATUS_LABELS: Record<IssueStatus, string> = {
 
 export const issueApi = {
   list: (workspaceId: string) => api.get<Issue[]>(`/api/v1/workspaces/${workspaceId}/issues`),
+  /**
+   * Every issue in every workspace you own — the All Workspaces board. Each
+   * issue carries the workspace it came from.
+   */
+  listAll: () => api.get<Issue[]>("/api/v1/issues"),
   get: (workspaceId: string, issueId: string) =>
     api.get<IssueDetail>(`/api/v1/workspaces/${workspaceId}/issues/${issueId}`),
   create: (workspaceId: string, body: {

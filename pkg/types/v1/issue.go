@@ -61,6 +61,15 @@ type Issue struct {
 	CommentsCount           int       `json:"comments_count"`
 	CreatedAt               time.Time `json:"created_at"`
 	UpdatedAt               time.Time `json:"updated_at"`
+	// WorkspaceSlug and WorkspaceName say which workspace the issue belongs to,
+	// and are filled only by the All Workspaces board. A board inside one
+	// workspace has nothing to disambiguate, and the card draws its chip only
+	// when they are there.
+	//
+	// The key alone would not do: issue numbers are per workspace, so two
+	// workspaces can each have a "GS-1".
+	WorkspaceSlug string `json:"workspace_slug,omitempty"`
+	WorkspaceName string `json:"workspace_name,omitempty"`
 }
 
 // IssueAgent is one agent assigned to work on an issue, together with what it
