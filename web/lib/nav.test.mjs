@@ -5,8 +5,10 @@ import {
   NAV_PAGES,
   PRODUCT_PAGES,
   WORKSPACE_PAGES,
+  consoleTitle,
   isNavPageActive,
   navPageByJump,
+  navPageForPath,
   navPagesInScope,
   navRowClass,
 } from "./nav.ts";
@@ -138,4 +140,35 @@ test("the active row keeps its own treatment while hovered", () => {
   assert.match(active, /bg-muted/);
   assert.doesNotMatch(active, /hover:/, "hover must not fight the active row");
   assert.match(idle, /hover:bg-muted/);
+});
+
+test("the bar names the section a path is in, longest href first", () => {
+  // The board's href is `/{slug}`, a prefix of every other page inside that
+  // workspace — so a plain `find` answers "Issues" for /acme/agents.
+  assert.equal(navPageForPath("/acme/agents", "acme")?.key, "agents");
+  assert.equal(consoleTitle("/acme/agents", "acme"), "Agents");
+  assert.equal(consoleTitle("/acme/skills", "acme"), "Skills");
+  assert.equal(consoleTitle("/acme/settings", "acme"), "Settings");
+  // A detail page keeps its section, the way Vercel's bar does.
+  assert.equal(consoleTitle("/acme/issues/E2E-1", "acme"), "Issues");
+  assert.equal(consoleTitle("/acme", "acme"), "Issues");
+  assert.equal(consoleTitle("/workspaces", null), "Workspaces");
+  assert.equal(consoleTitle("/daemons", null), "Daemons");
+  assert.equal(consoleTitle("/daemons/abc", null), "Daemons");
+  assert.equal(consoleTitle("/usage", null), "Usage");
+});
+
+test("the bar names the account settings, which are not a nav row", () => {
+  // They live behind the avatar rather than in the sidebar, so the registry
+  // cannot answer for them — and a page you can be on has to be nameable.
+  assert.equal(consoleTitle("/settings", null), "Account settings");
+  assert.ok(!NAV_PAGES.some((p) => p.href().startsWith("/settings")));
+});
+
+test("a page that titles itself is left out of the bar", () => {
+  // The create/configure flow draws its own big heading; a second one above it
+  // saying "Workspaces" would be the same words stacked twice.
+  assert.equal(consoleTitle("/workspaces/new", null), null);
+  assert.equal(consoleTitle("/workspaces/new/configure", null), null);
+  assert.equal(consoleTitle("/workspaces", null), "Workspaces");
 });

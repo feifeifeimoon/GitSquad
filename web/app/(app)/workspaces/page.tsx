@@ -14,7 +14,7 @@ import { useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { TimeAgo } from "@/components/time-ago";
 import { GitHubMark } from "@/components/github-mark";
-import { PageHeader, PageHeaderSkeleton } from "@/components/page-header";
+import { PageToolbar, PageToolbarSkeleton } from "@/components/page-toolbar";
 import { ErrorState } from "@/components/error-state";
 import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
 import { SortHeader, TH_CLASS, useSort, type SortState } from "@/components/table-sort";
@@ -77,7 +77,7 @@ export default function WorkspacesPage() {
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <PageHeaderSkeleton
+        <PageToolbarSkeleton
           actions={
             <>
               <Skeleton className="h-8 w-56" />
@@ -114,8 +114,7 @@ export default function WorkspacesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader
-        title="Workspaces"
+      <PageToolbar
         actions={
           <>
             <div className="relative">

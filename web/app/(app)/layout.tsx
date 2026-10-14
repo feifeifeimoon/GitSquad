@@ -13,7 +13,7 @@ import { NavSearchTrigger } from "@/components/nav-search-trigger";
 import { AccountMenu } from "@/components/account-menu";
 import { ScopeSwitcher } from "@/components/scope-switcher";
 import { CommandPalette } from "@/components/command-palette";
-import { navPageByJump } from "@/lib/nav";
+import { navPageByJump, consoleTitle } from "@/lib/nav";
 import { clampSidebarWidth, useSidebarWidth } from "@/lib/sidebar-width";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -205,13 +205,20 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         />
       </aside>
 
-      {/* The page column: the scope strip, then the page. The strip is outside
-          the scroll region so the answer to "where am I" never scrolls away —
-          which matters most on the long pages (a board, an issue thread) where
-          the page's own title is the first thing to leave the viewport. */}
+      {/* The page column: the bar, then the page.
+          The bar answers both halves of "where am I" in one line — which
+          workspace on the left, which page in the middle — and it is outside
+          the scroll region, so the answer never scrolls away. It is Vercel's
+          bar with our two scopes in it; the title moved up here from the first
+          row of every page, where it was the first thing to leave the viewport
+          on a long page and the second thing to say where you were. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="flex h-16 shrink-0 items-center border-b border-hairline px-4">
+        <div className="grid h-16 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-hairline px-4">
           <ScopeSwitcher slug={slug} workspaces={workspaces} />
+          <h1 className="min-w-0 truncate text-title font-semibold tracking-[-0.01em] text-ink">
+            {consoleTitle(pathname, slug ?? null)}
+          </h1>
+          <div />
         </div>
 
         {/* The realtime socket lives at this level, not inside the page, so

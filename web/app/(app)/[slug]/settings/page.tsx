@@ -9,7 +9,6 @@ import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
-import { PageHeader } from "@/components/page-header";
 import { ErrorState } from "@/components/error-state";
 import {
   SettingRow,
@@ -123,8 +122,6 @@ export default function WorkspaceSettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Settings" />
-
       <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8 pt-6">
         <SettingSection title="General">
           <SettingRow label="Name">

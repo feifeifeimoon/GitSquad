@@ -86,7 +86,9 @@ export function IssueTitle({
         {/* The words themselves are the control, the way they are in Linear and
             in multica: the caret is the affordance, and `cursor-text` says so
             before the click. */}
-        <h1
+        {/* h2, not h1: the bar above the page owns the h1 ("Issues"), and this
+            is the issue's own title underneath it. */}
+        <h2
           onClick={(event) => {
             // Selecting the title to copy it is not a request to change it.
             const selection = window.getSelection();
@@ -100,7 +102,7 @@ export function IssueTitle({
           className="min-w-0 cursor-text text-display font-semibold tracking-[-0.01em] text-ink"
         >
           {title}
-        </h1>
+        </h2>
         {/* Kept for the keyboard, and only then: revealed on hover or on focus,
             so it is not a second label beside every title. */}
         <button

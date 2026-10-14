@@ -148,7 +148,7 @@ export const PRODUCT_PAGES: ProductNavPage[] = [
 
 export const NAV_PAGES: NavPage[] = [...WORKSPACE_PAGES, ...PRODUCT_PAGES];
 
-/** The two group headings. */
+/** The two group headings. Drawn for screen readers only — see SidebarNav. */
 export const NAV_GROUP_LABEL: Record<NavGroup, string> = {
   workspace: "Workspace",
   product: "Product",
@@ -162,6 +162,59 @@ export function navPagesInScope(scope: NavScope): NavPage[] {
 /** Every page that asks for a jump letter, with the scope it needs. */
 export function navPageByJump(key: string): NavPage | undefined {
   return NAV_PAGES.find((page) => page.jump === key);
+}
+
+/**
+ * The page a path belongs to, or undefined when it belongs to none.
+ *
+ * Longest href wins, and that is not a detail: the board's href is `/{slug}`,
+ * which is a prefix of every other page inside that workspace, so a plain
+ * `find` would answer "Issues" for `/acme/agents`.
+ */
+export function navPageForPath(
+  pathname: string,
+  slug: string | null,
+): NavPage | undefined {
+  let best: NavPage | undefined;
+  let bestHref = "";
+  for (const page of NAV_PAGES) {
+    const href = page.group === "workspace" ? (slug ? page.href(slug) : null) : page.href();
+    if (href === null || !isNavPageActive(pathname, href)) continue;
+    if (href.length > bestHref.length) {
+      best = page;
+      bestHref = href;
+    }
+  }
+  return best;
+}
+
+/**
+ * Pages that name themselves with their own big heading, and are left out of
+ * the bar so the same words are not stacked twice on one screen.
+ */
+const SELF_TITLED = ["/workspaces/new"];
+
+/**
+ * What the bar above the page calls where you are.
+ *
+ * It is the registry's label, so the bar and the sidebar can never disagree
+ * about the name of a place — with one deliberate exception, the account
+ * settings, which are not a nav row (they live behind the avatar) but are still
+ * a page you can be on and should be able to name.
+ */
+export function consoleTitle(
+  pathname: string,
+  slug: string | null,
+): string | null {
+  if (SELF_TITLED.some((p) => pathname === p || pathname.startsWith(`${p}/`))) {
+    return null;
+  }
+  const page = navPageForPath(pathname, slug);
+  if (page) return page.label;
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) {
+    return "Account settings";
+  }
+  return null;
 }
 
 /**

@@ -2,7 +2,6 @@
 
 import { api } from "@/lib/api";
 import { useApi } from "@/lib/query";
-import { PageHeader } from "@/components/page-header";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   SettingRow,
@@ -35,8 +34,6 @@ export default function AccountSettingsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader title="Account settings" />
-
       <div className="mx-auto w-full max-w-2xl flex-1 px-8 pb-8 pt-6">
         <SettingSection title="Profile">
           <SettingRow

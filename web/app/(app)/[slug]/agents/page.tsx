@@ -14,7 +14,7 @@ import { paths } from "@/lib/paths";
 import { ProviderIcon } from "@/components/provider-icon";
 import { AgentStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
-import { PageHeader } from "@/components/page-header";
+import { PageToolbar } from "@/components/page-toolbar";
 import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { Field, TextArea } from "@/components/form-field";
 import { InlineConfirm } from "@/components/inline-confirm";
@@ -238,8 +238,7 @@ export default function WorkspaceAgentsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <PageHeader
-        title="Agents"
+      <PageToolbar
         actions={
           <Button onClick={openCreate}>
             <Plus className="size-4" />

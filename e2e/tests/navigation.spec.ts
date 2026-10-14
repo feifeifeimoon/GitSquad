@@ -32,6 +32,11 @@ test.describe("Navigation", () => {
     await expect(page.getByRole("button", { name: "New Agent" })).toBeVisible({
       timeout: 15_000,
     });
+    // The bar above the page names the section — the page's own title lives up
+    // there now, centred, the way Vercel's does.
+    await expect(
+      page.getByRole("heading", { name: "Agents", exact: true }),
+    ).toBeVisible();
 
     await page.getByRole("link", { name: "Skills" }).click();
     await expect(page.getByRole("button", { name: "New Skill" })).toBeVisible({
@@ -63,6 +68,17 @@ test.describe("Navigation", () => {
     await expect(
       page.getByRole("button", { name: "All Workspaces" }),
     ).toBeVisible();
+    // …and so is the page: the bar carries the title now.
+    await expect(
+      page.getByRole("heading", { name: "Workspaces", exact: true }),
+    ).toBeVisible();
+    // The band headings are gone — what separates the bands is a rule. They
+    // are kept for screen readers, so the assertion is on the treatment rather
+    // than on absence: `sr-only` is still a box on screen as far as Playwright
+    // is concerned, which is the whole point of the class.
+    await expect(
+      page.getByRole("heading", { name: "Product", exact: true }),
+    ).toHaveClass(/sr-only/);
 
     // The workspace band is not drawn here at all — not drawn disabled, not
     // drawn greyed. A page that belongs to a workspace does not belong to this
