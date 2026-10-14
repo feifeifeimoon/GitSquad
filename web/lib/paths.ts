@@ -25,6 +25,11 @@ export const paths = {
   workspaces: () => "/workspaces",
   newWorkspace: () => "/workspaces/new",
   newWorkspaceConfigure: () => "/workspaces/new/configure",
+  // The All Workspaces scope's own pages. They hang off /workspaces rather than
+  // taking a top-level segment of their own: /issues, /agents and /skills would
+  // collide with RESERVED_SLUGS, and a workspace already named "issues" would
+  // be read as the route.
+  allIssues: () => "/workspaces/issues",
   daemons: () => "/daemons",
   daemon: (id: string) => `/daemons/${encode(id)}`,
   usage: () => "/usage",

@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import type { Issue, IssueStatus } from "@/lib/api";
 import { ISSUE_STATUS_LABELS } from "@/lib/api";
 import { StatusIcon } from "@/components/status-icon";
-import { DraggableIssueCard } from "./board-card";
+import { DraggableIssueCard, LinkedIssueCard } from "./board-card";
 
 // Columns are neutral surfaces, and the status colour lives in the icon beside
 // the label. Painting the whole column was the loudest thing on the board and
@@ -21,11 +21,24 @@ export const BoardColumn = memo(function BoardColumn({
   issues,
   onCreate,
   onOpen,
+  mode = "drag",
 }: {
   status: IssueStatus;
   issues: Issue[];
-  onCreate: (status: IssueStatus) => void;
-  onOpen: (id: string) => void;
+  /**
+   * Absent on the All Workspaces board, which has no workspace to add an issue
+   * to. The button is left out rather than drawn doing nothing.
+   */
+  onCreate?: (status: IssueStatus) => void;
+  /** Only used in "drag" mode; a linked card carries its own destination. */
+  onOpen?: (id: string) => void;
+  /**
+   * What a card in this column is. "drag" is a board inside a workspace, where
+   * dropping means moving that workspace's issue; "link" is the All Workspaces
+   * board, where a card opens its issue in the workspace that owns it and
+   * cannot mean anything else.
+   */
+  mode?: "drag" | "link";
 }) {
   const { setNodeRef, isOver } = useDroppable({
     id: status,
@@ -42,14 +55,16 @@ export const BoardColumn = memo(function BoardColumn({
         <span className="text-caption tabular-nums text-mute">
           {issues.length}
         </span>
-        <button
-          onClick={() => onCreate(status)}
-          title={`Add to ${ISSUE_STATUS_LABELS[status]}`}
-          aria-label={`Add to ${ISSUE_STATUS_LABELS[status]}`}
-          className="ml-auto rounded-sm p-1 text-mute transition-colors hover:bg-muted hover:text-ink"
-        >
-          <Plus className="size-3.5" />
-        </button>
+        {onCreate && (
+          <button
+            onClick={() => onCreate(status)}
+            title={`Add to ${ISSUE_STATUS_LABELS[status]}`}
+            aria-label={`Add to ${ISSUE_STATUS_LABELS[status]}`}
+            className="ml-auto rounded-sm p-1 text-mute transition-colors hover:bg-muted hover:text-ink"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        )}
       </div>
       <div
         ref={setNodeRef}
@@ -57,9 +72,13 @@ export const BoardColumn = memo(function BoardColumn({
           isOver ? "bg-muted ring-2 ring-ring/25" : ""
         }`}
       >
-        {issues.map((issue) => (
-          <DraggableIssueCard key={issue.id} issue={issue} onOpen={onOpen} />
-        ))}
+        {issues.map((issue) =>
+          mode === "link" || !onOpen ? (
+            <LinkedIssueCard key={issue.id} issue={issue} />
+          ) : (
+            <DraggableIssueCard key={issue.id} issue={issue} onOpen={onOpen} />
+          ),
+        )}
         {issues.length === 0 && (
           <p className="py-8 text-center text-caption text-mute">No issues</p>
         )}

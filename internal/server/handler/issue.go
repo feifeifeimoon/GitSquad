@@ -117,6 +117,24 @@ func (h *IssueHandler) Create(c *gin.Context) {
 	c.JSON(http.StatusCreated, v1.SuccessResponse(issue, 0))
 }
 
+// ListAll handles GET /api/v1/issues — the All Workspaces board. It takes no
+// workspace because it spans them all, and it is the one issue endpoint whose
+// scope comes from the authenticated user rather than from the path.
+func (h *IssueHandler) ListAll(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("login required"))
+		return
+	}
+	list, err := h.issues.ListAllIssues(c.Request.Context(), user.ID)
+	if err != nil {
+		slog.Error("list all issues", "error", err)
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to list issues"))
+		return
+	}
+	c.JSON(http.StatusOK, v1.SuccessResponse(list, len(list)))
+}
+
 // List handles GET /api/v1/workspaces/:id/issues.
 func (h *IssueHandler) List(c *gin.Context) {
 	workspace, ok := h.requireWorkspaceOwner(c)

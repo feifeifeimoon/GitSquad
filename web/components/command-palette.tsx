@@ -6,7 +6,7 @@ import { Plus, UserCog } from "lucide-react";
 import { api, Workspace, Issue, issueApi } from "@/lib/api";
 import { useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
-import { navPagesInScope, type NavScope } from "@/lib/nav";
+import { navPageHref, navPagesInScope, type NavScope } from "@/lib/nav";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { StatusIcon } from "@/components/status-icon";
 import {
@@ -63,26 +63,15 @@ export function CommandPalette({
   // hand-written list of three, and it had already gone stale: Usage was in the
   // sidebar but unreachable from here, and its "Settings" opened the account
   // page while the sidebar's opened the workspace one. A page added to the
-  // registry is now reachable from both surfaces, under the same name — and
-  // drawn in the same scopes, so "Pages" holds exactly what the sidebar holds.
+  // registry is now reachable from both surfaces, under the same name, at the
+  // same href for the scope you are in, and in the same scopes — so "Pages"
+  // holds exactly what the sidebar holds.
   const pageItems = useMemo(
     () =>
       navPagesInScope(scope).flatMap((page) => {
-        if (page.group === "workspace") {
-          return wsId
-            ? [
-                {
-                  key: page.key,
-                  label: page.label,
-                  Icon: page.icon,
-                  href: page.href(wsId),
-                },
-              ]
-            : [];
-        }
-        return [
-          { key: page.key, label: page.label, Icon: page.icon, href: page.href() },
-        ];
+        const href = navPageHref(page, wsId ?? null);
+        if (!href) return [];
+        return [{ key: page.key, label: page.label, Icon: page.icon, href }];
       }),
     [scope, wsId],
   );

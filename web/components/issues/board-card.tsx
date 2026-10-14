@@ -1,9 +1,11 @@
 "use client";
 
 import { memo } from "react";
+import Link from "next/link";
 import { useDraggable } from "@dnd-kit/core";
 import { MessageSquare } from "lucide-react";
 import type { Issue } from "@/lib/api";
+import { paths } from "@/lib/paths";
 import { TimeAgo } from "@/components/time-ago";
 import { AgentStack } from "@/components/issues/agent-chip";
 import { IssuePullRequestBadge } from "@/components/issues/issue-pull-requests";
@@ -44,6 +46,21 @@ export const IssueCard = memo(function IssueCard({
         aria-hidden="true"
         className={`absolute inset-y-0 left-0 w-0.5 ${STATUS_TONE[issue.status].bar}`}
       />
+
+      {/* Only the All Workspaces board knows one: a board inside a workspace
+          has nothing to disambiguate, so the field is absent and nothing is
+          drawn. Here it has to be, because the key is not enough on its own —
+          numbers are per workspace and two of them can both be "GS-1".
+
+          Its own line rather than a chip in the row below: that row is the
+          facts worth scanning a column for, and on a card with agents, a PR and
+          comment count it had no width left — the name came out as "O…". A line
+          it is, on the one board where it says something new. */}
+      {issue.workspace_name ? (
+        <p className="mb-1.5 truncate text-micro font-medium text-body">
+          {issue.workspace_name}
+        </p>
+      ) : null}
 
       <p className="line-clamp-2 text-copy font-medium text-ink">
         {issue.title}
@@ -109,5 +126,33 @@ export const DraggableIssueCard = memo(function DraggableIssueCard({
     >
       <IssueCard issue={issue} />
     </div>
+  );
+});
+
+/**
+ * The card on a board that does not drag: the All Workspaces one, where a drop
+ * would mean changing the status of an issue in a workspace the board is not in.
+ *
+ * A link rather than a div with a click handler, because that is what it is —
+ * it goes to the issue, in the workspace that owns it. Middle-click works,
+ * "open in new tab" works, and a screen reader reads it as a destination. The
+ * draggable card cannot be one *and* a drag handle, which is why the two
+ * behaviours are two components rather than one with a flag: dnd-kit marks its
+ * nodes `aria-disabled`, and a card that says it is disabled while it is the
+ * only way into the issue is a lie the DOM does not need to tell.
+ */
+export const LinkedIssueCard = memo(function LinkedIssueCard({
+  issue,
+}: {
+  issue: Issue;
+}) {
+  const href = issue.workspace_slug
+    ? paths.workspace(issue.workspace_slug).issue(issue.issue_key)
+    : null;
+  if (!href) return <IssueCard issue={issue} />;
+  return (
+    <Link href={href} data-issue-card className="block rounded-lg">
+      <IssueCard issue={issue} />
+    </Link>
   );
 });

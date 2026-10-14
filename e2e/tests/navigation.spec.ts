@@ -80,18 +80,19 @@ test.describe("Navigation", () => {
       page.getByRole("heading", { name: "Product", exact: true }),
     ).toHaveClass(/sr-only/);
 
-    // The workspace band is not drawn here at all — not drawn disabled, not
-    // drawn greyed. A page that belongs to a workspace does not belong to this
-    // scope, and the console says so by leaving it out.
-    await expect(
-      page.getByRole("link", { name: "Issues", exact: true }),
-    ).toHaveCount(0);
+    // The band is not drawn disabled here — a page that belongs to a workspace
+    // does not belong to this scope, and the console says so by leaving it out
+    // rather than by greying it. Issues is the exception: it has a page here
+    // too, the board across every workspace.
     await expect(
       page.getByRole("link", { name: "Agents", exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Skills", exact: true }),
     ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Issues", exact: true }),
+    ).toHaveAttribute("href", "/workspaces/issues");
     // Nothing anywhere in the shell is a dead row any more.
     await expect(page.locator("[aria-disabled]")).toHaveCount(0);
 
@@ -139,12 +140,16 @@ test.describe("Navigation", () => {
     ).toHaveCount(0);
     await expect(page.getByRole("button", { name: workspace.name })).toBeVisible();
 
-    // And back, in one click.
+    // And back, in one click. Issues is still a row here — it is the board
+    // across every workspace now — but it points somewhere else.
     await page.getByRole("button", { name: workspace.name }).click();
     await page.getByRole("menuitem", { name: "All Workspaces" }).click();
     await expect(page).toHaveURL(/\/workspaces$/);
     await expect(
       page.getByRole("link", { name: "Issues", exact: true }),
+    ).toHaveAttribute("href", "/workspaces/issues");
+    await expect(
+      page.getByRole("link", { name: "Agents", exact: true }),
     ).toHaveCount(0);
   });
 
@@ -178,9 +183,17 @@ test.describe("Navigation", () => {
       await expect(
         page.getByRole("button", { name: "All Workspaces" }),
       ).toBeVisible();
+      // The rows that need a workspace are gone; the ones with an All
+      // Workspaces page of their own are not.
+      await expect(
+        page.getByRole("link", { name: "Agents", exact: true }),
+      ).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: "Skills", exact: true }),
+      ).toHaveCount(0);
       await expect(
         page.getByRole("link", { name: "Issues", exact: true }),
-      ).toHaveCount(0);
+      ).toHaveAttribute("href", "/workspaces/issues");
     }
   });
 

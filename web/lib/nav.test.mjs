@@ -7,6 +7,7 @@ import {
   WORKSPACE_PAGES,
   consoleTitle,
   isNavPageActive,
+  navPageHref,
   navPageByJump,
   navPageForPath,
   navPagesInScope,
@@ -47,13 +48,13 @@ test("every page declares a band and the scopes it is drawn in", () => {
   );
 });
 
-test("All Workspaces draws the list, and nothing that needs a workspace", () => {
+test("All Workspaces draws the pages that exist without a workspace", () => {
   // The exact set matters: this is the scope the console is in whenever the URL
   // names no workspace, and every row here has to be a page that exists without
-  // one.
+  // one. Issues joined it when the cross-workspace board shipped.
   assert.deepEqual(
     navPagesInScope("all").map((p) => p.key),
-    ["workspaces", "daemons", "usage"],
+    ["issues", "workspaces", "daemons", "usage"],
   );
 });
 
@@ -70,24 +71,60 @@ test("a workspace draws its own pages, and not the list it came from", () => {
   );
 });
 
-test("the account-level rows are the two that survive a scope change", () => {
+test("the account-level rows are drawn in every scope", () => {
   // A machine is paired to the account and the usage counters are the account's,
   // which is why these are the rows that do not move when the scope does.
-  assert.deepEqual(
-    NAV_PAGES.filter((p) => p.scopes.length === 2).map((p) => p.key),
-    ["daemons", "usage"],
-  );
+  for (const key of ["daemons", "usage"]) {
+    const page = NAV_PAGES.find((p) => p.key === key);
+    assert.deepEqual(page.scopes, ["all", "workspace"], `${key} moved`);
+  }
 });
 
-test("a jump letter is unique and belongs to a scope that draws it", () => {
+test("the rows that need a workspace are the ones the All scope leaves out", () => {
+  // Each of these names one workspace in the doing: assigning an agent binds it
+  // to a workspace's roster, a skill is the workspace's, and so are its
+  // settings. Issues is the only one with a cross-workspace answer so far.
+  for (const key of ["agents", "skills", "workspace-settings"]) {
+    assert.ok(
+      !navPagesInScope("all").some((p) => p.key === key),
+      `${key} is drawn in All Workspaces with no page to point at`,
+    );
+  }
+});
+
+test("a jump letter is unique, and resolves in the scopes that draw it", () => {
   const jumps = NAV_PAGES.filter((p) => p.jump).map((p) => p.jump);
   assert.equal(new Set(jumps).size, jumps.length, "two pages share a jump letter");
   const issues = navPageByJump("i");
   assert.equal(issues?.key, "issues");
-  // `g i` is a no-op in All Workspaces for the same reason the row is absent:
-  // there is no board there to jump to.
-  assert.ok(!issues.scopes.includes("all"));
+  // The one letter that answers in both scopes, with a different destination:
+  // `g i` is this scope's board either way.
+  assert.equal(navPageHref(issues, "acme"), "/acme");
+  assert.equal(navPageHref(issues, null), "/workspaces/issues");
   assert.equal(navPageByJump("z"), undefined);
+});
+
+test("a row with no page in a scope resolves to nothing there", () => {
+  const skills = NAV_PAGES.find((p) => p.key === "skills");
+  assert.equal(navPageHref(skills, "acme"), "/acme/skills");
+  assert.equal(navPageHref(skills, null), null);
+  // Belt as well as brace: the scope filter has already dropped it.
+  assert.ok(!navPagesInScope("all").includes(skills));
+});
+
+test("exactly one row is current, and it is the most specific one", () => {
+  // The board's href is `/{slug}`, a prefix of every other page inside that
+  // workspace — so a prefix-only rule lit two rows on every sub-page, the
+  // board's and the page's own.
+  assert.equal(navPageForPath("/acme/settings", "acme")?.key, "workspace-settings");
+  assert.equal(navPageForPath("/acme/agents", "acme")?.key, "agents");
+  assert.equal(navPageForPath("/acme/issues/E2E-1", "acme")?.key, "issues");
+  assert.equal(navPageForPath("/acme", "acme")?.key, "issues");
+  // …and the same rule keeps the list row dark on the aggregate board, which
+  // lives under it.
+  assert.equal(navPageForPath("/workspaces/issues", null)?.key, "issues");
+  assert.equal(navPageForPath("/workspaces", null)?.key, "workspaces");
+  assert.equal(navPageForPath("/workspaces/new", null)?.key, "workspaces");
 });
 
 test("a workspace page resolves under the slug it is given", () => {

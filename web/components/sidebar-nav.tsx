@@ -3,8 +3,9 @@
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import {
-  isNavPageActive,
   navIconStroke,
+  navPageForPath,
+  navPageHref,
   navPagesInScope,
   navRowClass,
   NAV_GROUP_LABEL,
@@ -36,6 +37,10 @@ export function SidebarNav({ slug }: { slug?: string }) {
   const pathname = usePathname();
   const scope: NavScope = slug ? "workspace" : "all";
   const pages = navPagesInScope(scope);
+  // One row is current, and it is the most specific match rather than every
+  // prefix: the board's href is `/{slug}`, which is a prefix of the rest of the
+  // workspace, and treating that as "active" lit two rows at once everywhere.
+  const active = navPageForPath(pathname, slug ?? null);
   const bands = (["workspace", "product"] as NavGroup[])
     .map((group) => ({ group, rows: pages.filter((page) => page.group === group) }))
     // A band with nothing to draw in this scope carries no divider either.
@@ -50,23 +55,21 @@ export function SidebarNav({ slug }: { slug?: string }) {
         >
           <h2 className="sr-only">{NAV_GROUP_LABEL[band.group]}</h2>
           <div className="space-y-0.5">
-            {band.rows.map((page) =>
-              page.group === "workspace" && slug ? (
+            {band.rows.map((page) => {
+              // A page the scope does not draw has no href to go to. In practice
+              // that is a workspace page with no All Workspaces counterpart, and
+              // it is already filtered out by the scope — this is the belt.
+              const href = navPageHref(page, slug ?? null);
+              if (!href) return null;
+              return (
                 <NavRow
                   key={page.key}
                   page={page}
-                  href={page.href(slug)}
-                  pathname={pathname}
+                  href={href}
+                  active={active?.key === page.key}
                 />
-              ) : page.group === "product" ? (
-                <NavRow
-                  key={page.key}
-                  page={page}
-                  href={page.href()}
-                  pathname={pathname}
-                />
-              ) : null,
-            )}
+              );
+            })}
           </div>
         </div>
       ))}
@@ -77,17 +80,17 @@ export function SidebarNav({ slug }: { slug?: string }) {
 function NavRow({
   page,
   href,
-  pathname,
+  active,
 }: {
   page: NavPage;
   href: string;
-  pathname: string;
+  active: boolean;
 }) {
-  const state = isNavPageActive(pathname, href) ? "active" : "idle";
+  const state = active ? "active" : "idle";
   return (
     <Link
       href={href}
-      aria-current={state === "active" ? "page" : undefined}
+      aria-current={active ? "page" : undefined}
       className={navRowClass(state)}
     >
       <page.icon className="size-4 shrink-0" strokeWidth={navIconStroke(state)} />

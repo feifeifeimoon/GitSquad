@@ -349,6 +349,97 @@ func (q *Queries) ListIssuesByWorkspace(ctx context.Context, workspaceID uuid.UU
 	return items, nil
 }
 
+const listIssuesForUser = `-- name: ListIssuesForUser :many
+SELECT i.id, i.workspace_id, i.number, i.title, i.description, i.status, i.creator_user_id, i.assignee_user_id, i.source_upstream_issue, i.created_at, i.updated_at, w.issue_prefix AS issue_prefix,
+       w.slug AS workspace_slug, w.name AS workspace_name,
+       COALESCE(u.login, '') AS creator_name,
+       au.id AS assignee_id, COALESCE(au.login, '') AS assignee_login,
+       COALESCE(au.avatar_url, '') AS assignee_avatar_url,
+       (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count,
+       COALESCE((SELECT pr.number FROM pull_requests pr
+                 WHERE pr.issue_id = i.id AND pr.state = 'open' AND pr.close_intent
+                   AND pr.suppressed_at IS NULL
+                 ORDER BY pr.created_at DESC LIMIT 1), 0)::int AS active_pr_number
+FROM issues i
+JOIN workspaces w ON w.id = i.workspace_id
+LEFT JOIN users u ON u.id = i.creator_user_id
+LEFT JOIN users au ON au.id = i.assignee_user_id
+WHERE w.user_id = $1 AND w.status != 'archived'
+ORDER BY i.status, i.created_at DESC
+`
+
+type ListIssuesForUserRow struct {
+	ID                  uuid.UUID  `json:"id"`
+	WorkspaceID         uuid.UUID  `json:"workspace_id"`
+	Number              int32      `json:"number"`
+	Title               string     `json:"title"`
+	Description         string     `json:"description"`
+	Status              string     `json:"status"`
+	CreatorUserID       *uuid.UUID `json:"creator_user_id"`
+	AssigneeUserID      *uuid.UUID `json:"assignee_user_id"`
+	SourceUpstreamIssue *string    `json:"source_upstream_issue"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	IssuePrefix         string     `json:"issue_prefix"`
+	WorkspaceSlug       string     `json:"workspace_slug"`
+	WorkspaceName       string     `json:"workspace_name"`
+	CreatorName         string     `json:"creator_name"`
+	AssigneeID          *uuid.UUID `json:"assignee_id"`
+	AssigneeLogin       string     `json:"assignee_login"`
+	AssigneeAvatarUrl   string     `json:"assignee_avatar_url"`
+	CommentsCount       int64      `json:"comments_count"`
+	ActivePrNumber      int32      `json:"active_pr_number"`
+}
+
+// The All Workspaces board: every issue in every workspace this user owns, in
+// one read. The workspace rides along on each row because the card has to say
+// which one it belongs to — the key alone is ambiguous, since issue numbers are
+// per workspace and two of them can both be "GS-1".
+//
+// Archived workspaces are left out, matching the workspace list this board is
+// reached from. The scoped query above does not need the filter: you cannot be
+// inside an archived workspace to ask it.
+func (q *Queries) ListIssuesForUser(ctx context.Context, userID uuid.UUID) ([]ListIssuesForUserRow, error) {
+	rows, err := q.db.Query(ctx, listIssuesForUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListIssuesForUserRow
+	for rows.Next() {
+		var i ListIssuesForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Number,
+			&i.Title,
+			&i.Description,
+			&i.Status,
+			&i.CreatorUserID,
+			&i.AssigneeUserID,
+			&i.SourceUpstreamIssue,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IssuePrefix,
+			&i.WorkspaceSlug,
+			&i.WorkspaceName,
+			&i.CreatorName,
+			&i.AssigneeID,
+			&i.AssigneeLogin,
+			&i.AssigneeAvatarUrl,
+			&i.CommentsCount,
+			&i.ActivePrNumber,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const updateIssueAssignee = `-- name: UpdateIssueAssignee :one
 UPDATE issues SET assignee_user_id = $3::uuid, updated_at = now()
 WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, number, title, description, status, creator_user_id, assignee_user_id, source_upstream_issue, created_at, updated_at

@@ -18,6 +18,32 @@ LEFT JOIN users au ON au.id = i.assignee_user_id
 WHERE i.workspace_id = $1
 ORDER BY i.status, i.created_at DESC;
 
+-- name: ListIssuesForUser :many
+-- The All Workspaces board: every issue in every workspace this user owns, in
+-- one read. The workspace rides along on each row because the card has to say
+-- which one it belongs to — the key alone is ambiguous, since issue numbers are
+-- per workspace and two of them can both be "GS-1".
+--
+-- Archived workspaces are left out, matching the workspace list this board is
+-- reached from. The scoped query above does not need the filter: you cannot be
+-- inside an archived workspace to ask it.
+SELECT i.*, w.issue_prefix AS issue_prefix,
+       w.slug AS workspace_slug, w.name AS workspace_name,
+       COALESCE(u.login, '') AS creator_name,
+       au.id AS assignee_id, COALESCE(au.login, '') AS assignee_login,
+       COALESCE(au.avatar_url, '') AS assignee_avatar_url,
+       (SELECT count(*) FROM issue_comments c WHERE c.issue_id = i.id) AS comments_count,
+       COALESCE((SELECT pr.number FROM pull_requests pr
+                 WHERE pr.issue_id = i.id AND pr.state = 'open' AND pr.close_intent
+                   AND pr.suppressed_at IS NULL
+                 ORDER BY pr.created_at DESC LIMIT 1), 0)::int AS active_pr_number
+FROM issues i
+JOIN workspaces w ON w.id = i.workspace_id
+LEFT JOIN users u ON u.id = i.creator_user_id
+LEFT JOIN users au ON au.id = i.assignee_user_id
+WHERE w.user_id = $1 AND w.status != 'archived'
+ORDER BY i.status, i.created_at DESC;
+
 -- name: GetIssue :one
 SELECT i.*, w.issue_prefix AS issue_prefix, COALESCE(u.login, '') AS creator_name,
        au.id AS assignee_id, COALESCE(au.login, '') AS assignee_login,

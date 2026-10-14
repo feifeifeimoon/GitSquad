@@ -53,6 +53,11 @@ interface NavPageBase {
 export interface WorkspaceNavPage extends NavPageBase {
   group: "workspace";
   href: (slug: string) => string;
+  /**
+   * Where the row goes in the All Workspaces scope. A row without one is not
+   * drawn there — the scope has no page for it yet.
+   */
+  allHref?: () => string;
 }
 
 export interface ProductNavPage extends NavPageBase {
@@ -69,9 +74,13 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
     label: "Issues",
     icon: CircleDot,
     group: "workspace",
-    scopes: ["workspace"],
+    // The one page that exists in both scopes: the board you get here, and the
+    // board across every workspace you own. Its key is what the scope switcher
+    // is for — the work does not stop at a workspace boundary.
+    scopes: ["all", "workspace"],
     jump: "i",
     href: (slug) => paths.workspace(slug).board(),
+    allHref: () => paths.allIssues(),
   },
   {
     key: "agents",
@@ -165,11 +174,29 @@ export function navPageByJump(key: string): NavPage | undefined {
 }
 
 /**
+ * Where a row goes in the scope the console is in, or null when that scope does
+ * not draw it.
+ *
+ * The scope is derived from the slug rather than passed beside it: a slug means
+ * the workspace scope, and the two can never disagree. That is the whole reason
+ * the console has no remembered scope any more — a scope that is inferred is a
+ * scope that can be missing.
+ */
+export function navPageHref(page: NavPage, slug: string | null): string | null {
+  if (!page.scopes.includes(slug ? "workspace" : "all")) return null;
+  if (page.group === "product") return page.href();
+  if (slug) return page.href(slug);
+  return page.allHref?.() ?? null;
+}
+
+/**
  * The page a path belongs to, or undefined when it belongs to none.
  *
- * Longest href wins, and that is not a detail: the board's href is `/{slug}`,
- * which is a prefix of every other page inside that workspace, so a plain
- * `find` would answer "Issues" for `/acme/agents`.
+ * **Longest href wins, and that is not a detail.** The board's href is
+ * `/{slug}`, a prefix of every other page inside that workspace, so a plain
+ * `find` answers "Issues" for `/acme/agents` — and it lit two rows at once on
+ * every workspace sub-page, the board's and the page's own. The same rule is
+ * what keeps `/workspaces` from lighting up on `/workspaces/issues`.
  */
 export function navPageForPath(
   pathname: string,
@@ -178,7 +205,7 @@ export function navPageForPath(
   let best: NavPage | undefined;
   let bestHref = "";
   for (const page of NAV_PAGES) {
-    const href = page.group === "workspace" ? (slug ? page.href(slug) : null) : page.href();
+    const href = navPageHref(page, slug);
     if (href === null || !isNavPageActive(pathname, href)) continue;
     if (href.length > bestHref.length) {
       best = page;
