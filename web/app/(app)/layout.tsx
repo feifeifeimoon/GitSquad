@@ -177,7 +177,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
             both outside the scrolling list. The trigger is shaped like a field
             because it opens one — it is not a destination, so it does not sit
             among the destinations. */}
-        <div className="border-b border-hairline px-3 pb-3 pt-2">
+        <div className="border-b border-hairline px-2 py-2">
           <NavSearchTrigger
             onOpen={() => setPaletteOpen(true)}
             isMac={isMac}

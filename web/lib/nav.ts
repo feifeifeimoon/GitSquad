@@ -268,13 +268,19 @@ export type NavRowState = "active" | "idle";
  * needs the row to be a step down any more: the hierarchy the 13px was bought
  * for is carried by the page title in the bar above it, which is 19px.
  *
+ * The row is 36px with no gap between rows, and the block it sits in is inset
+ * 8px: that is the reference console's box, measured off it rather than guessed
+ * — its rows pitch at 36px and its icons start 18px from the edge, where ours
+ * were 34 and 22. Two pixels of pitch and four of inset are the difference
+ * between "the same sidebar" and "a sidebar that feels tighter".
+ *
  * Active and hover are two branches rather than two sets of utilities on one
  * element on purpose — the active branch carries no hover class at all, so
  * hovering the current page cannot make it look less current.
  */
 export function navRowClass(state: NavRowState): string {
   const base =
-    "flex h-8 items-center gap-2.5 rounded-sm px-2.5 text-copy transition-colors";
+    "flex h-9 items-center gap-2.5 rounded-sm px-2.5 text-copy transition-colors";
   return state === "active"
     ? `${base} bg-muted font-medium text-ink`
     : `${base} text-body hover:bg-muted/60 hover:text-ink`;

@@ -47,14 +47,14 @@ export function SidebarNav({ slug }: { slug?: string }) {
     .filter((band) => band.rows.length > 0);
 
   return (
-    <nav aria-label="Console" className="flex-1 overflow-y-auto px-3 pb-3 pt-1">
+    <nav aria-label="Console" className="flex-1 overflow-y-auto px-2 pb-2 pt-1">
       {bands.map((band, index) => (
         <div
           key={band.group}
           className={index > 0 ? "mt-2 border-t border-hairline pt-2" : ""}
         >
           <h2 className="sr-only">{NAV_GROUP_LABEL[band.group]}</h2>
-          <div className="space-y-0.5">
+          <div>
             {band.rows.map((page) => {
               // A page the scope does not draw has no href to go to. In practice
               // that is a workspace page with no All Workspaces counterpart, and
