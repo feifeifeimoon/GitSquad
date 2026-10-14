@@ -43,6 +43,10 @@ const searchTrigger = readFileSync(
   new URL("../components/nav-search-trigger.tsx", import.meta.url),
   "utf8",
 );
+const scopeSwitcher = readFileSync(
+  new URL("../components/scope-switcher.tsx", import.meta.url),
+  "utf8",
+);
 
 test("workspace list renders a card grid by default", () => {
   assert.match(list, /grid-cols-1/);
@@ -76,10 +80,19 @@ test("workspace list supports search and a table list view", () => {
   assert.match(list, /Created/);
 });
 
-test("console shell swaps GitSquad for the active workspace", () => {
+test("the sidebar header is the product; the scope is named above the page", () => {
+  // The header used to be the workspace switcher, and it fell back to "GitSquad"
+  // whenever the URL named no workspace — which is exactly what read as "you are
+  // nowhere". The switcher moved above the page and always names a scope, so
+  // what is left in the corner is only ever the product.
   assert.match(shell, /GitSquad/);
-  assert.match(shell, /usePathname/);
-  assert.match(shell, /workspace\.name/);
+  assert.match(shell, /ScopeSwitcher/);
+  assert.match(scopeSwitcher, /All Workspaces/);
+  assert.match(scopeSwitcher, /WorkspaceAvatar/);
+  assert.match(scopeSwitcher, /paths\.workspace\(/);
+  // Nothing remembers the last workspace. A remembered scope is one that can be
+  // missing, and a missing scope is what drew the four grey rows.
+  assert.doesNotMatch(shell, /lastWorkspaceSlug/);
 });
 
 test("status badge defines three states", () => {
@@ -116,14 +129,15 @@ test("sidebar has a search entry that opens the palette", () => {
   assert.match(searchTrigger, /onOpen/);
 });
 
-test("the sidebar is generated from the nav registry", () => {
+test("the sidebar is generated from the nav registry, in scope", () => {
   // One list, two surfaces. The sidebar and the palette each used to keep their
-  // own copy, and they had already drifted.
+  // own copy, and they had already drifted — including on which pages exist at
+  // all, since each decided the scope for itself.
   assert.match(nav, /WORKSPACE_PAGES/);
   assert.match(nav, /PRODUCT_PAGES/);
-  assert.match(sidebarNav, /WORKSPACE_PAGES/);
-  assert.match(sidebarNav, /PRODUCT_PAGES/);
-  assert.match(palette, /NAV_PAGES/);
+  assert.match(nav, /navPagesInScope/);
+  assert.match(sidebarNav, /navPagesInScope/);
+  assert.match(palette, /navPagesInScope/);
 });
 
 test("sidebar destinations are links, not buttons that push", () => {
@@ -135,7 +149,11 @@ test("sidebar destinations are links, not buttons that push", () => {
 });
 
 test("command palette searches issues within the active workspace", () => {
-  assert.match(palette, /usePathname/);
+  // The scope arrives from the shell rather than being derived from the pathname
+  // — the palette and the sidebar used to work it out separately, which is how
+  // they ended up disagreeing about which pages exist.
+  assert.match(palette, /slug/);
+  assert.doesNotMatch(palette, /usePathname/);
   assert.match(palette, /issueApi/);
   assert.match(palette, /Issues/);
 });

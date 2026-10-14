@@ -44,16 +44,105 @@ test.describe("Navigation", () => {
     });
   });
 
-  // Global pages used to lose the workspace context: the console decides
-  // whether the first path segment is a workspace by checking a reserved-slug
-  // list, and /usage was missing from it, so that page was read as a workspace
-  // named "usage" and the real one was cleared.
-  //
-  // Those links vanishing was the visible half of the regression, so their
-  // presence is what this asserts. The rows are unconditional now — with no
-  // workspace they render disabled rather than disappearing — but the hrefs
-  // still have to resolve inside the workspace.
-  test("keeps the workspace context on global pages", async ({ page }) => {
+  // The console has two scopes, and the URL names which one you are in: a slug
+  // is a workspace, no slug is All Workspaces. This is the case that used to be
+  // the bug — a cold load of /workspaces had no workspace in the URL and none
+  // remembered, so the sidebar drew its four workspace rows greyed out with
+  // "Open a workspace first" on hover.
+  test("All Workspaces is a scope, not a gap", async ({ page }) => {
+    await loginAsE2E(page, api);
+    // Straight to the list, without visiting a workspace first: this is how the
+    // console is entered from the marketing page, and a full page load is the
+    // only thing that ever produced the empty scope.
+    await page.goto("/workspaces", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", { name: "New Workspace" }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    // The scope is named, above the page it scopes.
+    await expect(
+      page.getByRole("button", { name: "All Workspaces" }),
+    ).toBeVisible();
+
+    // The workspace band is not drawn here at all — not drawn disabled, not
+    // drawn greyed. A page that belongs to a workspace does not belong to this
+    // scope, and the console says so by leaving it out.
+    await expect(
+      page.getByRole("link", { name: "Issues", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Agents", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Skills", exact: true }),
+    ).toHaveCount(0);
+    // Nothing anywhere in the shell is a dead row any more.
+    await expect(page.locator("[aria-disabled]")).toHaveCount(0);
+
+    // And the rows that are here are live.
+    await expect(
+      page.getByRole("link", { name: "Daemons", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Usage", exact: true }),
+    ).toBeVisible();
+  });
+
+  test("the switcher moves the console into a workspace, and back", async ({
+    page,
+  }) => {
+    await loginAsE2E(page, api);
+    await page.goto("/workspaces", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", { name: "New Workspace" }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    await page.getByRole("button", { name: "All Workspaces" }).click();
+
+    // The field narrows the list, and says so when it matches nothing.
+    await page.getByPlaceholder("Find workspace…").fill("no-such-workspace-zzz");
+    await expect(page.getByText("No workspaces match")).toBeVisible();
+    await expect(
+      page.getByRole("menuitem", { name: workspace.name }),
+    ).toHaveCount(0);
+
+    await page.getByPlaceholder("Find workspace…").fill(workspace.name);
+    await page.getByRole("menuitem", { name: workspace.name }).click();
+
+    // In the workspace: the band is drawn, the switcher names it, and the row
+    // that led here is gone — leaving a workspace is the switcher's job.
+    await expect(page).toHaveURL(new RegExp(`/${workspace.slug}$`));
+    await expect(page.getByRole("button", { name: "New Issue" })).toBeVisible({
+      timeout: 20_000,
+    });
+    await expect(
+      page.getByRole("link", { name: "Issues", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Workspaces", exact: true }),
+    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: workspace.name })).toBeVisible();
+
+    // And back, in one click.
+    await page.getByRole("button", { name: workspace.name }).click();
+    await page.getByRole("menuitem", { name: "All Workspaces" }).click();
+    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(
+      page.getByRole("link", { name: "Issues", exact: true }),
+    ).toHaveCount(0);
+  });
+
+  // This spec used to assert the opposite: that /usage and /daemons kept the
+  // workspace's rows in the sidebar. It was defending a real bug — /usage was
+  // missing from the reserved-slug list, so the page was read as a workspace
+  // *named* "usage" and the one you were in was cleared. That guard is the
+  // reserved list itself (web/lib/paths.test.mjs walks the real route
+  // directories), not the sidebar rows; and the rows were a half-truth anyway,
+  // because /daemons is not inside a workspace. Now the scope is named, and it
+  // is the one the URL says.
+  test("a page outside any workspace says so, instead of keeping a stale one", async ({
+    page,
+  }) => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
     await expect(
@@ -70,26 +159,13 @@ test.describe("Navigation", () => {
         page.getByRole("heading", { name: label, exact: true }),
       ).toBeVisible({ timeout: 15_000 });
 
-      // Still in a workspace. The switcher is the sharpest signal: without the
-      // workspace it falls back to the product name.
       await expect(
-        page.getByRole("button", { name: workspace.name }),
+        page.getByRole("button", { name: "All Workspaces" }),
       ).toBeVisible();
-      for (const section of ["Issues", "Agents", "Skills"]) {
-        await expect(
-          page.getByRole("link", { name: section, exact: true }),
-        ).toBeVisible();
-      }
+      await expect(
+        page.getByRole("link", { name: "Issues", exact: true }),
+      ).toHaveCount(0);
     }
-
-    // And the context is live rather than merely painted: a section link has to
-    // resolve inside this workspace. Without the workspace the links still
-    // render but point at the global path, so this is what catches them.
-    await page.getByRole("link", { name: "Agents", exact: true }).click();
-    await expect(page).toHaveURL(new RegExp(`/${workspace.slug}/agents$`));
-    await expect(
-      page.getByRole("button", { name: "New Agent" }),
-    ).toBeVisible({ timeout: 15_000 });
   });
 
   test("logs out and clears the session", async ({ page }) => {

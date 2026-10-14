@@ -1,27 +1,19 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef, useSyncExternalStore } from "react";
+import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
-import { ChevronsUpDown, Plus, Check } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { useApi } from "@/lib/query";
 import { RealtimeProvider } from "@/lib/realtime";
 import { paths, workspaceSlugFromPath } from "@/lib/paths";
-import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { GitSquadMark } from "@/components/gitsquad-mark";
 import { SidebarNav } from "@/components/sidebar-nav";
 import { NavSearchTrigger } from "@/components/nav-search-trigger";
 import { AccountMenu } from "@/components/account-menu";
-import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { ScopeSwitcher } from "@/components/scope-switcher";
 import { CommandPalette } from "@/components/command-palette";
-import { NAV_JUMP, NAV_PAGES } from "@/lib/nav";
+import { navPageByJump } from "@/lib/nav";
 import { clampSidebarWidth, useSidebarWidth } from "@/lib/sidebar-width";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -48,29 +40,22 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   const [paletteOpen, setPaletteOpen] = useState(false);
   const isMac = useSyncExternalStore(emptySubscribe, getIsMac, getIsMacServer);
 
-  const pathWorkspaceId = workspaceSlugFromPath(pathname);
-  // Remember the last workspace slug so the workspace context (switcher +
-  // nav) survives navigating to global pages like /workspaces or /daemons.
-  const [lastWorkspaceSlug, setLastWorkspaceSlug] = useState<string | null>(null);
-  if (pathWorkspaceId && pathWorkspaceId !== lastWorkspaceSlug) {
-    setLastWorkspaceSlug(pathWorkspaceId);
-  }
-  const wsId = pathWorkspaceId ?? lastWorkspaceSlug;
+  // The console's scope, and it comes from the URL and nowhere else. It used to
+  // be remembered in component state so that global pages kept the workspace
+  // they were visited from — which meant a fresh load of /workspaces, or of
+  // /daemons, had no workspace at all and drew the workspace pages greyed out.
+  // A scope that is inferred is a scope that can be missing; this one cannot.
+  // With no slug the scope is All Workspaces, which is a page you can be on
+  // rather than a state the console can be in.
+  const slug = workspaceSlugFromPath(pathname) ?? undefined;
 
-  // Reads go through the cache, so the shell, the command palette and the
+  // Reads go through the cache, so the shell, the scope switcher and the
   // workspaces page share one request per path instead of one each.
   const { data: me, error: meError } = useApi<User>("/api/v1/me", () =>
     api.get<User>("/api/v1/me"),
   );
   const { data: workspaces = [] } = useApi<Workspace[]>("/api/v1/workspaces", () =>
     api.get<Workspace[]>("/api/v1/workspaces"),
-  );
-  // Keyed by the slug, so this cannot show one workspace's name while the route
-  // is on another: a new slug is a new cache entry, and undefined until it
-  // lands. That is what the `{ slug, data }` pairing used to guard against.
-  const { data: workspace } = useApi<Workspace>(
-    wsId ? `/api/v1/workspaces/${wsId}` : null,
-    () => api.get<Workspace>(`/api/v1/workspaces/${wsId}`),
   );
 
   // On a failed identity read the session is not usable, so the shell hands
@@ -95,6 +80,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   // `g` then a letter jumps to a page. The palette answers "find a thing"; this
   // answers "go to a place" without opening anything, which is the fastest path
   // in a console you move around all day.
+  //
+  // The scope decides which letters exist: `g i` is Issues in a workspace and
+  // nothing at all in All Workspaces, because there is no Issues page to reach
+  // — the same answer the sidebar gives by not drawing the row.
   useEffect(() => {
     let armed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -125,19 +114,17 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         return;
       }
 
-      const pageKey = NAV_JUMP[event.key.toLowerCase()];
+      const page = navPageByJump(event.key.toLowerCase());
       disarm();
-      if (!pageKey) return;
-      const page = NAV_PAGES.find((p) => p.key === pageKey);
       if (!page) return;
-      event.preventDefault();
-      // A workspace page has nowhere to go without a workspace, so the jump is
-      // a no-op rather than an error — the same answer its disabled row gives.
-      if (page.scope === "workspace") {
-        if (wsId) router.push(page.href(wsId));
-      } else {
-        router.push(page.href());
+      if (page.group === "workspace") {
+        if (!slug) return;
+        event.preventDefault();
+        router.push(page.href(slug));
+        return;
       }
+      event.preventDefault();
+      router.push(page.href());
     };
 
     document.addEventListener("keydown", onKeyDown);
@@ -145,7 +132,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       document.removeEventListener("keydown", onKeyDown);
       disarm();
     };
-  }, [router, wsId]);
+  }, [router, slug]);
 
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
@@ -176,53 +163,19 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         className="relative flex shrink-0 flex-col border-r border-hairline bg-chrome"
         style={{ width: sidebarWidth }}
       >
-        {/* Logo / workspace switcher */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button className="flex h-16 w-full items-center gap-2 border-b border-hairline px-5 text-left outline-none transition-colors hover:bg-muted/40">
-              {wsId && workspace ? (
-                <>
-                  <WorkspaceAvatar
-                    name={workspace.name}
-                    avatarUrl={workspace.avatar_url}
-                    className="size-6"
-                  />
-                  <span className="min-w-0 flex-1 truncate text-copy font-semibold tracking-tight">
-                    {workspace.name}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <GitSquadMark className="size-6" />
-                  <span className="min-w-0 flex-1 text-copy font-semibold tracking-tight">GitSquad</span>
-                </>
-              )}
-              <ChevronsUpDown className="size-3.5 shrink-0 text-mute" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56">
-            <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
-            {workspaces.map((w) => (
-              <DropdownMenuItem
-                key={w.id}
-                onClick={() => router.push(paths.workspace(w.slug).board())}
-              >
-                <WorkspaceAvatar
-                  name={w.name}
-                  avatarUrl={w.avatar_url}
-                  className="size-5"
-                />
-                <span className="min-w-0 flex-1 truncate">{w.name}</span>
-                {wsId === w.slug && <Check className="size-4 shrink-0 text-ink" />}
-              </DropdownMenuItem>
-            ))}
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => router.push(paths.newWorkspace())}>
-              <Plus className="size-4" />
-              Create workspace
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* The product, and only the product. This used to be the workspace
+            switcher, from back when the scope lived at the top of the sidebar;
+            the scope is chosen above the page now, and what is left here is
+            where "home" is — the All Workspaces list. */}
+        <Link
+          href={paths.workspaces()}
+          className="flex h-16 items-center gap-2 border-b border-hairline px-5 outline-none transition-colors hover:bg-muted/40"
+        >
+          <GitSquadMark className="size-6 shrink-0" />
+          <span className="min-w-0 flex-1 truncate text-copy font-semibold tracking-tight">
+            GitSquad
+          </span>
+        </Link>
 
         {/* The fixed top block: identity above, the palette's trigger below it,
             both outside the scrolling list. The trigger is shaped like a field
@@ -236,7 +189,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         </div>
 
         {/* Destinations. The only region that scrolls. */}
-        <SidebarNav slug={wsId ?? undefined} />
+        <SidebarNav slug={slug} />
 
         <AccountMenu
           login={me?.login}
@@ -252,15 +205,31 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
         />
       </aside>
 
-      {/* Main content. The realtime socket lives at this level, not inside the
-          page, so navigating between routes does not tear the connection down
-          and lose whatever arrived in the gap. */}
-      <div className="flex-1 overflow-auto">
-        <RealtimeProvider workspace={wsId ?? undefined}>{children}</RealtimeProvider>
+      {/* The page column: the scope strip, then the page. The strip is outside
+          the scroll region so the answer to "where am I" never scrolls away —
+          which matters most on the long pages (a board, an issue thread) where
+          the page's own title is the first thing to leave the viewport. */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-16 shrink-0 items-center border-b border-hairline px-4">
+          <ScopeSwitcher slug={slug} workspaces={workspaces} />
+        </div>
+
+        {/* The realtime socket lives at this level, not inside the page, so
+            navigating between routes does not tear the connection down and lose
+            whatever arrived in the gap. It is scoped to a workspace, so in All
+            Workspaces there is no socket at all: the aggregate has no channel
+            of its own yet. */}
+        <div className="min-h-0 flex-1 overflow-auto">
+          <RealtimeProvider workspace={slug}>{children}</RealtimeProvider>
+        </div>
       </div>
 
       {/* Global command palette (Cmd/Ctrl+K) */}
-      <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
+      <CommandPalette
+        open={paletteOpen}
+        onOpenChange={setPaletteOpen}
+        slug={slug}
+      />
 
       {/* Logout confirmation */}
       <Dialog open={logoutConfirm} onOpenChange={setLogoutConfirm}>
