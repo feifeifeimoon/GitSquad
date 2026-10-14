@@ -122,6 +122,15 @@ typography:
     fontSize: 12px
     fontWeight: 400
     lineHeight: 16px
+  label:
+    # The console's own step between caption and body, and the one role here
+    # that has no counterpart in the marketing scale: section headings, board
+    # column labels, form field labels. The sidebar's nav rows were here too and
+    # are `body-sm` now — see `app-shell-nav-row`.
+    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontSize: 13px
+    fontWeight: 400
+    lineHeight: 18px
   code:
     fontFamily: Geist Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, monospace
     fontSize: 13px
@@ -283,6 +292,7 @@ components:
     width: 240px
   app-shell-nav-row:
     textColor: "{colors.body}"
+    typography: "{typography.body-sm}"
     activeIndicator: "{colors.primary}"
     rounded: "{rounded.sm}"
     padding: "{spacing.xs} {spacing.sm}"
@@ -538,6 +548,8 @@ The console names sizes by **role**, not by Tailwind's `text-sm`/`text-base` ram
 
 The page used to have two sizes and no hierarchy: a page title and a sidebar nav row were the same 14px at the same weight, so nothing led. Title, section, body and meta are four steps now, and the step is carried by size *and* colour *and* weight — never by one alone.
 
+The nav row has since gone back to `{typography.body-sm}` (14px) at 13px's expense, because the hierarchy no longer rests on it: the page title is `{typography.title}` (19px) in the bar above, so the sidebar can be the size its reference console sets it at. What did *not* come back is the old failure — the row is a destination, not a heading, and the two no longer compete.
+
 ### Principles
 - **Weight 600 is the display ceiling.** The sans never appears at 700+. The interface reads as calm partly because of this.
 - **Negative tracking is part of the voice.** Display sizes use `-0.04em` down to `-0.015em`. Reverting to default tracking makes the headline look generic.
@@ -683,9 +695,9 @@ Every button carries `active:translate-y-px` and `focus-visible:ring-3 focus-vis
 ### Navigation
 
 - **`nav-bar`** — the marketing top bar: 64 px tall, `bg-canvas`, hairline bottom border, the logo in `{colors.ink}` left, the in-page destinations centred and hidden below `md`, then three controls right. The **GitHub mark** is an icon rather than a fourth nav word: it is the one destination in this bar that leaves the page, and its label names the artifact (`GitSquad on GitHub`) because the word alone leaves a screen reader guessing at what the link is for. `GitHubMark` is inlined in `currentColor` for a measured reason — the SVG asset it replaces had `fill="black"` baked in, and a mark loaded through `<img>` cannot inherit `currentColor`, so it was black on a near-black card in dark mode. Then the theme control (`ThemeToggle`), the console's own button wearing the nav's shape: the page has followed `prefers-color-scheme` from the start, but a visitor had no way to say otherwise without changing an operating-system setting. Then the `nav-cta-pill`, which is the account control: signed out it says "Get started" and opens the Google flow, signed in it is the reader's avatar and the way back to the console. One control rather than a sign-in link and a sign-up button that do the same thing.
-- **`app-shell-sidebar`** — the console's left column, in three bands: a **fixed top block** (workspace switcher, then the palette trigger), a **single scrolling middle** (the destinations), and a **fixed footer** (the account). Only the middle scrolls. `bg-chrome`, `border-r border-hairline`, 200–400 px wide, drag-resized and remembered in `localStorage`.
-- **`sidebar-section-label`** — `{typography.micro}` semibold uppercase in `{colors.mute}`. The only uppercase text in the product. It doubles as the group's placeholder: it is drawn whether or not the rows under it can be used.
-- **`app-shell-nav-row`** — a **link**, not a button wired to the router. Middle-click, open-in-new-tab and being announced as a destination all come free, and none of them did before. `{typography.label}` in `{colors.body}`, `{rounded.sm}`, `aria-current="page"` on the active row. Active is a `bg-muted` fill with `{colors.ink}` and a heavier icon stroke; hover is the same fill at half strength, written as a *separate branch* so the active row carries no hover class at all — two greys one step apart are not a distinction. A row whose page needs a workspace and has none renders **disabled**: on screen, in place, not clickable. It used to vanish along with its whole group, taking every row below it along.
+- **`app-shell-sidebar`** — the console's left column, in three bands: a **fixed top block** (the brand, a link to All Workspaces, then the palette trigger — the workspace switcher moved up into the bar, where what it scopes is), a **single scrolling middle** (the destinations), and a **fixed footer** (the account). Only the middle scrolls. `bg-chrome`, `border-r border-hairline`, 200–400 px wide, drag-resized and remembered in `localStorage`.
+- **`sidebar-section-label`** — `{typography.caption}` semibold uppercase in `{colors.mute}`, now **screen-reader only**: what separates the bands on screen is a hairline, because two words set in caps above six rows were doing a divider's job in a 240px column that already names the workspace twice. The text stays for assistive tech, where a rule is not a group.
+- **`app-shell-nav-row`** — a **link**, not a button wired to the router. Middle-click, open-in-new-tab and being announced as a destination all come free, and none of them did before. `{typography.body-sm}` (14px, `text-copy`) in `{colors.body}`, `{rounded.sm}`, `aria-current="page"` on the active row. Active is a `bg-muted` fill with `{colors.ink}` and a heavier icon stroke; hover is the same fill at half strength, written as a *separate branch* so the active row carries no hover class at all — two greys one step apart are not a distinction. A row whose page does not exist in the current **scope** is not drawn at all: the console is either in a workspace or in All Workspaces, and pages that need a workspace have no page there yet (Issues does — it has a board of its own across every workspace). Neither hidden-then-shown nor greyed-out: a greyed row says "this exists and you may not have it", which was never true. What keeps the list from moving under the reader is that the scope itself is always on screen, named in the bar above the page.
 - **`nav-search-trigger`** — the palette's trigger, shaped as a **field** (`Search…` plus a `kbd-hint`) in the fixed top block. It opens a modal rather than navigating, so it must not look like the destinations it sits above.
 - **`account-menu`** — the footer: avatar and handle as the trigger, opening an identity block, **Settings** (`/settings`) and a destructive **Sign out**. The account is not a nav row. The *workspace* settings are a workspace page and sit in that group. Those two used to be one row that rewrote its own href, which made `/settings` unreachable from the sidebar for anyone who had ever opened a workspace.
 - **`kbd-hint`** — `font-mono text-micro` in `{colors.mute}` on a `{colors.muted}` chip with a hairline border, e.g. the ⌘K affordance on the search trigger. Decorative on a control that already has a name: `aria-hidden`, so it does not join the accessible name.
@@ -743,7 +755,7 @@ Every button carries `active:translate-y-px` and `focus-visible:ring-3 focus-vis
 - Cycle surfaces with the polarity-flipped `{colors.primary}` band as the depth cue.
 - Put every machine-reported value — status, count, id, model, log line — in a mono face.
 - Pair every status dot with a written label so state survives grayscale.
-- Keep the sidebar's uppercase `{typography.caption}` labels as the only all-caps text in the product.
+- Keep uppercase for `{typography.caption}` section labels only. The sidebar's bands are separated by a hairline rather than labelled, so the console's only all-caps text is a section label inside a page, if one is ever needed.
 
 ### Don't
 - Don't introduce a sixth accent colour, and don't add a green "success" hue — `{colors.success}` is the link blue by design.
