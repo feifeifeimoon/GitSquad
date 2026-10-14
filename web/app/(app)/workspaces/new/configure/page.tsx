@@ -4,6 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronLeft, Loader2 } from "lucide-react";
 import { api } from "@/lib/api";
+import { invalidateApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,11 @@ function ConfigureContent() {
         repo_id: repoID,
         name: name.trim(),
       });
+      // The list is read from the cache, and a fresh entry would otherwise
+      // serve the pre-import value (often the empty state) for up to its
+      // staleTime. Anyone who landed on /workspaces before configuring lands
+      // back on it now, so the new workspace has to be what that read returns.
+      invalidateApi("/api/v1/workspaces");
       router.push(paths.workspaces());
     } catch (err: unknown) {
       setError(
