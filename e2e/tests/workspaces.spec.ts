@@ -40,4 +40,36 @@ test.describe("Workspaces", () => {
     await expect(page.getByText("In Progress")).toBeVisible();
     await expect(page.getByText("Done")).toBeVisible();
   });
+
+  // The card's corner used to hold a status badge that read "Active" on every
+  // card — the list is filtered to the active ones before it arrives — and it
+  // holds the way to that workspace's settings now.
+  test("a card carries the way into that workspace's settings", async ({
+    page,
+  }) => {
+    const suffix = Date.now().toString(36);
+    const workspace = await api.seedWorkspace({
+      name: `E2E Settings ${suffix}`,
+      slug: `e2e-set-${suffix}`,
+      owner: `e2e-owner-${suffix}`,
+      repo: `e2e-repo-${suffix}`,
+    });
+
+    await loginAsE2E(page, api);
+    await page.goto("/workspaces", { waitUntil: "domcontentloaded" });
+    await expect(page.getByText(workspace.name)).toBeVisible({ timeout: 20_000 });
+
+    // Named for the workspace as well as the action: a page of cards each
+    // labelled only "Workspace settings" is a page of identical controls.
+    const settings = page.getByRole("link", {
+      name: `${workspace.name} settings`,
+    });
+    await expect(settings).toBeVisible();
+    await settings.click();
+
+    await expect(page).toHaveURL(new RegExp(`/${workspace.slug}/settings$`));
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible({
+      timeout: 20_000,
+    });
+  });
 });
