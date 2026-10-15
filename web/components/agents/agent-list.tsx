@@ -38,13 +38,6 @@ export interface AgentGroup {
   agents: Agent[];
 }
 
-/**
- * The rail the list reads inside: a roster is a handful of facts per row, and a
- * full-width row of four of them put the name and its status a screen apart.
- * Centred and capped, like the settings pages' column, so the toolbar above it
- * and the header rows inside it all share one edge.
- */
-export const AGENT_LIST_RAIL = "mx-auto w-full max-w-3xl";
 
 export function AgentList({
   groups,
@@ -214,7 +207,7 @@ function AgentRow({ agent, actions }: { agent: Agent; actions?: ReactNode }) {
           saying. */}
       {agent.total_runs > 0 && (
         <span className="shrink-0 font-mono text-caption tabular-nums text-mute">
-          {agent.total_runs} runs
+          {agent.total_runs} run{agent.total_runs === 1 ? "" : "s"}
         </span>
       )}
       {actions}
