@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronsUpDown, LayoutGrid, Plus, Search } from "lucide-react";
 import type { Workspace } from "@/lib/api";
+import { scopeTargetHref } from "@/lib/nav";
 import { paths } from "@/lib/paths";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,9 +32,12 @@ import {
  */
 export function ScopeSwitcher({
   slug,
+  pathname,
   workspaces,
 }: {
   slug?: string;
+  /** Where you are, so the menu can offer the same page in the other scope. */
+  pathname: string;
   workspaces: Workspace[];
 }) {
   const [open, setOpen] = useState(false);
@@ -72,6 +76,7 @@ export function ScopeSwitcher({
       <DropdownMenuContent align="start" className="w-72">
         <ScopeMenu
           slug={slug}
+          pathname={pathname}
           workspaces={workspaces}
           onDone={() => setOpen(false)}
         />
@@ -87,10 +92,12 @@ export function ScopeSwitcher({
  */
 function ScopeMenu({
   slug,
+  pathname,
   workspaces,
   onDone,
 }: {
   slug?: string;
+  pathname: string;
   workspaces: Workspace[];
   onDone: () => void;
 }) {
@@ -129,8 +136,11 @@ function ScopeMenu({
             if (e.key !== "Enter") return;
             // "type two letters, Enter" has to work without reaching for the
             // mouse: the first match is what the field is narrowing towards.
-            if (filtered[0]) go(paths.workspace(filtered[0].slug).board());
-            else go(paths.workspaces());
+            if (filtered[0]) {
+              go(scopeTargetHref(pathname, slug ?? null, filtered[0].slug));
+            } else {
+              go(paths.workspaces());
+            }
           }}
           placeholder="Find workspace…"
           className="h-8 w-full rounded-sm border border-hairline bg-canvas pl-8 pr-2 text-copy text-ink outline-none placeholder:text-mute focus:border-hairline-strong"
@@ -138,7 +148,7 @@ function ScopeMenu({
       </div>
 
       <DropdownMenuItem asChild>
-        <Link href={paths.workspaces()}>
+        <Link href={scopeTargetHref(pathname, slug ?? null, null)}>
           <LayoutGrid className="size-4 text-mute" />
           <span className="min-w-0 flex-1 truncate">All Workspaces</span>
           {!slug && <Check className="size-4 shrink-0 text-ink" />}
@@ -147,7 +157,7 @@ function ScopeMenu({
 
       {filtered.map((w) => (
         <DropdownMenuItem key={w.id} asChild>
-          <Link href={paths.workspace(w.slug).board()}>
+          <Link href={scopeTargetHref(pathname, slug ?? null, w.slug)}>
             <WorkspaceAvatar
               name={w.name}
               avatarUrl={w.avatar_url}

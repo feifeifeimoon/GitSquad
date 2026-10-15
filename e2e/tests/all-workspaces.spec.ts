@@ -161,4 +161,30 @@ test.describe("All Workspaces board", () => {
     // Read-only here as well: creating an agent names a workspace.
     await expect(page.getByRole("button", { name: "New Agent" })).toHaveCount(0);
   });
+
+  // The switcher changes the scope, not the page. It used to hardcode the
+  // workspace's board, so picking a workspace while reading the roster landed
+  // on that workspace's *issues*.
+  test("picking a workspace stays on the page you were reading", async ({
+    page,
+  }) => {
+    await loginAsE2E(page, api);
+    await page.goto("/workspaces/agents", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Agents", exact: true })).toBeVisible(
+      { timeout: 20_000 },
+    );
+
+    await page.getByRole("button", { name: "All Workspaces" }).click();
+    await page.getByRole("menuitem", { name: alpha.name }).click();
+
+    // The roster of that workspace, not its board.
+    await expect(page).toHaveURL(new RegExp(`/${alpha.slug}/agents$`));
+    await expect(page.getByRole("button", { name: "New Agent" })).toBeVisible({
+      timeout: 20_000,
+    });
+    // …and the same rule on the way back.
+    await page.getByRole("button", { name: alpha.name }).click();
+    await page.getByRole("menuitem", { name: "All Workspaces" }).click();
+    await expect(page).toHaveURL(/\/workspaces\/agents$/);
+  });
 });

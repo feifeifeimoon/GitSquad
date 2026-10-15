@@ -210,7 +210,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           on a long page and the second thing to say where you were. */}
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="grid h-16 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-hairline px-4">
-          <ScopeSwitcher slug={slug} workspaces={workspaces} />
+          <ScopeSwitcher slug={slug} pathname={pathname} workspaces={workspaces} />
           <h1 className="min-w-0 truncate text-title font-semibold tracking-[-0.01em] text-ink">
             {consoleTitle(pathname, slug ?? null)}
           </h1>

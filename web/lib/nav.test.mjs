@@ -11,6 +11,7 @@ import {
   navPageByJump,
   navPageForPath,
   navPagesInScope,
+  scopeTargetHref,
   navRowClass,
 } from "./nav.ts";
 
@@ -211,4 +212,32 @@ test("a page that titles itself is left out of the bar", () => {
   assert.equal(consoleTitle("/workspaces/new", null), null);
   assert.equal(consoleTitle("/workspaces/new/configure", null), null);
   assert.equal(consoleTitle("/workspaces", null), "Workspaces");
+});
+
+test("the switcher changes the scope, not the page", () => {
+  // Picking a workspace while reading the Agents roster stays on Agents — the
+  // bug was landing on that workspace's board instead.
+  assert.equal(scopeTargetHref("/workspaces/agents", null, "acme"), "/acme/agents");
+  assert.equal(scopeTargetHref("/workspaces/issues", null, "acme"), "/acme");
+  // …and the other way: from a workspace's Agents to the roster across all.
+  assert.equal(scopeTargetHref("/acme/agents", "acme", null), "/workspaces/agents");
+  assert.equal(scopeTargetHref("/acme", "acme", null), "/workspaces/issues");
+  assert.equal(scopeTargetHref("/acme/skills", "acme", "other"), "/other/skills");
+  // A detail page keeps its section: the issue is not in the other workspace,
+  // but its board is.
+  assert.equal(scopeTargetHref("/acme/issues/E1", "acme", "other"), "/other");
+});
+
+test("a page with no counterpart falls back to the target scope's front door", () => {
+  // The workspace list has no workspace page.
+  assert.equal(scopeTargetHref("/workspaces", null, "acme"), "/acme");
+  // Settings has no All Workspaces page.
+  assert.equal(scopeTargetHref("/acme/settings", "acme", null), "/workspaces");
+  // Daemons and Usage resolve to the same URL in both scopes, so "stay" would
+  // leave the switcher showing the scope you just left.
+  assert.equal(scopeTargetHref("/daemons", null, "acme"), "/acme");
+  assert.equal(scopeTargetHref("/usage", null, "acme"), "/acme");
+  assert.equal(scopeTargetHref("/acme/agents", "acme", "acme"), "/acme");
+  // A page that is not a destination at all: the account settings.
+  assert.equal(scopeTargetHref("/settings", null, "acme"), "/acme");
 });
