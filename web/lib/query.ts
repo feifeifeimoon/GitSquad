@@ -118,7 +118,10 @@ export function invalidateApi(prefix: string): void {
     entry.stale = true;
     notify(key);
   }
-  if (!prefix.startsWith("/api/v1/workspaces/")) return;
+  // Anything workspace-shaped, including the list at `/api/v1/workspaces`
+  // itself: deleting a workspace is a workspace-shaped change that touches no
+  // single workspace's keys.
+  if (!prefix.startsWith("/api/v1/workspaces")) return;
   for (const key of AGGREGATE_KEYS) {
     const entry = cache.get(key);
     if (!entry) continue;

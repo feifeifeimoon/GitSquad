@@ -48,6 +48,9 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   // With no slug the scope is All Workspaces, which is a page you can be on
   // rather than a state the console can be in.
   const slug = workspaceSlugFromPath(pathname) ?? undefined;
+  // Read once: the bar draws it, and the same call decides whether there is
+  // anything to draw at all.
+  const title = consoleTitle(pathname, slug ?? null);
 
   // Reads go through the cache, so the shell, the scope switcher and the
   // workspaces page share one request per path instead of one each.
@@ -81,9 +84,10 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
   // answers "go to a place" without opening anything, which is the fastest path
   // in a console you move around all day.
   //
-  // The scope decides which letters exist: `g i` is Issues in a workspace and
-  // nothing at all in All Workspaces, because there is no Issues page to reach
-  // — the same answer the sidebar gives by not drawing the row.
+  // The scope decides where a letter lands, and whether it lands at all:
+  // `g i` is this workspace's board inside a workspace and the board across all
+  // of them in All Workspaces, while `g s` is Skills only inside one — the same
+  // answer the sidebar gives by not drawing that row in the other scope.
   useEffect(() => {
     let armed = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -211,9 +215,16 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="grid h-16 shrink-0 grid-cols-[1fr_auto_1fr] items-center gap-4 border-b border-hairline px-4">
           <ScopeSwitcher slug={slug} pathname={pathname} workspaces={workspaces} />
-          <h1 className="min-w-0 truncate text-title font-semibold tracking-[-0.01em] text-ink">
-            {consoleTitle(pathname, slug ?? null)}
-          </h1>
+          {/* No heading at all when the page titles itself — an empty `<h1>` is a
+              landmark with nothing in it, and the flow pages draw their own. The
+              cell stays so the grid keeps three columns. */}
+          {title ? (
+            <h1 className="min-w-0 truncate text-title font-semibold tracking-[-0.01em] text-ink">
+              {title}
+            </h1>
+          ) : (
+            <span />
+          )}
           <div />
         </div>
 
