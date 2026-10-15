@@ -58,6 +58,31 @@ export function CommandPalette({
     wsId ? `/api/v1/workspaces/${wsId}/issues` : null,
     () => issueApi.list(wsId as string),
   );
+  // With no workspace in scope there is still a list of issues to search: the
+  // one across every workspace, which is what the board in that scope reads.
+  // The placeholder has always promised "pages, workspaces, issues" — in the
+  // aggregate scope it was promising something it did not do.
+  const { data: allIssues = [] } = useApi<Issue[]>(
+    wsId ? null : "/api/v1/issues",
+    () => issueApi.listAll(),
+  );
+  // The destination is resolved once, here: across workspaces the key alone is
+  // not an address, so the slug has to come from the issue itself.
+  const issueItems = useMemo(
+    () =>
+      (wsId ? issueList : allIssues).flatMap((issue) => {
+        const slug = wsId ?? issue.workspace_slug;
+        if (!slug) return [];
+        return [
+          {
+            issue,
+            href: paths.workspace(slug).issue(issue.issue_key),
+            workspaceName: wsId ? "" : (issue.workspace_name ?? ""),
+          },
+        ];
+      }),
+    [wsId, issueList, allIssues],
+  );
 
   // The Pages group is the nav registry, not a copy of it. It was a
   // hand-written list of three, and it had already gone stale: Usage was in the
@@ -86,7 +111,6 @@ export function CommandPalette({
   // with a few hundred issues used to draw all of them — the fastest surface in
   // the console, arriving as its longest page.
   const searching = query.trim() !== "";
-  const currentIssues = wsId ? issueList : [];
 
   return (
     <CommandDialog open={open} onOpenChange={onOpenChange}>
@@ -125,23 +149,30 @@ export function CommandPalette({
             Account settings
           </CommandItem>
         </CommandGroup>
-        {searching && wsId && currentIssues.length > 0 && (
+        {searching && issueItems.length > 0 && (
           <>
             <CommandSeparator />
             <CommandGroup heading="Issues">
-              {currentIssues.map((issue) => (
+              {issueItems.map(({ issue, href, workspaceName }) => (
                 <CommandItem
                   key={issue.id}
-                  value={`${issue.issue_key} ${issue.title}`}
-                  onSelect={() =>
-                    run(paths.workspace(wsId).issue(issue.issue_key))
-                  }
+                  // The workspace is part of what the item matches on, not just
+                  // what it shows: in the aggregate scope the key alone does not
+                  // identify an issue, and typing a workspace name is a
+                  // reasonable way to ask for its issues.
+                  value={`${issue.issue_key} ${issue.title} ${workspaceName}`}
+                  onSelect={() => run(href)}
                 >
                   <StatusIcon status={issue.status} />
                   <span className="shrink-0 font-mono text-caption text-mute">
                     {issue.issue_key}
                   </span>
                   <span className="min-w-0 flex-1 truncate">{issue.title}</span>
+                  {workspaceName && (
+                    <span className="shrink-0 truncate text-caption text-mute">
+                      {workspaceName}
+                    </span>
+                  )}
                 </CommandItem>
               ))}
             </CommandGroup>

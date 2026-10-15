@@ -91,6 +91,20 @@ function read<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
 }
 
 /**
+ * Reads derived from *every* workspace, so any workspace going stale makes them
+ * stale. The All Workspaces pages read these, and they are keyed by nothing in
+ * particular — `GET /api/v1/issues` is the same URL whoever is asking.
+ *
+ * Without this they were invisible to invalidation: creating an issue under
+ * `/api/v1/workspaces/acme` left `/api/v1/issues` fresh for its 30 seconds, so
+ * walking from a workspace to the aggregate board showed a board missing the
+ * issue just created. Every mutation already invalidates the workspace it
+ * touched, so the aggregates follow from that instead of each of the eight
+ * call sites remembering two more keys.
+ */
+const AGGREGATE_KEYS = ["/api/v1/issues", "/api/v1/agents"];
+
+/**
  * Mark everything under a path prefix stale, and let whoever is reading it
  * re-read now.
  *
@@ -101,6 +115,13 @@ function read<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
 export function invalidateApi(prefix: string): void {
   for (const [key, entry] of cache) {
     if (!key.startsWith(prefix)) continue;
+    entry.stale = true;
+    notify(key);
+  }
+  if (!prefix.startsWith("/api/v1/workspaces/")) return;
+  for (const key of AGGREGATE_KEYS) {
+    const entry = cache.get(key);
+    if (!entry) continue;
     entry.stale = true;
     notify(key);
   }

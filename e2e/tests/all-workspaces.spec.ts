@@ -182,9 +182,36 @@ test.describe("All Workspaces board", () => {
     await expect(page.getByRole("button", { name: "New Agent" })).toBeVisible({
       timeout: 20_000,
     });
-    // …and the same rule on the way back.
+    // …and the same rule on the way back, by keyboard: an empty field means the
+    // row the menu opens on — All Workspaces — rather than the first workspace
+    // in the list, which is what Enter used to pick.
+    await page.getByRole("button", { name: alpha.name }).click();
+    await page.getByPlaceholder("Find workspace…").press("Enter");
+    await expect(page).toHaveURL(/\/workspaces\/agents$/);
+  });
+
+  test("an issue created in a workspace is on the board across them", async ({
+    page,
+  }) => {
+    await loginAsE2E(page, api);
+    await page.goto(`/${alpha.slug}`, { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", { name: "New Issue" }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    const title = `Created in ${alpha.slug} ${suffix}`;
+    await page.getByRole("button", { name: "New Issue" }).click();
+    await page.getByPlaceholder("Issue title").fill(title);
+    await page.getByRole("button", { name: "Create issue" }).click();
+    await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 });
+
+    // Straight to the aggregate board through the switcher — an in-app hop, so
+    // the cache survives it. The board reads a different key than the workspace
+    // board does, and it used to be stale for the rest of the 30 seconds, which
+    // looked like the issue had not been created at all.
     await page.getByRole("button", { name: alpha.name }).click();
     await page.getByRole("menuitem", { name: "All Workspaces" }).click();
-    await expect(page).toHaveURL(/\/workspaces\/agents$/);
+    await expect(page).toHaveURL(/\/workspaces\/issues$/);
+    await expect(page.getByText(title)).toBeVisible({ timeout: 15_000 });
   });
 });

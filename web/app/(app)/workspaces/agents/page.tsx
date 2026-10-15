@@ -1,8 +1,10 @@
 "use client";
 
+import { useEffect } from "react";
 import { Bot } from "lucide-react";
 import { agentApi, type Agent } from "@/lib/api";
-import { useApi } from "@/lib/query";
+import { AGENT_REFRESH_MS } from "@/lib/agent-status";
+import { invalidateApi, useApi } from "@/lib/query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/error-state";
 import { AgentTable } from "@/components/agents/agent-table";
@@ -32,6 +34,18 @@ export default function AllAgentsPage() {
     error,
     refresh,
   } = useApi<Agent[]>("/api/v1/agents", () => agentApi.listAll());
+
+  // No socket here — the app's connection is scoped to a workspace — and status
+  // is derived from the daemon heartbeat, so the page has to ask again on its
+  // own schedule. Same interval as the roster inside a workspace, for the same
+  // reason.
+  useEffect(() => {
+    const interval = setInterval(
+      () => invalidateApi("/api/v1/agents"),
+      AGENT_REFRESH_MS,
+    );
+    return () => clearInterval(interval);
+  }, []);
 
   if (error) {
     return (

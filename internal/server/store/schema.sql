@@ -230,6 +230,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_agent
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_issue ON tasks(issue_id);
 
+-- The agent lists read their workload per agent — counts by status, and the
+-- issue in flight — twice per row, so agent_id has to lead. The unique index
+-- above is on (issue_id, agent_id) and holds only pending rows.
+CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(agent_id, status);
+
 -- The issue ↔ pull request relationship. One issue has at most one active PR at
 -- a time — the one that declares closing intent — and keeps the older ones as
 -- history, so the issue page can show how the issue got here. Unrelated PRs are

@@ -415,6 +415,15 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// column nobody writes.
 		{name: "050_drop_issues_assigned_agents", sql: `ALTER TABLE issues
 			DROP COLUMN IF EXISTS assigned_agents`},
+		// Every agent list reads its workload per agent: the running/queued/total
+		// counts and the issue an agent is on right now both come from
+		// `tasks WHERE agent_id = …`, twice per row. No index led with agent_id,
+		// so each of those was a sequential scan of the whole task history —
+		// with `enable_seqscan = off` the planner still had nothing to use. The
+		// unique partial index on (issue_id, agent_id) cannot serve it: agent_id
+		// is the second column, and the index holds only pending rows.
+		{name: "051_tasks_agent_idx", sql: `CREATE INDEX IF NOT EXISTS idx_tasks_agent
+			ON tasks(agent_id, status)`},
 	}
 
 	for _, m := range migrations {

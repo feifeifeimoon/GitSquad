@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, ChevronsUpDown, LayoutGrid, Plus, Search } from "lucide-react";
@@ -41,6 +41,8 @@ export function ScopeSwitcher({
   workspaces: Workspace[];
 }) {
   const [open, setOpen] = useState(false);
+  // For the one thing the field cannot delegate: stepping into the list.
+  const menuRef = useRef<HTMLDivElement>(null);
   const current = slug ? workspaces.find((w) => w.slug === slug) : undefined;
 
   return (
@@ -48,7 +50,7 @@ export function ScopeSwitcher({
       <DropdownMenuTrigger asChild>
         {/* No aria-label on purpose: the visible text already names the scope,
             and a label that repeats it just gives the control two names. */}
-        <button className="flex h-8 items-center gap-2 rounded-md pl-1 pr-2 text-copy font-medium text-ink outline-none transition-colors hover:bg-muted/60">
+        <button type="button" className="flex h-8 items-center gap-2 rounded-md pl-1 pr-2 text-copy font-medium text-ink outline-none transition-colors hover:bg-muted/60">
           {slug ? (
             current ? (
               <>
@@ -73,11 +75,12 @@ export function ScopeSwitcher({
           <ChevronsUpDown className="size-3.5 shrink-0 text-mute" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-72">
+      <DropdownMenuContent ref={menuRef} align="start" className="w-72">
         <ScopeMenu
           slug={slug}
           pathname={pathname}
           workspaces={workspaces}
+          menuRef={menuRef}
           onDone={() => setOpen(false)}
         />
       </DropdownMenuContent>
@@ -94,10 +97,12 @@ function ScopeMenu({
   slug,
   pathname,
   workspaces,
+  menuRef,
   onDone,
 }: {
   slug?: string;
   pathname: string;
+  menuRef: React.RefObject<HTMLDivElement | null>;
   workspaces: Workspace[];
   onDone: () => void;
 }) {
@@ -129,18 +134,32 @@ function ScopeMenu({
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={(e) => {
             // Escape is the menu's (it closes it). Everything else is the
-            // field's — Radix's menu would otherwise read typing as typeahead
-            // and move the highlight out from under the caret.
+            // field's — without stopping it, Radix reads typing as typeahead
+            // and moves the highlight out from under the caret.
             if (e.key === "Escape") return;
+            if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+              // The first step into the list is ours: Radix ignores key events
+              // that come from an input — deliberately, so a search field keeps
+              // its own keys — so nothing moves focus on its behalf. Once focus
+              // is on an item, Radix's own arrow handling takes over.
+              e.preventDefault();
+              const items = menuRef.current?.querySelectorAll<HTMLElement>(
+                "[role='menuitem']",
+              );
+              if (!items?.length) return;
+              items[e.key === "ArrowUp" ? items.length - 1 : 0].focus();
+              return;
+            }
             e.stopPropagation();
             if (e.key !== "Enter") return;
-            // "type two letters, Enter" has to work without reaching for the
-            // mouse: the first match is what the field is narrowing towards.
-            if (filtered[0]) {
-              go(scopeTargetHref(pathname, slug ?? null, filtered[0].slug));
-            } else {
-              go(paths.workspaces());
-            }
+            // An empty field means the row the menu opens on: All Workspaces.
+            // Once something is typed, the first match is what the field is
+            // narrowing towards, and typing nothing that matches falls back to
+            // this page's All Workspaces. Never the workspace list — the
+            // switcher keeps the page you are on.
+            const target =
+              query.trim() === "" ? null : (filtered[0]?.slug ?? null);
+            go(scopeTargetHref(pathname, slug ?? null, target));
           }}
           placeholder="Find workspace…"
           className="h-8 w-full rounded-sm border border-hairline bg-canvas pl-8 pr-2 text-copy text-ink outline-none placeholder:text-mute focus:border-hairline-strong"
