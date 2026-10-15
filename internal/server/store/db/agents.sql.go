@@ -444,7 +444,7 @@ LEFT JOIN LATERAL (
     LIMIT 1
 ) cur ON true
 WHERE w.user_id = $1 AND w.status != 'archived'
-ORDER BY w.name ASC, a.name ASC
+ORDER BY w.name ASC, a.name ASC, w.id ASC
 `
 
 type ListAgentsForUserRow struct {
@@ -482,6 +482,8 @@ type ListAgentsForUserRow struct {
 // and ordered by workspace, because a flat list of agents reads as one
 // workspace's roster and this is the roster of all of them.
 // aliased w2 because the outer query already joins workspaces as w
+// w.id last, so the order is total: two workspaces can share a name, and this
+// page polls, so an unstable tie-break reads as groups swapping places.
 func (q *Queries) ListAgentsForUser(ctx context.Context, userID uuid.UUID) ([]ListAgentsForUserRow, error) {
 	rows, err := q.db.Query(ctx, listAgentsForUser, userID)
 	if err != nil {

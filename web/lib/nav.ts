@@ -244,8 +244,13 @@ export function scopeTargetHref(
 ): string {
   const current = navPageForPath(pathname, slug);
   if (current) {
-    const target = navPageHref(current, targetSlug);
-    if (target && target !== navPageHref(current, slug)) return target;
+    const here = navPageHref(current, slug);
+    const there = navPageHref(current, targetSlug);
+    // The page in the other scope, unless that is no move at all. Picking the
+    // scope you are already in is a no-op, not a trip to the front door — the
+    // switcher lists the current workspace like any other, and clicking the
+    // checked row used to throw the reader off the page.
+    if (there && (there !== here || targetSlug === slug)) return there;
   }
   return targetSlug ? paths.workspace(targetSlug).board() : paths.workspaces();
 }

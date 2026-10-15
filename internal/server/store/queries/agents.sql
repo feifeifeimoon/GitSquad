@@ -121,7 +121,9 @@ LEFT JOIN LATERAL (
     LIMIT 1
 ) cur ON true
 WHERE w.user_id = $1 AND w.status != 'archived'
-ORDER BY w.name ASC, a.name ASC;
+-- w.id last, so the order is total: two workspaces can share a name, and this
+-- page polls, so an unstable tie-break reads as groups swapping places.
+ORDER BY w.name ASC, a.name ASC, w.id ASC;
 
 -- name: ListAgentsByDaemon :many
 SELECT a.*, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,

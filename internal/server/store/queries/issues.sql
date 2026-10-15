@@ -25,8 +25,10 @@ ORDER BY i.status, i.created_at DESC;
 -- per workspace and two of them can both be "GS-1".
 --
 -- Archived workspaces are left out, matching the workspace list this board is
--- reached from. The scoped query above does not need the filter: you cannot be
--- inside an archived workspace to ask it.
+-- reached from. The scoped query above does not filter on status, and for the
+-- console it does not need to: every page reaches a workspace by slug, and the
+-- slug lookup already excludes archived ones. A direct API call with the UUID
+-- can still read an archived workspace — older behaviour, left alone here.
 SELECT i.*, w.issue_prefix AS issue_prefix,
        w.slug AS workspace_slug, w.name AS workspace_name,
        COALESCE(u.login, '') AS creator_name,
