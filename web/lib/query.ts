@@ -1,6 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
 // A cache for the console's server reads, keyed by the API path that produces
 // them.
@@ -30,6 +36,12 @@ interface Entry {
   inFlight?: Promise<unknown>;
   /** Set by invalidateApi; cleared when a read lands. */
   stale?: boolean;
+  /**
+   * Bumped by every read. A response whose sequence is no longer the entry's
+   * belongs to a read that something newer has superseded, and must not write:
+   * the newer read is the one answering the caller.
+   */
+  seq?: number;
 }
 
 const cache = new Map<string, Entry>();
@@ -63,14 +75,31 @@ function entryFor(key: string): Entry {
   return entry;
 }
 
-function read<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
+function read<T>(
+  key: string,
+  fetcher: () => Promise<T>,
+  options: { supersede?: boolean } = {},
+): Promise<T> {
   const entry = entryFor(key);
 
-  // One request per key at a time: the second caller joins the first.
-  if (entry.inFlight) return entry.inFlight as Promise<T>;
+  // One request per key at a time: the second caller joins the first. Unless
+  // the caller is answering an invalidation — joining is the bug then. The read
+  // in flight was *sent* before the change that invalidated the entry, so its
+  // response is the value being thrown away, and a caller that joins it gets
+  // exactly the stale answer it meant to replace.
+  //
+  // This is not hypothetical: a delete followed by the list's re-read produced
+  // it on a slow machine every time. The list request went out before the
+  // delete, the invalidation joined it, and its response — the list still
+  // holding the deleted workspace — was written back as fresh.
+  if (entry.inFlight && !options.supersede) return entry.inFlight as Promise<T>;
+
+  const seq = (entry.seq ?? 0) + 1;
+  entry.seq = seq;
 
   const request = fetcher()
     .then((data) => {
+      if (entry.seq !== seq) return data;
       entry.data = data;
       entry.error = undefined;
       entry.updatedAt = Date.now();
@@ -78,10 +107,12 @@ function read<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
       return data;
     })
     .catch((error: unknown) => {
-      entry.error = error instanceof Error ? error : new Error(String(error));
-      throw entry.error;
+      const failure = error instanceof Error ? error : new Error(String(error));
+      if (entry.seq === seq) entry.error = failure;
+      throw failure;
     })
     .finally(() => {
+      if (entry.seq !== seq) return;
       entry.inFlight = undefined;
       notify(key);
     });
@@ -179,10 +210,38 @@ export function useApi<T>(
     fetcherRef.current = fetcher;
   });
 
+  const subscribeKey = useCallback(
+    (onChange: () => void) => (key ? subscribe(key, onChange) : () => {}),
+    [key],
+  );
   useEffect(() => {
     if (!key) return;
     return subscribe(key, () => setVersion((n) => n + 1));
   }, [key]);
+
+  // The value is read through useSyncExternalStore rather than mirrored into
+  // state, and the reason is the subscribe/render window: a component renders
+  // the cached value, a read lands before its effects have run, and `notify`
+  // reaches every subscriber except the one that has not subscribed yet. The
+  // entry is fresh by then, so nothing re-reads and nothing bumps `version` —
+  // the render keeps a value that arrived after it. `useSyncExternalStore`
+  // re-reads its snapshot after subscribing, which closes that window; it is
+  // what the sidebar's width and the shell's platform check use, for the same
+  // reason.
+  //
+  // It is not the whole story: the flake this was investigated for turned out
+  // to be the in-flight join in `read` (see its comment), which no render shape
+  // would have fixed. This closes the other window on the same path.
+  const data = useSyncExternalStore<T | undefined>(
+    subscribeKey,
+    () => (key ? (cache.get(key)?.data as T | undefined) : undefined),
+    () => undefined,
+  );
+  const error = useSyncExternalStore<Error | undefined>(
+    subscribeKey,
+    () => (key ? cache.get(key)?.error : undefined),
+    () => undefined,
+  );
 
   const staleTime = options.staleTime ?? 30_000;
   useEffect(() => {
@@ -193,11 +252,17 @@ export function useApi<T>(
       !entry.stale &&
       entry.data !== undefined &&
       Date.now() - entry.updatedAt < staleTime;
-    if (fresh || entry?.inFlight) return;
+    if (fresh) return;
+    // A read already in flight is normally worth joining. Not when this entry
+    // is stale: that read was sent before whatever invalidated it, so its
+    // response is the value being replaced — joining it is how a deleted
+    // workspace stayed on the list.
+    const supersede = entry?.stale === true;
+    if (entry?.inFlight && !supersede) return;
 
     // The failure is recorded on the entry and surfaces through `error`; this
     // catch only stops it becoming an unhandled rejection.
-    read(key, () => fetcherRef.current()).catch(() => {});
+    read(key, () => fetcherRef.current(), { supersede }).catch(() => {});
   }, [key, version, staleTime]);
 
   const refresh = useCallback(() => {
@@ -206,11 +271,10 @@ export function useApi<T>(
     setVersion((n) => n + 1);
   }, [key]);
 
-  const entry = key ? cache.get(key) : undefined;
   return {
-    data: entry?.data as T | undefined,
-    error: entry?.error,
-    loading: entry?.data === undefined && entry?.error === undefined,
+    data,
+    error,
+    loading: data === undefined && error === undefined,
     refresh,
   };
 }
