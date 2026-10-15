@@ -201,6 +201,37 @@ test.describe("Navigation", () => {
     }
   });
 
+  test("a remembered sidebar width hydrates without a mismatch", async ({
+    page,
+  }) => {
+    // The width lives in localStorage, which the server cannot see. The shell
+    // used to read it in a lazy initializer, so the server rendered the default
+    // and the client rendered the stored value — a hydration mismatch, which
+    // React answers by throwing away the server's markup for the tree it was
+    // hydrating. It logged that on every load, for anyone who had ever dragged
+    // the handle.
+    await page.addInitScript(() =>
+      localStorage.setItem("gitsquad_sidebar_width", "320"),
+    );
+    await loginAsE2E(page, api);
+
+    // Attached before the first load, because hydration is when it speaks.
+    const complaints: string[] = [];
+    page.on("console", (message) => {
+      if (/hydrat/i.test(message.text())) complaints.push(message.text());
+    });
+
+    await page.goto("/workspaces", { waitUntil: "domcontentloaded" });
+    await expect(
+      page.getByRole("button", { name: "New Workspace" }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    // The remembered width is applied…
+    await expect(page.locator("aside")).toHaveCSS("width", "320px");
+    // …and nothing complained about how it got there.
+    expect(complaints).toEqual([]);
+  });
+
   test("logs out and clears the session", async ({ page }) => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
