@@ -140,11 +140,12 @@ test.describe("Navigation", () => {
     ).toHaveCount(0);
     await expect(page.getByRole("button", { name: workspace.name })).toBeVisible();
 
-    // And back, in one click. Issues is still a row here — it is the board
-    // across every workspace now — but it points somewhere else.
+    // And back, in one click — to the *same page* in the other scope, not to
+    // the workspace list. The switcher changes the scope; the page is what you
+    // were reading, and Issues is the board across every workspace now.
     await page.getByRole("button", { name: workspace.name }).click();
     await page.getByRole("menuitem", { name: "All Workspaces" }).click();
-    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(page).toHaveURL(/\/workspaces\/issues$/);
     await expect(
       page.getByRole("link", { name: "Issues", exact: true }),
     ).toHaveAttribute("href", "/workspaces/issues");

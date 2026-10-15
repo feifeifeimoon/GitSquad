@@ -220,6 +220,37 @@ export function navPageForPath(
 }
 
 /**
+ * Where the scope switcher goes when you pick a scope from where you are.
+ *
+ * **The switcher changes the scope, not the page.** Picking a workspace while
+ * reading Agents lands on that workspace's Agents; picking All Workspaces from
+ * a workspace's board lands on the board across all of them. Vercel's project
+ * switcher keeps you on the page you are on, for the same reason: the page is
+ * what you were reading, and the scope is what it should be read in.
+ *
+ * Two cases fall back to the scope's front door — the workspace's board, or the
+ * All Workspaces list:
+ *
+ *   - the page has no counterpart in the target scope (Settings has no All
+ *     Workspaces page, the workspace list has no workspace page);
+ *   - the counterpart resolves to the *same* URL, which is what the account-level
+ *     rows do: Daemons is `/daemons` in both scopes, so a plain "stay" would
+ *     leave the switcher showing the scope you just left.
+ */
+export function scopeTargetHref(
+  pathname: string,
+  slug: string | null,
+  targetSlug: string | null,
+): string {
+  const current = navPageForPath(pathname, slug);
+  if (current) {
+    const target = navPageHref(current, targetSlug);
+    if (target && target !== navPageHref(current, slug)) return target;
+  }
+  return targetSlug ? paths.workspace(targetSlug).board() : paths.workspaces();
+}
+
+/**
  * Pages that name themselves with their own big heading, and are left out of
  * the bar so the same words are not stacked twice on one screen.
  */

@@ -89,7 +89,11 @@ test("the sidebar header is the product; the scope is named above the page", () 
   assert.match(shell, /ScopeSwitcher/);
   assert.match(scopeSwitcher, /All Workspaces/);
   assert.match(scopeSwitcher, /WorkspaceAvatar/);
-  assert.match(scopeSwitcher, /paths\.workspace\(/);
+  // Where a pick goes is the registry's answer, not the switcher's: it used to
+  // build `paths.workspace(slug).board()` itself, which is why picking a
+  // workspace from the Agents roster landed on that workspace's board.
+  assert.match(scopeSwitcher, /scopeTargetHref\(/);
+  assert.doesNotMatch(scopeSwitcher, /paths\.workspace\(/);
   // Nothing remembers the last workspace. A remembered scope is one that can be
   // missing, and a missing scope is what drew the four grey rows.
   assert.doesNotMatch(shell, /lastWorkspaceSlug/);
