@@ -51,7 +51,10 @@ test("workspace list renders a card grid by default", () => {
   // said the same word every time. What is there is the way to that
   // workspace's settings.
   assert.doesNotMatch(list, /StatusBadge/);
-  assert.match(list, /.settings()/);
+  // Anchored to the workspace-scoped builder: the earlier unanchored
+  // `/\.settings()/` matched the account page's `paths.settings()` just as
+  // happily, which is the mix-up this registry exists to prevent.
+  assert.match(list, /paths\.workspace\([^)]*\)\.settings\(\)/);
   assert.doesNotMatch(list, /font-bold/);
   assert.doesNotMatch(list, /text-\[10px\]/);
 });

@@ -30,18 +30,25 @@ import {
 interface Entry {
   data?: unknown;
   error?: Error;
-  /** When `data` was last written, for staleness. */
+  /** When `data` or `error` was last written, for staleness. */
   updatedAt: number;
   /** The read in flight, so two components asking at once share one request. */
   inFlight?: Promise<unknown>;
-  /** Set by invalidateApi; cleared when a read lands. */
-  stale?: boolean;
   /**
-   * Bumped by every read. A response whose sequence is no longer the entry's
-   * belongs to a read that something newer has superseded, and must not write:
-   * the newer read is the one answering the caller.
+   * The generation of the world this entry is describing. Every invalidation —
+   * and every explicit `refresh` — starts a new one.
+   *
+   * Reads are answered *for a generation*, which is what makes the difference
+   * between "this answer is current" and "this answer arrived later": a
+   * response from an older generation is dropped, and a read still in flight in
+   * the current one is worth joining. Timestamps alone cannot tell those apart,
+   * and that is how a list kept a row it had just been told was deleted.
    */
-  seq?: number;
+  generation: number;
+  /** The generation the in-flight read was sent in. */
+  inFlightGen?: number;
+  /** The generation `data`/`error` answer; `generation` means "current". */
+  answeredGen: number;
 }
 
 const cache = new Map<string, Entry>();
@@ -69,55 +76,64 @@ function subscribe(key: string, listener: () => void): () => void {
 function entryFor(key: string): Entry {
   let entry = cache.get(key);
   if (!entry) {
-    entry = { updatedAt: 0, stale: true };
+    // `answeredGen: -1` is "nothing has been answered yet" — the first reader
+    // sees an entry that is not current and reads.
+    entry = { updatedAt: 0, generation: 0, answeredGen: -1 };
     cache.set(key, entry);
   }
   return entry;
 }
 
-function read<T>(
-  key: string,
-  fetcher: () => Promise<T>,
-  options: { supersede?: boolean } = {},
-): Promise<T> {
+/**
+ * Read a key, joining a read that is already in flight **in the same
+ * generation**.
+ *
+ * The same-generation condition is the whole point. A read sent before an
+ * invalidation is answering a world that no longer exists, so a caller that
+ * joins it gets exactly the value the invalidation exists to throw away — and
+ * its response must not write either, or the entry is stamped current with
+ * pre-invalidation data. Both halves are checked here rather than in the
+ * callers.
+ */
+function read<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
   const entry = entryFor(key);
+  const generation = entry.generation;
 
-  // One request per key at a time: the second caller joins the first. Unless
-  // the caller is answering an invalidation — joining is the bug then. The read
-  // in flight was *sent* before the change that invalidated the entry, so its
-  // response is the value being thrown away, and a caller that joins it gets
-  // exactly the stale answer it meant to replace.
-  //
-  // This is not hypothetical: a delete followed by the list's re-read produced
-  // it on a slow machine every time. The list request went out before the
-  // delete, the invalidation joined it, and its response — the list still
-  // holding the deleted workspace — was written back as fresh.
-  if (entry.inFlight && !options.supersede) return entry.inFlight as Promise<T>;
-
-  const seq = (entry.seq ?? 0) + 1;
-  entry.seq = seq;
+  if (entry.inFlight && entry.inFlightGen === generation) {
+    return entry.inFlight as Promise<T>;
+  }
 
   const request = fetcher()
     .then((data) => {
-      if (entry.seq !== seq) return data;
+      if (entry.generation !== generation) return data;
       entry.data = data;
       entry.error = undefined;
       entry.updatedAt = Date.now();
-      entry.stale = false;
+      entry.answeredGen = generation;
       return data;
     })
     .catch((error: unknown) => {
       const failure = error instanceof Error ? error : new Error(String(error));
-      if (entry.seq === seq) entry.error = failure;
+      if (entry.generation === generation) {
+        // The failure answers this generation too. Without that, a failing read
+        // re-arms the entry: not current, no read in flight, read again — a
+        // request loop for as long as the API is down.
+        entry.error = failure;
+        entry.updatedAt = Date.now();
+        entry.answeredGen = generation;
+      }
       throw failure;
     })
     .finally(() => {
-      if (entry.seq !== seq) return;
+      // A newer read owns `inFlight` if the generation moved on; leave it be.
+      if (entry.inFlightGen !== generation) return;
       entry.inFlight = undefined;
+      entry.inFlightGen = undefined;
       notify(key);
     });
 
   entry.inFlight = request;
+  entry.inFlightGen = generation;
   return request;
 }
 
@@ -146,7 +162,9 @@ const AGGREGATE_KEYS = ["/api/v1/issues", "/api/v1/agents"];
 export function invalidateApi(prefix: string): void {
   for (const [key, entry] of cache) {
     if (!key.startsWith(prefix)) continue;
-    entry.stale = true;
+    // A new generation, which is what retires any read already on the wire for
+    // this key: its response belongs to the previous one and is dropped.
+    entry.generation += 1;
     notify(key);
   }
   // Anything workspace-shaped, including the list at `/api/v1/workspaces`
@@ -156,7 +174,7 @@ export function invalidateApi(prefix: string): void {
   for (const key of AGGREGATE_KEYS) {
     const entry = cache.get(key);
     if (!entry) continue;
-    entry.stale = true;
+    entry.generation += 1;
     notify(key);
   }
 }
@@ -187,7 +205,7 @@ export function setApiData<T>(
   const entry = entryFor(key);
   entry.data = updater(entry.data as T | undefined);
   entry.updatedAt = Date.now();
-  entry.stale = false;
+  entry.answeredGen = entry.generation;
   notify(key);
 }
 
@@ -247,27 +265,25 @@ export function useApi<T>(
   useEffect(() => {
     if (!key) return;
     const entry = cache.get(key);
-    const fresh =
+    const current = entry !== undefined && entry.answeredGen === entry.generation;
+    const hasAnswer =
       entry !== undefined &&
-      !entry.stale &&
-      entry.data !== undefined &&
-      Date.now() - entry.updatedAt < staleTime;
-    if (fresh) return;
-    // A read already in flight is normally worth joining. Not when this entry
-    // is stale: that read was sent before whatever invalidated it, so its
-    // response is the value being replaced — joining it is how a deleted
-    // workspace stayed on the list.
-    const supersede = entry?.stale === true;
-    if (entry?.inFlight && !supersede) return;
+      (entry.data !== undefined || entry.error !== undefined);
+    if (current && hasAnswer && Date.now() - entry.updatedAt < staleTime) return;
+
+    // A read in flight in this generation answers the question being asked, so
+    // join it. One sent in an earlier generation does not: `read` starts a
+    // fresh one instead, and the older response is dropped when it lands.
+    if (entry?.inFlight && entry.inFlightGen === entry.generation) return;
 
     // The failure is recorded on the entry and surfaces through `error`; this
     // catch only stops it becoming an unhandled rejection.
-    read(key, () => fetcherRef.current(), { supersede }).catch(() => {});
+    read(key, () => fetcherRef.current()).catch(() => {});
   }, [key, version, staleTime]);
 
   const refresh = useCallback(() => {
     if (!key) return;
-    entryFor(key).stale = true;
+    entryFor(key).generation += 1;
     setVersion((n) => n + 1);
   }, [key]);
 

@@ -140,8 +140,8 @@ func (s *AgentService) ListAgents(ctx context.Context, workspaceID uuid.UUID) ([
 }
 
 // ListAllAgents returns every agent in every workspace the user owns, each
-// carrying the workspace it belongs to. The All Workspaces page's read, and the
-// second of the console's cross-workspace reads after ListAllIssues.
+// carrying the workspace it belongs to. The All Workspaces page's read: the
+// roster that spans workspaces, the way the board across them spans issues.
 //
 // The roster is the interesting half of "what is running": a machine can back
 // runtimes in several workspaces at once, and before this the only way to see
@@ -166,8 +166,8 @@ func (s *AgentService) ListAllAgents(ctx context.Context, userID uuid.UUID) ([]v
 			createdAt: r.CreatedAt, updatedAt: r.UpdatedAt,
 		})
 		// Set after the builder rather than threaded through agentRow: the
-		// builder's shape is shared with the three reads that have no workspace
-		// to name, and only this one does.
+		// builder's shape is shared with the two reads that have no workspace to
+		// name (by workspace, by id), and only this one has one.
 		agent.WorkspaceSlug = r.WorkspaceSlug
 		agent.WorkspaceName = r.WorkspaceName
 		out = append(out, agent)
@@ -340,9 +340,10 @@ func (s *AgentService) setSkills(ctx context.Context, agentID uuid.UUID, skillID
 	})
 }
 
-// agentRow is the column set every agent query selects. The three queries
-// (by workspace, by id, by daemon) return the same joined shape, so the view
-// builder takes this instead of twenty positional arguments.
+// agentRow is the column set the agent reads select. Three of them return the
+// same joined shape — by workspace, by id, by user — so the view builder takes
+// this instead of twenty positional arguments. The by-daemon read has its own
+// columns and builds v1.DaemonAgent directly.
 type agentRow struct {
 	id, workspaceID, runtimeID             uuid.UUID
 	name, description, instructions        string

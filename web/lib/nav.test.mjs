@@ -203,7 +203,14 @@ test("the bar names the account settings, which are not a nav row", () => {
   // They live behind the avatar rather than in the sidebar, so the registry
   // cannot answer for them — and a page you can be on has to be nameable.
   assert.equal(consoleTitle("/settings", null), "Account settings");
-  assert.ok(!NAV_PAGES.some((p) => p.href().startsWith("/settings")));
+  // A slug for the rows that need one: `href()` with no argument encodes
+  // `undefined`, so calling it on a workspace row tested "/undefined/settings"
+  // and never looked at the row this asks about.
+  assert.ok(
+    !NAV_PAGES.some((p) =>
+      (p.group === "workspace" ? p.href("acme") : p.href()).startsWith("/settings"),
+    ),
+  );
 });
 
 test("a page that titles itself is left out of the bar", () => {
@@ -237,7 +244,10 @@ test("a page with no counterpart falls back to the target scope's front door", (
   // leave the switcher showing the scope you just left.
   assert.equal(scopeTargetHref("/daemons", null, "acme"), "/acme");
   assert.equal(scopeTargetHref("/usage", null, "acme"), "/acme");
-  assert.equal(scopeTargetHref("/acme/agents", "acme", "acme"), "/acme");
+  // Picking the scope you are already in is a no-op, not a trip to the front
+  // door: the switcher lists the current workspace too.
+  assert.equal(scopeTargetHref("/acme/agents", "acme", "acme"), "/acme/agents");
+  assert.equal(scopeTargetHref("/acme/agents", "acme", null), "/workspaces/agents");
   // A page that is not a destination at all: the account settings.
   assert.equal(scopeTargetHref("/settings", null, "acme"), "/acme");
 });

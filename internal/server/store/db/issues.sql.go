@@ -397,8 +397,10 @@ type ListIssuesForUserRow struct {
 // per workspace and two of them can both be "GS-1".
 //
 // Archived workspaces are left out, matching the workspace list this board is
-// reached from. The scoped query above does not need the filter: you cannot be
-// inside an archived workspace to ask it.
+// reached from. The scoped query above does not filter on status, and for the
+// console it does not need to: every page reaches a workspace by slug, and the
+// slug lookup already excludes archived ones. A direct API call with the UUID
+// can still read an archived workspace — older behaviour, left alone here.
 func (q *Queries) ListIssuesForUser(ctx context.Context, userID uuid.UUID) ([]ListIssuesForUserRow, error) {
 	rows, err := q.db.Query(ctx, listIssuesForUser, userID)
 	if err != nil {
