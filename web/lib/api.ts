@@ -303,6 +303,14 @@ export interface Agent {
   runtime?: AgentRuntime;
   created_at: string;
   updated_at: string;
+  /**
+   * Whose roster the agent is on. Only the All Workspaces page fills these —
+   * same rule as Issue's, and the table draws its Workspace column only when
+   * they are here. Names are reused across workspaces, so this is what tells
+   * two "@planner"s apart.
+   */
+  workspace_slug?: string;
+  workspace_name?: string;
 }
 
 // ── Daemons ───────────────────────────────────────────────────────────
@@ -452,6 +460,11 @@ export const usageApi = {
 
 export const agentApi = {
   list: (workspaceId: string) => api.get<Agent[]>(`/api/v1/workspaces/${workspaceId}/agents`),
+  /**
+   * Every agent in every workspace you own — the All Workspaces roster. Each
+   * agent carries the workspace it belongs to.
+   */
+  listAll: () => api.get<Agent[]>("/api/v1/agents"),
   get: (workspaceId: string, agentId: string) =>
     api.get<Agent>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`),
   create: (workspaceId: string, body: {

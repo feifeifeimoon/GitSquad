@@ -54,7 +54,7 @@ test("All Workspaces draws the pages that exist without a workspace", () => {
   // one. Issues joined it when the cross-workspace board shipped.
   assert.deepEqual(
     navPagesInScope("all").map((p) => p.key),
-    ["issues", "workspaces", "daemons", "usage"],
+    ["issues", "agents", "workspaces", "daemons", "usage"],
   );
 });
 
@@ -81,10 +81,10 @@ test("the account-level rows are drawn in every scope", () => {
 });
 
 test("the rows that need a workspace are the ones the All scope leaves out", () => {
-  // Each of these names one workspace in the doing: assigning an agent binds it
-  // to a workspace's roster, a skill is the workspace's, and so are its
-  // settings. Issues is the only one with a cross-workspace answer so far.
-  for (const key of ["agents", "skills", "workspace-settings"]) {
+  // Each of these names one workspace in the doing: a skill is the workspace's,
+  // and so are its settings. Issues and Agents are the two that have since
+  // earned a page here of their own.
+  for (const key of ["skills", "workspace-settings"]) {
     assert.ok(
       !navPagesInScope("all").some((p) => p.key === key),
       `${key} is drawn in All Workspaces with no page to point at`,
@@ -97,10 +97,13 @@ test("a jump letter is unique, and resolves in the scopes that draw it", () => {
   assert.equal(new Set(jumps).size, jumps.length, "two pages share a jump letter");
   const issues = navPageByJump("i");
   assert.equal(issues?.key, "issues");
-  // The one letter that answers in both scopes, with a different destination:
-  // `g i` is this scope's board either way.
+  // Both letters answer in both scopes, with a different destination: `g i` is
+  // this scope's board either way.
   assert.equal(navPageHref(issues, "acme"), "/acme");
   assert.equal(navPageHref(issues, null), "/workspaces/issues");
+  const agents = navPageByJump("a");
+  assert.equal(navPageHref(agents, "acme"), "/acme/agents");
+  assert.equal(navPageHref(agents, null), "/workspaces/agents");
   assert.equal(navPageByJump("z"), undefined);
 });
 

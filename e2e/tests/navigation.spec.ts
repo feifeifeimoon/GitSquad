@@ -85,14 +85,14 @@ test.describe("Navigation", () => {
     // rather than by greying it. Issues is the exception: it has a page here
     // too, the board across every workspace.
     await expect(
-      page.getByRole("link", { name: "Agents", exact: true }),
-    ).toHaveCount(0);
-    await expect(
       page.getByRole("link", { name: "Skills", exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Issues", exact: true }),
     ).toHaveAttribute("href", "/workspaces/issues");
+    await expect(
+      page.getByRole("link", { name: "Agents", exact: true }),
+    ).toHaveAttribute("href", "/workspaces/agents");
     // Nothing anywhere in the shell is a dead row any more.
     await expect(page.locator("[aria-disabled]")).toHaveCount(0);
 
@@ -150,6 +150,9 @@ test.describe("Navigation", () => {
     ).toHaveAttribute("href", "/workspaces/issues");
     await expect(
       page.getByRole("link", { name: "Agents", exact: true }),
+    ).toHaveAttribute("href", "/workspaces/agents");
+    await expect(
+      page.getByRole("link", { name: "Skills", exact: true }),
     ).toHaveCount(0);
   });
 
@@ -187,7 +190,7 @@ test.describe("Navigation", () => {
       // Workspaces page of their own are not.
       await expect(
         page.getByRole("link", { name: "Agents", exact: true }),
-      ).toHaveCount(0);
+      ).toHaveAttribute("href", "/workspaces/agents");
       await expect(
         page.getByRole("link", { name: "Skills", exact: true }),
       ).toHaveCount(0);

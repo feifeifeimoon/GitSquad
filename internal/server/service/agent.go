@@ -139,6 +139,42 @@ func (s *AgentService) ListAgents(ctx context.Context, workspaceID uuid.UUID) ([
 	return out, nil
 }
 
+// ListAllAgents returns every agent in every workspace the user owns, each
+// carrying the workspace it belongs to. The All Workspaces page's read, and the
+// second of the console's cross-workspace reads after ListAllIssues.
+//
+// The roster is the interesting half of "what is running": a machine can back
+// runtimes in several workspaces at once, and before this the only way to see
+// the whole team was to open each workspace in turn.
+func (s *AgentService) ListAllAgents(ctx context.Context, userID uuid.UUID) ([]v1.Agent, error) {
+	rows, err := s.store.ListAgentsForUser(ctx, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list agents for user: %w", err)
+	}
+	out := make([]v1.Agent, 0, len(rows))
+	for _, r := range rows {
+		agent := buildAgentView(agentRow{
+			id: r.ID, workspaceID: r.WorkspaceID, runtimeID: r.RuntimeID,
+			name: r.Name, description: r.Description, instructions: r.Instructions,
+			model: r.Model, runtimeProvider: r.RuntimeProvider, runtimeName: r.RuntimeName,
+			avatarURL: r.AvatarUrl, enabled: r.Enabled,
+			runtimeDaemonID:   r.RuntimeDaemonID,
+			runtimeDaemonName: r.RuntimeDaemonName, runtimeDaemonStatus: r.RuntimeDaemonStatus,
+			runtimeDaemonLastSeenAt: r.RuntimeDaemonLastSeenAt,
+			runningCount:            r.RunningCount, queuedCount: r.QueuedCount, totalRuns: r.TotalRuns,
+			issuePrefix: r.IssuePrefix, issueNumber: r.IssueNumber, issueTitle: r.IssueTitle,
+			createdAt: r.CreatedAt, updatedAt: r.UpdatedAt,
+		})
+		// Set after the builder rather than threaded through agentRow: the
+		// builder's shape is shared with the three reads that have no workspace
+		// to name, and only this one does.
+		agent.WorkspaceSlug = r.WorkspaceSlug
+		agent.WorkspaceName = r.WorkspaceName
+		out = append(out, agent)
+	}
+	return out, nil
+}
+
 func (s *AgentService) GetAgent(ctx context.Context, workspaceID, agentID uuid.UUID) (*v1.Agent, error) {
 	r, err := s.store.GetAgent(ctx, db.GetAgentParams{ID: agentID, WorkspaceID: workspaceID})
 	if err != nil {

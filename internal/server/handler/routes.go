@@ -195,6 +195,10 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.POST("/workspaces/:id/issues/:issueId/pull-requests/:prId/restore", issueHandler.RestorePullRequest)
 
 			// Agent configuration
+			// The All Workspaces roster: every agent in every workspace the
+			// caller owns, the second read here whose scope is the account
+			// rather than a workspace in the path.
+			protected.GET("/agents", agentHandler.ListAll)
 			protected.GET("/workspaces/:id/agents", agentHandler.List)
 			protected.POST("/workspaces/:id/agents", agentHandler.Create)
 			protected.GET("/workspaces/:id/agents/:agentId", agentHandler.Get)
