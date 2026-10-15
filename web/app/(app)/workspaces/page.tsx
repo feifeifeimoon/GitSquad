@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   FolderGit2,
@@ -8,6 +9,7 @@ import {
   Lock,
   Plus,
   Search,
+  Settings,
 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
 import { useApi } from "@/lib/query";
@@ -21,7 +23,6 @@ import { SortHeader, TH_CLASS, useSort, type SortState } from "@/components/tabl
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { StatusBadge } from "@/components/ui/status-badge";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import {
   Empty,
@@ -170,7 +171,6 @@ export default function WorkspacesPage() {
             <WorkspaceCard
               key={w.id}
               workspace={w}
-              onOpen={() => router.push(paths.workspace(w.slug).board())}
             />
           ))}
         </div>
@@ -186,20 +186,17 @@ export default function WorkspacesPage() {
   );
 }
 
-function WorkspaceCard({
-  workspace,
-  onOpen,
-}: {
-  workspace: Workspace;
-  onOpen: () => void;
-}) {
+function WorkspaceCard({ workspace }: { workspace: Workspace }) {
   return (
-    <button
-      onClick={onOpen}
-      className="group flex flex-col rounded-lg border border-hairline bg-canvas p-4 text-left shadow-level-2 transition-all hover:border-hairline-strong hover:shadow-level-3"
-    >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2">
+    <div className="group relative">
+      {/* A link rather than a button wired to the router: middle-click,
+          open-in-new-tab, and being announced as a destination all come free —
+          the same reason the sidebar's rows are links. */}
+      <Link
+        href={paths.workspace(workspace.slug).board()}
+        className="flex flex-col rounded-lg border border-hairline bg-canvas p-4 shadow-level-2 transition-all hover:border-hairline-strong hover:shadow-level-3"
+      >
+        <div className="mb-2 flex min-w-0 items-center gap-2">
           <WorkspaceAvatar
             name={workspace.name}
             avatarUrl={workspace.avatar_url}
@@ -207,29 +204,45 @@ function WorkspaceCard({
           />
           <p className="truncate text-copy font-medium text-ink">{workspace.name}</p>
         </div>
-        <StatusBadge status={workspace.status} />
-      </div>
-      <p className="mt-1 flex items-start gap-1.5 text-caption text-body">
-        <GitCommitHorizontal className="mt-0.5 size-3.5 shrink-0 text-mute" />
-        <span className="line-clamp-2 min-w-0 flex-1">
-          {workspace.last_commit_message || "No commits yet"}
-        </span>
-      </p>
-      <div className="mt-3 flex items-center justify-between gap-2">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <GitHubMark className="size-3.5 shrink-0" />
-          <span className="truncate font-mono text-caption text-mute">
-            {workspace.repo_full_name ||
-              `${workspace.repo_owner}/${workspace.repo_name}`}
+        <p className="mt-1 flex items-start gap-1.5 text-caption text-body">
+          <GitCommitHorizontal className="mt-0.5 size-3.5 shrink-0 text-mute" />
+          <span className="line-clamp-2 min-w-0 flex-1">
+            {workspace.last_commit_message || "No commits yet"}
           </span>
-          {workspace.repo_private && <Lock className="size-3 shrink-0 text-mute" />}
-        </span>
-        <TimeAgo
-          iso={workspace.last_commit_at || workspace.created_at}
-          className="shrink-0 font-mono text-caption tabular-nums text-mute"
-        />
-      </div>
-    </button>
+        </p>
+        <div className="mt-3 flex items-center justify-between gap-2">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <GitHubMark className="size-3.5 shrink-0" />
+            <span className="truncate font-mono text-caption text-mute">
+              {workspace.repo_full_name ||
+                `${workspace.repo_owner}/${workspace.repo_name}`}
+            </span>
+            {workspace.repo_private && <Lock className="size-3 shrink-0 text-mute" />}
+          </span>
+          <TimeAgo
+            iso={workspace.last_commit_at || workspace.created_at}
+            className="shrink-0 font-mono text-caption tabular-nums text-mute"
+          />
+        </div>
+      </Link>
+
+      {/* The corner held a status badge that could only ever say "Active": the
+          list is filtered to the active ones before it arrives, so the word was
+          the same on every card. What is here instead is the one thing the card
+          cannot reach — this workspace's settings — revealed on hover or focus
+          the way the issue title's pencil is, so the card stays the
+          destination. Labelled with the workspace as well as the action: twelve
+          cards each saying just "Workspace settings" is twelve identical names
+          to anything reading the page. */}
+      <Link
+        href={paths.workspace(workspace.slug).settings()}
+        title="Workspace settings"
+        aria-label={`${workspace.name} settings`}
+        className="absolute right-2.5 top-2.5 z-10 rounded-md p-1.5 text-mute opacity-0 transition-opacity hover:bg-muted hover:text-ink focus-visible:opacity-100 group-hover:opacity-100"
+      >
+        <Settings className="size-3.5" />
+      </Link>
+    </div>
   );
 }
 
@@ -252,7 +265,6 @@ function WorkspaceTable({
             <tr className="border-b border-hairline bg-canvas-soft">
               <SortHeader label="Name" column="name" sort={sort} onSort={onSort} />
               <th className={TH_CLASS}>Repository</th>
-              <th className={TH_CLASS}>Status</th>
               <th className={TH_CLASS}>Last commit</th>
               <SortHeader
                 label="Created"
@@ -289,9 +301,6 @@ function WorkspaceTable({
                     {w.repo_private && <Lock className="size-3 shrink-0 text-mute" />}
                   </span>
                 </td>
-                <td className="px-4 py-3">
-                  <StatusBadge status={w.status} />
-                </td>
                 <td className="max-w-0 px-4 py-3">
                   <p className="truncate text-caption text-body">
                     {w.last_commit_message || "No commits yet"}
@@ -299,6 +308,21 @@ function WorkspaceTable({
                 </td>
                 <td className="px-4 py-3 text-right font-mono text-caption tabular-nums text-mute">
                   <TimeAgo iso={w.created_at} />
+                </td>
+                {/* The card's corner, in a table: the way to the workspace's
+                    settings, which is the one place the row cannot get to. The
+                    row itself opens the board, so this has to stop the click
+                    from reaching it. */}
+                <td className="px-4 py-3 text-right">
+                  <Link
+                    href={paths.workspace(w.slug).settings()}
+                    title="Workspace settings"
+                    aria-label={`${w.name} settings`}
+                    onClick={(e) => e.stopPropagation()}
+                    className="inline-flex rounded-md p-1.5 text-mute transition-colors hover:bg-muted hover:text-ink"
+                  >
+                    <Settings className="size-3.5" />
+                  </Link>
                 </td>
               </tr>
             ))}

@@ -10,10 +10,6 @@ const shell = readFileSync(
   new URL("../app/(app)/layout.tsx", import.meta.url),
   "utf8",
 );
-const badge = readFileSync(
-  new URL("../components/ui/status-badge.tsx", import.meta.url),
-  "utf8",
-);
 const time = readFileSync(
   new URL("./time.ts", import.meta.url),
   "utf8",
@@ -50,8 +46,12 @@ const scopeSwitcher = readFileSync(
 
 test("workspace list renders a card grid by default", () => {
   assert.match(list, /grid-cols-1/);
-  assert.match(list, /StatusBadge/);
   assert.match(list, /TimeAgo/);
+  // The corner badge is gone: every card in this list is already active, so it
+  // said the same word every time. What is there is the way to that
+  // workspace's settings.
+  assert.doesNotMatch(list, /StatusBadge/);
+  assert.match(list, /.settings()/);
   assert.doesNotMatch(list, /font-bold/);
   assert.doesNotMatch(list, /text-\[10px\]/);
 });
@@ -97,12 +97,6 @@ test("the sidebar header is the product; the scope is named above the page", () 
   // Nothing remembers the last workspace. A remembered scope is one that can be
   // missing, and a missing scope is what drew the four grey rows.
   assert.doesNotMatch(shell, /lastWorkspaceSlug/);
-});
-
-test("status badge defines three states", () => {
-  assert.match(badge, /active/);
-  assert.match(badge, /degraded/);
-  assert.match(badge, /archived/);
 });
 
 test("shared time util formats relative time", () => {
