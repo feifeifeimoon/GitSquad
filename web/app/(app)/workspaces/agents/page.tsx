@@ -7,7 +7,11 @@ import { AGENT_REFRESH_MS } from "@/lib/agent-status";
 import { invalidateApi, useApi } from "@/lib/query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/error-state";
-import { AgentList, type AgentGroup } from "@/components/agents/agent-list";
+import {
+  AGENT_LIST_RAIL,
+  AgentList,
+  type AgentGroup,
+} from "@/components/agents/agent-list";
 import {
   Empty,
   EmptyDescription,
@@ -79,7 +83,7 @@ export default function AllAgentsPage() {
   }
 
   return (
-    <div className="flex-1 px-8 pb-8 pt-6">
+    <div className={`flex-1 px-8 pb-8 pt-6 ${AGENT_LIST_RAIL}`}>
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 4 }).map((_, i) => (
