@@ -151,76 +151,72 @@ export function AgentList({
 
 function AgentRow({ agent, actions }: { agent: Agent; actions?: ReactNode }) {
   const status = agentStatus(agent);
+  // The full sentence ("GTS-42: fix the thing", "2 tasks queued") for the
+  // tooltip; the row itself only has room for the key.
   const detail = workloadDetail(agent);
   return (
     <li
       role="listitem"
-      className="flex items-center gap-3 border-b border-hairline px-4 py-2.5 transition-colors last:border-b-0 hover:bg-muted/40"
+      className="flex h-9 items-center gap-3 border-b border-hairline px-4 transition-colors last:border-b-0 hover:bg-muted/40"
     >
-      <div className="flex min-w-0 flex-1 items-center gap-3">
-        <WorkspaceAvatar
-          name={agent.name}
-          avatarUrl={agent.avatar_url}
-          className="size-8 shrink-0"
-        />
-        <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate font-medium text-ink">@{agent.name}</span>
-            {!agent.enabled && (
-              <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption text-mute">
-                disabled
-              </span>
-            )}
-          </div>
-          {agent.description && (
-            <p className="truncate text-caption text-mute">{agent.description}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Fixed widths rather than the table's column sizing: a flex row does not
-          align itself across rows, and four of these stack into a column you
-          read down.
-
-          Sized for the rail the list is drawn inside (see the pages), not for
-          the viewport: past that rail the columns would drift away from the
-          names they belong to, which is what a full-width row of four facts
-          looked like — a name at one edge and its status at the other. The
-          viewport breakpoints below only ever hide columns while the rail is
-          narrower than its cap, which is the one case where the viewport *is*
-          the space available. */}
-      <div className="hidden w-36 shrink-0 sm:block">
-        <AgentStatusBadge status={status} />
-        {detail && (
-          <p className="mt-0.5 truncate text-caption text-mute" title={detail}>
-            {detail}
-          </p>
-        )}
-      </div>
-
-      <div className="hidden w-28 shrink-0 md:block">
-        <span className="flex min-w-0 items-center gap-1.5 text-caption text-body">
-          <ProviderIcon
-            provider={agent.runtime?.provider ?? ""}
-            className="size-3.5 shrink-0"
-          />
-          <span className="truncate">{agent.runtime?.provider || "—"}</span>
-        </span>
-        <p className="truncate text-caption text-mute">
-          {agent.runtime?.daemon_name || "no daemon"}
-        </p>
-      </div>
-
-      <div className="hidden w-24 shrink-0 lg:block">
-        <span className="truncate font-mono text-caption text-body">
-          {agent.model || "default"}
-        </span>
-      </div>
-
-      <span className="w-8 shrink-0 text-right font-mono text-caption tabular-nums text-body">
-        {agent.total_runs}
+      {/* One line, and the same composition as the reference's list row: the
+          identity first (avatar, then the name), then what the agent is for,
+          with the standing facts packed at the right end. It was two lines —
+          name over description — which made every row 60px and put the facts
+          you scan for on a second baseline. */}
+      <WorkspaceAvatar
+        name={agent.name}
+        avatarUrl={agent.avatar_url}
+        className="size-5 shrink-0"
+      />
+      <span className="shrink-0 truncate text-copy font-medium text-ink">
+        @{agent.name}
       </span>
-
+      {!agent.enabled && (
+        <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption text-mute">
+          disabled
+        </span>
+      )}
+      {agent.description && (
+        <span
+          title={agent.description}
+          className="min-w-0 truncate text-caption text-mute"
+        >
+          {agent.description}
+        </span>
+      )}
+      {/* The spacer, not the description: it is what keeps the facts on the
+          right, and it has to be there whether or not there is a description.
+          The description is the one thing that shrinks when the row is tight. */}
+      <span className="min-w-0 flex-1" />
+      {agent.current_task?.issue_key && (
+        <span
+          title={detail ?? undefined}
+          className="shrink-0 font-mono text-micro text-mute"
+        >
+          {agent.current_task.issue_key}
+        </span>
+      )}
+      <AgentStatusBadge status={status} />
+      <span className="flex shrink-0 items-center gap-1.5 text-caption text-body">
+        <ProviderIcon
+          provider={agent.runtime?.provider ?? ""}
+          className="size-3.5 shrink-0"
+        />
+        <span className="truncate">{agent.runtime?.provider || "—"}</span>
+      </span>
+      <span className="hidden shrink-0 text-caption text-mute sm:inline">
+        {agent.runtime?.daemon_name || "no daemon"}
+      </span>
+      {/* Only when it has run something. It was a labelled column with a header
+          above it; on one line it would be a bare digit at the end of every row
+          — and zero, which is most rows, is the default and does not need
+          saying. */}
+      {agent.total_runs > 0 && (
+        <span className="shrink-0 font-mono text-caption tabular-nums text-mute">
+          {agent.total_runs} runs
+        </span>
+      )}
       {actions}
     </li>
   );
