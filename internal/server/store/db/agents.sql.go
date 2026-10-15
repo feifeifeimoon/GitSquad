@@ -415,6 +415,120 @@ func (q *Queries) ListAgentsByWorkspace(ctx context.Context, workspaceID uuid.UU
 	return items, nil
 }
 
+const listAgentsForUser = `-- name: ListAgentsForUser :many
+SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
+       d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
+       d.last_seen_at AS runtime_daemon_last_seen_at,
+       w.name AS workspace_name, w.slug AS workspace_slug,
+       workload.running_count, workload.queued_count, workload.total_runs,
+       coalesce(cur.issue_prefix, '') AS issue_prefix,
+       coalesce(cur.issue_number, 0)::int AS issue_number,
+       coalesce(cur.issue_title, '') AS issue_title
+FROM agents a
+JOIN agent_runtimes ar ON ar.id = a.runtime_id
+JOIN workspaces w ON w.id = a.workspace_id
+LEFT JOIN daemons d ON d.id = ar.daemon_id
+LEFT JOIN LATERAL (
+    SELECT (count(*) FILTER (WHERE t.status IN ('dispatched','running')))::int AS running_count,
+           (count(*) FILTER (WHERE t.status = 'queued'))::int AS queued_count,
+           (count(*) FILTER (WHERE t.status IN ('completed','failed')))::int AS total_runs
+    FROM tasks t WHERE t.agent_id = a.id
+) workload ON true
+LEFT JOIN LATERAL (
+    SELECT w2.issue_prefix, i.number AS issue_number, i.title AS issue_title
+    FROM tasks t
+    JOIN issues i ON i.id = t.issue_id
+    JOIN workspaces w2 ON w2.id = t.workspace_id
+    WHERE t.agent_id = a.id AND t.status IN ('dispatched','running')
+    ORDER BY t.started_at DESC NULLS LAST, t.created_at DESC
+    LIMIT 1
+) cur ON true
+WHERE w.user_id = $1 AND w.status != 'archived'
+ORDER BY w.name ASC, a.name ASC
+`
+
+type ListAgentsForUserRow struct {
+	ID                      uuid.UUID  `json:"id"`
+	WorkspaceID             uuid.UUID  `json:"workspace_id"`
+	Name                    string     `json:"name"`
+	Description             string     `json:"description"`
+	Instructions            string     `json:"instructions"`
+	Model                   string     `json:"model"`
+	RuntimeID               uuid.UUID  `json:"runtime_id"`
+	Enabled                 bool       `json:"enabled"`
+	AvatarUrl               string     `json:"avatar_url"`
+	CreatedBy               *uuid.UUID `json:"created_by"`
+	CreatedAt               time.Time  `json:"created_at"`
+	UpdatedAt               time.Time  `json:"updated_at"`
+	RuntimeProvider         string     `json:"runtime_provider"`
+	RuntimeName             string     `json:"runtime_name"`
+	RuntimeDaemonID         *uuid.UUID `json:"runtime_daemon_id"`
+	RuntimeDaemonName       *string    `json:"runtime_daemon_name"`
+	RuntimeDaemonStatus     *string    `json:"runtime_daemon_status"`
+	RuntimeDaemonLastSeenAt *time.Time `json:"runtime_daemon_last_seen_at"`
+	WorkspaceName           string     `json:"workspace_name"`
+	WorkspaceSlug           string     `json:"workspace_slug"`
+	RunningCount            int32      `json:"running_count"`
+	QueuedCount             int32      `json:"queued_count"`
+	TotalRuns               int32      `json:"total_runs"`
+	IssuePrefix             string     `json:"issue_prefix"`
+	IssueNumber             int32      `json:"issue_number"`
+	IssueTitle              string     `json:"issue_title"`
+}
+
+// The All Workspaces agents page: every agent in every workspace this user
+// owns, with the workspace it belongs to on each row. Same columns as
+// ListAgentsByDaemon — that one is scoped by machine, this one by account —
+// and ordered by workspace, because a flat list of agents reads as one
+// workspace's roster and this is the roster of all of them.
+// aliased w2 because the outer query already joins workspaces as w
+func (q *Queries) ListAgentsForUser(ctx context.Context, userID uuid.UUID) ([]ListAgentsForUserRow, error) {
+	rows, err := q.db.Query(ctx, listAgentsForUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAgentsForUserRow
+	for rows.Next() {
+		var i ListAgentsForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.Name,
+			&i.Description,
+			&i.Instructions,
+			&i.Model,
+			&i.RuntimeID,
+			&i.Enabled,
+			&i.AvatarUrl,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.RuntimeProvider,
+			&i.RuntimeName,
+			&i.RuntimeDaemonID,
+			&i.RuntimeDaemonName,
+			&i.RuntimeDaemonStatus,
+			&i.RuntimeDaemonLastSeenAt,
+			&i.WorkspaceName,
+			&i.WorkspaceSlug,
+			&i.RunningCount,
+			&i.QueuedCount,
+			&i.TotalRuns,
+			&i.IssuePrefix,
+			&i.IssueNumber,
+			&i.IssueTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listWorkspaceAgentsForAssignment = `-- name: ListWorkspaceAgentsForAssignment :many
 SELECT id, name, COALESCE(avatar_url, '') AS avatar_url, enabled
 FROM agents WHERE workspace_id = $1 ORDER BY created_at

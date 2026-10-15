@@ -30,6 +30,7 @@ export const paths = {
   // collide with RESERVED_SLUGS, and a workspace already named "issues" would
   // be read as the route.
   allIssues: () => "/workspaces/issues",
+  allAgents: () => "/workspaces/agents",
   daemons: () => "/daemons",
   daemon: (id: string) => `/daemons/${encode(id)}`,
   usage: () => "/usage",

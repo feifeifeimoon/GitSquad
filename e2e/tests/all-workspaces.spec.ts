@@ -39,6 +39,22 @@ test.describe("All Workspaces board", () => {
     betaTitle = `Beta work ${suffix}`;
     alphaIssue = await api.createIssue(alpha.id, alphaTitle);
     betaIssue = await api.createIssue(beta.id, betaTitle);
+
+    // One machine backing an agent in each workspace, both named "planner" —
+    // the same name twice, which is exactly what the roster's Workspace column
+    // is for.
+    const daemon = await api.seedDaemon({
+      name: `mac-${suffix}`,
+      kinds: ["claude"],
+    });
+    for (const workspace of [alpha, beta]) {
+      await api.createAgent(workspace.id, {
+        name: "planner",
+        daemon_id: daemon.id,
+        provider: "claude",
+        description: "Turns an issue into a plan",
+      });
+    }
   });
 
   test.afterEach(async () => {
@@ -118,5 +134,31 @@ test.describe("All Workspaces board", () => {
     await expect(page.getByRole("button", { name: /^Add to / })).toHaveCount(0);
     // The cards still open things — that is the one thing a card here can do.
     await expect(page.locator("[data-issue-card]").first()).toBeVisible();
+  });
+
+  test("the agent roster spans workspaces too, and names each one", async ({
+    page,
+  }) => {
+    await loginAsE2E(page, api);
+    await page.goto("/workspaces/agents", { waitUntil: "domcontentloaded" });
+    await expect(page.getByRole("heading", { name: "Agents", exact: true })).toBeVisible(
+      { timeout: 20_000 },
+    );
+
+    // Two rows, one per workspace, both called "@planner" — a name people
+    // reuse, which is why the row has to say whose it is. The identity of a row
+    // is its workspace, not its name.
+    const rows = page.locator("tbody tr");
+    await expect(rows).toHaveCount(2);
+    await expect(rows.filter({ hasText: alpha.name })).toContainText("@planner");
+    await expect(rows.filter({ hasText: beta.name })).toContainText("@planner");
+
+    // The workspace cell goes back to that workspace's roster, which is where
+    // an agent can be edited — there is no agent detail page.
+    await expect(page.locator(`a[href="/${alpha.slug}/agents"]`)).toBeVisible();
+    await expect(page.locator(`a[href="/${beta.slug}/agents"]`)).toBeVisible();
+
+    // Read-only here as well: creating an agent names a workspace.
+    await expect(page.getByRole("button", { name: "New Agent" })).toHaveCount(0);
   });
 });

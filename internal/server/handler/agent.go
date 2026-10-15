@@ -70,6 +70,24 @@ func (h *AgentHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, v1.SuccessResponse(list, len(list)))
 }
 
+// ListAll handles GET /api/v1/agents — the All Workspaces roster. Like the
+// unscoped issues list, its scope is the authenticated user rather than a
+// workspace in the path.
+func (h *AgentHandler) ListAll(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("login required"))
+		return
+	}
+	list, err := h.agents.ListAllAgents(c.Request.Context(), user.ID)
+	if err != nil {
+		slog.Error("list all agents", "error", err)
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to list agents"))
+		return
+	}
+	c.JSON(http.StatusOK, v1.SuccessResponse(list, len(list)))
+}
+
 func (h *AgentHandler) Get(c *gin.Context) {
 	wsID, ok := h.requireWorkspace(c)
 	if !ok {

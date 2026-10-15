@@ -46,6 +46,15 @@ type Agent struct {
 	Runtime      *AgentRuntime     `json:"runtime,omitempty"`
 	CreatedAt    time.Time         `json:"created_at"`
 	UpdatedAt    time.Time         `json:"updated_at"`
+	// WorkspaceSlug and WorkspaceName say whose roster the agent is on, and are
+	// filled only by the All Workspaces page — the same rule as v1.Issue's, for
+	// the same reason: a page inside one workspace has nothing to disambiguate,
+	// so the column is absent there and the table draws it only when it is here.
+	//
+	// Worth more here than it is for an issue: "planner" is a name a user is
+	// likely to have used in two workspaces at once.
+	WorkspaceSlug string `json:"workspace_slug,omitempty"`
+	WorkspaceName string `json:"workspace_name,omitempty"`
 }
 
 // AgentCurrentTask names the issue an agent is working on right now. Nil when

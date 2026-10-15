@@ -87,9 +87,13 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
     label: "Agents",
     icon: Bot,
     group: "workspace",
-    scopes: ["workspace"],
+    // Like Issues, both scopes have a page: the roster here, and the roster
+    // across every workspace you own. Agents are the half of "what is running"
+    // that spans workspaces, since one machine can back runtimes in several.
+    scopes: ["all", "workspace"],
     jump: "a",
     href: (slug) => paths.workspace(slug).agents(),
+    allHref: () => paths.allAgents(),
   },
   {
     key: "skills",

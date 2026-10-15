@@ -6,19 +6,17 @@ import { Plus, Pencil } from "lucide-react";
 import { api, agentApi, skillApi, type Agent, type Skill } from "@/lib/api";
 import {
   agentStatus,
-  workloadDetail,
   AGENT_STATUS_LABEL,
   type AgentStatus,
 } from "@/lib/agent-status";
 import { paths } from "@/lib/paths";
+import { AgentTable } from "@/components/agents/agent-table";
 import { ProviderIcon } from "@/components/provider-icon";
-import { AgentStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { PageToolbar } from "@/components/page-toolbar";
 import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { Field, TextArea } from "@/components/form-field";
 import { InlineConfirm } from "@/components/inline-confirm";
-import { TH_CLASS } from "@/components/table-sort";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -296,40 +294,39 @@ export default function WorkspaceAgentsPage() {
               })}
             </div>
 
-            <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
-              <table className="w-full border-collapse text-copy">
-                <thead>
-                  <tr className="border-b border-hairline bg-canvas-soft">
-                    <th className={TH_CLASS}>Agent</th>
-                    <th className={TH_CLASS}>Status</th>
-                    <th className={TH_CLASS}>Runtime</th>
-                    <th className={`${TH_CLASS} hidden lg:table-cell`}>Model</th>
-                    <th className={`${TH_CLASS} hidden text-right sm:table-cell`}>
-                      Runs
-                    </th>
-                    <th className={`${TH_CLASS} text-right`}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {visible.map((a) => (
-                    <AgentRow
-                      key={a.id}
-                      agent={a}
-                      confirming={confirmId === a.id}
-                      onEdit={() => openEdit(a)}
-                      onRequestDelete={() => setConfirmId(a.id)}
-                      onCancelDelete={() => setConfirmId(null)}
-                      onConfirmDelete={() => remove(a.id)}
-                    />
-                  ))}
-                </tbody>
-              </table>
-              {visible.length === 0 && (
-                <p className="px-4 py-8 text-center text-caption text-mute">
-                  No agents are {AGENT_STATUS_LABEL[statusFilter as AgentStatus].toLowerCase()}.
-                </p>
+            <AgentTable
+              agents={visible}
+              // Only a real status has a "no agents are …" sentence. With "all"
+              // chosen the empty case is the page's own empty state above, and
+              // `AGENT_STATUS_LABEL["all"]` is not a key at all — which is why
+              // this is a guard and not the expression it used to be inline,
+              // where the `&&` kept it from being evaluated.
+              empty={
+                statusFilter === "all"
+                  ? undefined
+                  : `No agents are ${AGENT_STATUS_LABEL[statusFilter].toLowerCase()}.`
+              }
+              renderActions={(a) => (
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => openEdit(a)}
+                    className="text-hairline-strong transition-colors hover:text-ink"
+                    title="Edit agent"
+                    aria-label="Edit agent"
+                  >
+                    <Pencil className="size-4" />
+                  </button>
+                  <InlineConfirm
+                    confirming={confirmId === a.id}
+                    question="Delete?"
+                    title="Delete agent"
+                    onRequest={() => setConfirmId(a.id)}
+                    onConfirm={() => remove(a.id)}
+                    onCancel={() => setConfirmId(null)}
+                  />
+                </div>
               )}
-            </div>
+            />
           </>
         )}
       </div>
@@ -497,97 +494,3 @@ export default function WorkspaceAgentsPage() {
   );
 }
 
-function AgentRow({
-  agent,
-  confirming,
-  onEdit,
-  onRequestDelete,
-  onCancelDelete,
-  onConfirmDelete,
-}: {
-  agent: Agent;
-  confirming: boolean;
-  onEdit: () => void;
-  onRequestDelete: () => void;
-  onCancelDelete: () => void;
-  onConfirmDelete: () => void;
-}) {
-  const status = agentStatus(agent);
-  const detail = workloadDetail(agent);
-  return (
-    <tr className="border-b border-hairline last:border-b-0 transition-colors hover:bg-muted/40">
-      <td className="px-4 py-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <WorkspaceAvatar
-            name={agent.name}
-            avatarUrl={agent.avatar_url}
-            className="size-8"
-          />
-          <div className="min-w-0">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="truncate font-medium text-ink">@{agent.name}</span>
-              {!agent.enabled && (
-                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-caption text-mute">
-                  disabled
-                </span>
-              )}
-            </div>
-            {agent.description && (
-              <p className="truncate text-caption text-mute">{agent.description}</p>
-            )}
-          </div>
-        </div>
-      </td>
-      <td className="px-4 py-3">
-        <AgentStatusBadge status={status} />
-        {/* The current issue is a second line so the row stays narrow while
-            still naming what the agent is actually working on. */}
-        {detail && (
-          <p className="mt-0.5 truncate text-caption text-mute" title={detail}>
-            {detail}
-          </p>
-        )}
-      </td>
-      <td className="px-4 py-3">
-        <span className="flex min-w-0 items-center gap-1.5 text-caption text-body">
-          <ProviderIcon
-            provider={agent.runtime?.provider ?? ""}
-            className="size-3.5 shrink-0"
-          />
-          <span className="truncate">{agent.runtime?.provider || "—"}</span>
-        </span>
-        <p className="truncate text-caption text-mute">
-          {agent.runtime?.daemon_name || "no daemon"}
-        </p>
-      </td>
-      <td className="hidden px-4 py-3 lg:table-cell">
-        <span className="font-mono text-caption text-body">
-          {agent.model || "default"}
-        </span>
-      </td>
-      <td className="hidden px-4 py-3 text-right font-mono text-caption tabular-nums text-body sm:table-cell">
-        {agent.total_runs}
-      </td>
-      <td className="px-4 py-3">
-        <div className="flex items-center justify-end gap-3">
-          <button
-            onClick={onEdit}
-            className="text-hairline-strong transition-colors hover:text-ink"
-            title="Edit agent"
-            aria-label="Edit agent"
-          >
-            <Pencil className="size-4" />
-          </button>
-          <InlineConfirm
-            confirming={confirming}
-            question="Delete?"
-            title="Delete agent"
-            onRequest={onRequestDelete}
-            onConfirm={onConfirmDelete}
-            onCancel={onCancelDelete}
-          />
-        </div>
-      </td>
-    </tr>
-  );
-}

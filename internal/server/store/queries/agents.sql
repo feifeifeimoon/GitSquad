@@ -86,6 +86,43 @@ SELECT name FROM agents WHERE workspace_id = $1 AND enabled = true ORDER BY name
 SELECT id, name, COALESCE(avatar_url, '') AS avatar_url, enabled
 FROM agents WHERE workspace_id = $1 ORDER BY created_at;
 
+-- name: ListAgentsForUser :many
+-- The All Workspaces agents page: every agent in every workspace this user
+-- owns, with the workspace it belongs to on each row. Same columns as
+-- ListAgentsByDaemon — that one is scoped by machine, this one by account —
+-- and ordered by workspace, because a flat list of agents reads as one
+-- workspace's roster and this is the roster of all of them.
+SELECT a.*, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
+       d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
+       d.last_seen_at AS runtime_daemon_last_seen_at,
+       w.name AS workspace_name, w.slug AS workspace_slug,
+       workload.running_count, workload.queued_count, workload.total_runs,
+       coalesce(cur.issue_prefix, '') AS issue_prefix,
+       coalesce(cur.issue_number, 0)::int AS issue_number,
+       coalesce(cur.issue_title, '') AS issue_title
+FROM agents a
+JOIN agent_runtimes ar ON ar.id = a.runtime_id
+JOIN workspaces w ON w.id = a.workspace_id
+LEFT JOIN daemons d ON d.id = ar.daemon_id
+LEFT JOIN LATERAL (
+    SELECT (count(*) FILTER (WHERE t.status IN ('dispatched','running')))::int AS running_count,
+           (count(*) FILTER (WHERE t.status = 'queued'))::int AS queued_count,
+           (count(*) FILTER (WHERE t.status IN ('completed','failed')))::int AS total_runs
+    FROM tasks t WHERE t.agent_id = a.id
+) workload ON true
+-- aliased w2 because the outer query already joins workspaces as w
+LEFT JOIN LATERAL (
+    SELECT w2.issue_prefix, i.number AS issue_number, i.title AS issue_title
+    FROM tasks t
+    JOIN issues i ON i.id = t.issue_id
+    JOIN workspaces w2 ON w2.id = t.workspace_id
+    WHERE t.agent_id = a.id AND t.status IN ('dispatched','running')
+    ORDER BY t.started_at DESC NULLS LAST, t.created_at DESC
+    LIMIT 1
+) cur ON true
+WHERE w.user_id = $1 AND w.status != 'archived'
+ORDER BY w.name ASC, a.name ASC;
+
 -- name: ListAgentsByDaemon :many
 SELECT a.*, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
        d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
