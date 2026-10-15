@@ -38,6 +38,14 @@ export interface AgentGroup {
   agents: Agent[];
 }
 
+/**
+ * The rail the list reads inside: a roster is a handful of facts per row, and a
+ * full-width row of four of them put the name and its status a screen apart.
+ * Centred and capped, like the settings pages' column, so the toolbar above it
+ * and the header rows inside it all share one edge.
+ */
+export const AGENT_LIST_RAIL = "mx-auto w-full max-w-3xl";
+
 export function AgentList({
   groups,
   empty,
@@ -83,6 +91,13 @@ export function AgentList({
               // A div, not a button: the roster link at the end cannot live
               // inside a button. The toggle takes the rest of the width, so
               // clicking the header anywhere but the link still collapses it.
+              //
+              // Not sticky, and it cannot be while the surface clips: the
+              // rounded corners come from `overflow-hidden` on the wrapper, and
+              // a sticky child of a clipping ancestor has no scrollport to
+              // stick to. Making it sticky means rounding the first header and
+              // the last row by hand instead — worth doing when a real roster
+              // is long enough to lose its group header, not before.
               <div className="flex h-9 items-center gap-2 bg-muted/40 pr-3 hover:bg-muted/60">
                 <button
                   type="button"
@@ -165,8 +180,16 @@ function AgentRow({ agent, actions }: { agent: Agent; actions?: ReactNode }) {
 
       {/* Fixed widths rather than the table's column sizing: a flex row does not
           align itself across rows, and four of these stack into a column you
-          read down. */}
-      <div className="hidden w-40 shrink-0 sm:block">
+          read down.
+
+          Sized for the rail the list is drawn inside (see the pages), not for
+          the viewport: past that rail the columns would drift away from the
+          names they belong to, which is what a full-width row of four facts
+          looked like — a name at one edge and its status at the other. The
+          viewport breakpoints below only ever hide columns while the rail is
+          narrower than its cap, which is the one case where the viewport *is*
+          the space available. */}
+      <div className="hidden w-36 shrink-0 sm:block">
         <AgentStatusBadge status={status} />
         {detail && (
           <p className="mt-0.5 truncate text-caption text-mute" title={detail}>
@@ -175,7 +198,7 @@ function AgentRow({ agent, actions }: { agent: Agent; actions?: ReactNode }) {
         )}
       </div>
 
-      <div className="hidden w-36 shrink-0 lg:block">
+      <div className="hidden w-28 shrink-0 md:block">
         <span className="flex min-w-0 items-center gap-1.5 text-caption text-body">
           <ProviderIcon
             provider={agent.runtime?.provider ?? ""}
@@ -188,7 +211,7 @@ function AgentRow({ agent, actions }: { agent: Agent; actions?: ReactNode }) {
         </p>
       </div>
 
-      <div className="hidden w-28 shrink-0 xl:block">
+      <div className="hidden w-24 shrink-0 lg:block">
         <span className="truncate font-mono text-caption text-body">
           {agent.model || "default"}
         </span>
