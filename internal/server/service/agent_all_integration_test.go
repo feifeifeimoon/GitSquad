@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/database"
@@ -118,6 +119,19 @@ func TestListAllAgentsIntegration(t *testing.T) {
 	got := make([]string, len(list))
 	for i, agent := range list {
 		got[i] = agent.WorkspaceName + "/" + agent.Name
+	}
+	// The order the page shows is the order the query promises. Only the inside
+	// of a group is asserted: the two workspaces this test seeds are both named
+	// "Integration Workspace" (the helper hardcodes it), so which of them comes
+	// first is an unspecified tie-break rather than a contract.
+	var alphaOrder []string
+	for _, agent := range list {
+		if agent.WorkspaceSlug == alpha.Slug {
+			alphaOrder = append(alphaOrder, agent.Name)
+		}
+	}
+	if !slices.Equal(alphaOrder, []string{"planner", "reviewer"}) {
+		t.Errorf("agents in %s came back %v, want [planner reviewer]", alpha.Slug, alphaOrder)
 	}
 	// The two workspaces were created with the same name by the helper, so the
 	// slug is what tells them apart below.

@@ -4,7 +4,7 @@ import { useRef, useState, type ChangeEvent } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Trash2 } from "lucide-react";
 import { api, Workspace } from "@/lib/api";
-import { setApiData, useApi } from "@/lib/query";
+import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { paths } from "@/lib/paths";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -92,6 +92,11 @@ export default function WorkspaceSettingsPage() {
     setDeleting(true);
     try {
       await api.delete(`/api/v1/workspaces/${slug}/delete`);
+      // Before navigating, not after: the list this lands on is served from the
+      // cache, and it would still hold the workspace that was just deleted —
+      // clicking it 404s. The prefix covers every key beneath the workspace too,
+      // and the aggregate reads this branch made stale in the same rule.
+      invalidateApi("/api/v1/workspaces");
       router.push(paths.workspaces());
     } catch {
       setDeleting(false);

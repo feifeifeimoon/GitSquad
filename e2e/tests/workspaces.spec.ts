@@ -72,4 +72,37 @@ test.describe("Workspaces", () => {
       timeout: 20_000,
     });
   });
+
+  test("a deleted workspace is gone from the list it lands on", async ({
+    page,
+  }) => {
+    const suffix = Date.now().toString(36);
+    const workspace = await api.seedWorkspace({
+      name: `E2E Removal ${suffix}`,
+      slug: `e2e-del-${suffix}`,
+      owner: `e2e-owner-${suffix}`,
+      repo: `e2e-repo-${suffix}`,
+    });
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/settings`, { waitUntil: "domcontentloaded" });
+    // "Delete workspace" is the row's label; the control is the Delete button
+    // that opens the confirmation, which holds another one of the same name.
+    // `exact`, because role+name matching is substring-based and a switcher's
+    // trigger is named after its workspace.
+    const trigger = page.getByRole("button", { name: "Delete", exact: true });
+    await expect(trigger).toBeVisible({ timeout: 20_000 });
+    await trigger.click();
+    await page.getByPlaceholder(workspace.name).fill(workspace.name);
+    await page.getByRole("dialog").getByRole("button", { name: "Delete" }).click();
+
+    // The list is served from the cache, and it used to keep the row it was
+    // just told to forget — so the first thing after a delete was a card that
+    // 404s.
+    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(
+      page.getByRole("button", { name: "New Workspace" }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText(workspace.name)).toHaveCount(0);
+  });
 });

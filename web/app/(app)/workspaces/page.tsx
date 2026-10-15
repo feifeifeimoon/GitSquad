@@ -273,6 +273,11 @@ function WorkspaceTable({
                 onSort={onSort}
                 align="right"
               />
+              {/* The settings cell at the end of each row. An empty header
+                  rather than none: a table whose body has more cells than its
+                  head is malformed, and the extra cell would belong to no
+                  column. */}
+              <th className={TH_CLASS}></th>
             </tr>
           </thead>
           <tbody>
