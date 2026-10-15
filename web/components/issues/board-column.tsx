@@ -43,6 +43,9 @@ export const BoardColumn = memo(function BoardColumn({
   const { setNodeRef, isOver } = useDroppable({
     id: status,
     data: { type: "column", status },
+    // Nothing can be dropped here in "link" mode, and the aggregate board has no
+    // DndContext above it at all: the column is a container, not a target.
+    disabled: mode === "link",
   });
 
   return (

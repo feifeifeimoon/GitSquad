@@ -7,6 +7,7 @@ import { api, agentApi, skillApi, type Agent, type Skill } from "@/lib/api";
 import {
   agentStatus,
   AGENT_STATUS_LABEL,
+  AGENT_REFRESH_MS,
   type AgentStatus,
 } from "@/lib/agent-status";
 import { paths } from "@/lib/paths";
@@ -39,10 +40,6 @@ interface DaemonOption {
   name: string;
   providers: string[];
 }
-
-// Status is derived (see lib/agent-status.ts), so the list has to re-read the
-// daemon heartbeat and the task queue instead of holding a stale snapshot.
-const REFRESH_MS = 15_000;
 
 const STATUS_FILTERS: Array<{ key: AgentStatus | "all"; label: string }> = [
   { key: "all", label: "All" },
@@ -112,7 +109,7 @@ export default function WorkspaceAgentsPage() {
   useEffect(() => {
     const interval = setInterval(
       () => invalidateApi(`/api/v1/workspaces/${slug}/agents`),
-      REFRESH_MS,
+      AGENT_REFRESH_MS,
     );
     return () => clearInterval(interval);
   }, [slug]);

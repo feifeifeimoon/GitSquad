@@ -14,6 +14,17 @@
 export type AgentStatus = "running" | "queued" | "idle" | "offline";
 export type DaemonStatus = "online" | "offline";
 
+/**
+ * How often an agent list re-reads, because status is derived rather than
+ * stored: the daemon heartbeat and the task queue move on their own schedule,
+ * and nothing pushes them — the app socket is scoped per workspace, so the
+ * aggregate roster has no connection at all.
+ *
+ * Here rather than beside one page, because both rosters need the same answer
+ * and a constant that has to agree across files should not be declared twice.
+ */
+export const AGENT_REFRESH_MS = 15_000;
+
 /** The union of both vocabularies, for the shared colour maps. */
 export type StatusTone = AgentStatus | DaemonStatus;
 
