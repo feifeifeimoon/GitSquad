@@ -11,7 +11,7 @@ import {
   type AgentStatus,
 } from "@/lib/agent-status";
 import { paths } from "@/lib/paths";
-import { AGENT_LIST_RAIL, AgentList } from "@/components/agents/agent-list";
+import { AgentList } from "@/components/agents/agent-list";
 import { ProviderIcon } from "@/components/provider-icon";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { PageToolbar } from "@/components/page-toolbar";
@@ -242,7 +242,7 @@ export default function WorkspaceAgentsPage() {
         }
       />
 
-      <div className={`flex-1 px-8 pb-8 pt-6 ${AGENT_LIST_RAIL}`}>
+      <div className="flex-1 px-8 pb-8 pt-6">
         {loading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
