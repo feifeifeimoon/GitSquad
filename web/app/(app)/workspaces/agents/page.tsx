@@ -7,7 +7,7 @@ import { AGENT_REFRESH_MS } from "@/lib/agent-status";
 import { invalidateApi, useApi } from "@/lib/query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/error-state";
-import { AgentTable } from "@/components/agents/agent-table";
+import { AgentList, type AgentGroup } from "@/components/agents/agent-list";
 import {
   Empty,
   EmptyDescription,
@@ -16,16 +16,39 @@ import {
 } from "@/components/ui/empty";
 
 /**
- * The All Workspaces roster: every agent in every workspace you own.
+ * One group per workspace, in the order the server sent them — it orders by
+ * workspace then name, so this is a fold rather than a sort. The key is the
+ * slug: two workspaces can share a name, and only the slug tells them apart.
+ */
+function groupByWorkspace(agents: Agent[]): AgentGroup[] {
+  const groups = new Map<string, AgentGroup>();
+  for (const agent of agents) {
+    const key = agent.workspace_slug ?? agent.workspace_id;
+    const group = groups.get(key) ?? {
+      key,
+      name: agent.workspace_name,
+      slug: agent.workspace_slug,
+      agents: [],
+    };
+    group.agents.push(agent);
+    groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+
+/**
+ * The All Workspaces roster: every agent in every workspace you own, grouped by
+ * the workspace each belongs to.
  *
- * The second page that reads across workspaces, and the one where the Workspace
- * column earns its place most: "@planner" is a name people reuse, and one
- * machine can back runtimes in several workspaces at once, so a flat list of
- * agent names would be genuinely ambiguous.
+ * The second page that reads across workspaces, and the one where drawing the
+ * workspace matters most: "@planner" is a name people reuse, and one machine can
+ * back runtimes in several workspaces at once, so a flat list of agent names
+ * would be genuinely ambiguous. The workspace is the group header here rather
+ * than a column — the same name down twenty rows is a header waiting to happen.
  *
  * Read-only, like the board across workspaces: creating, editing and deleting an
- * agent all belong to a workspace, and this page is not in one. Each row's
- * workspace links to that workspace's roster, which is where the edits are.
+ * agent all belong to a workspace, and this page is not in one. Each header
+ * carries the link to that workspace's roster, which is where the edits are.
  */
 export default function AllAgentsPage() {
   const {
@@ -75,7 +98,7 @@ export default function AllAgentsPage() {
           </EmptyDescription>
         </Empty>
       ) : (
-        <AgentTable agents={agents ?? []} />
+        <AgentList groups={groupByWorkspace(agents ?? [])} />
       )}
     </div>
   );

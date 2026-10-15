@@ -136,7 +136,7 @@ test.describe("All Workspaces board", () => {
     await expect(page.locator("[data-issue-card]").first()).toBeVisible();
   });
 
-  test("the agent roster spans workspaces too, and names each one", async ({
+  test("the agent roster groups by workspace, and names each one", async ({
     page,
   }) => {
     await loginAsE2E(page, api);
@@ -145,16 +145,25 @@ test.describe("All Workspaces board", () => {
       { timeout: 20_000 },
     );
 
-    // Two rows, one per workspace, both called "@planner" — a name people
-    // reuse, which is why the row has to say whose it is. The identity of a row
-    // is its workspace, not its name.
-    const rows = page.locator("tbody tr");
-    await expect(rows).toHaveCount(2);
-    await expect(rows.filter({ hasText: alpha.name })).toContainText("@planner");
-    await expect(rows.filter({ hasText: beta.name })).toContainText("@planner");
+    // One group per workspace, and one row in each — both rows called
+    // "@planner", which is a name people reuse. The group is what tells them
+    // apart; the name no longer has to.
+    await expect(page.getByRole("listitem")).toHaveCount(2);
+    const alphaGroup = page.getByRole("button", { name: alpha.name });
+    const betaGroup = page.getByRole("button", { name: beta.name });
+    await expect(alphaGroup).toContainText("1");
+    await expect(betaGroup).toContainText("1");
 
-    // The workspace cell goes back to that workspace's roster, which is where
-    // an agent can be edited — there is no agent detail page.
+    // Collapsing is the header's job, and it takes the group with it.
+    await expect(alphaGroup).toHaveAttribute("aria-expanded", "true");
+    await alphaGroup.click();
+    await expect(alphaGroup).toHaveAttribute("aria-expanded", "false");
+    await expect(page.getByRole("listitem")).toHaveCount(1);
+    await alphaGroup.click();
+    await expect(page.getByRole("listitem")).toHaveCount(2);
+
+    // The header's link goes back to that workspace's roster, which is where an
+    // agent can be edited — there is no agent detail page.
     await expect(page.locator(`a[href="/${alpha.slug}/agents"]`)).toBeVisible();
     await expect(page.locator(`a[href="/${beta.slug}/agents"]`)).toBeVisible();
 

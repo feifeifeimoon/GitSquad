@@ -11,7 +11,7 @@ import {
   type AgentStatus,
 } from "@/lib/agent-status";
 import { paths } from "@/lib/paths";
-import { AgentTable } from "@/components/agents/agent-table";
+import { AgentList } from "@/components/agents/agent-list";
 import { ProviderIcon } from "@/components/provider-icon";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { PageToolbar } from "@/components/page-toolbar";
@@ -291,8 +291,8 @@ export default function WorkspaceAgentsPage() {
               })}
             </div>
 
-            <AgentTable
-              agents={visible}
+            <AgentList
+              groups={[{ key: slug, agents: visible }]}
               // Only a real status has a "no agents are …" sentence. With "all"
               // chosen the empty case is the page's own empty state above, and
               // `AGENT_STATUS_LABEL["all"]` is not a key at all — which is why

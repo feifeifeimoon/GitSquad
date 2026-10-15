@@ -34,10 +34,10 @@ test.describe("Agents", () => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}/agents`, { waitUntil: "domcontentloaded" });
 
-    const table = page.getByRole("table");
-    await expect(table.getByText(`@${agentName}`)).toBeVisible({ timeout: 20_000 });
-    await expect(table.getByText("claude")).toBeVisible();
-    await expect(table.getByText(daemon.name)).toBeVisible();
+    const list = page.getByRole("list");
+    await expect(list.getByText(`@${agentName}`)).toBeVisible({ timeout: 20_000 });
+    await expect(list.getByText("claude")).toBeVisible();
+    await expect(list.getByText(daemon.name)).toBeVisible();
   });
 
   // Status is derived from the backing daemon's heartbeat plus the task queue,
@@ -53,7 +53,7 @@ test.describe("Agents", () => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}/agents`, { waitUntil: "domcontentloaded" });
 
-    const row = page.getByRole("row").filter({ hasText: `@${agentName}` });
+    const row = page.getByRole("listitem").filter({ hasText: `@${agentName}` });
     await expect(row.getByText("Idle", { exact: true })).toBeVisible({
       timeout: 20_000,
     });
@@ -79,7 +79,7 @@ test.describe("Agents", () => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}/agents`, { waitUntil: "domcontentloaded" });
 
-    const row = page.getByRole("row").filter({ hasText: `@${agentName}` });
+    const row = page.getByRole("listitem").filter({ hasText: `@${agentName}` });
     await expect(row.getByText("Running", { exact: true })).toBeVisible({
       timeout: 20_000,
     });
@@ -101,7 +101,7 @@ test.describe("Agents", () => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}/agents`, { waitUntil: "domcontentloaded" });
 
-    const row = page.getByRole("row").filter({ hasText: `@${agentName}` });
+    const row = page.getByRole("listitem").filter({ hasText: `@${agentName}` });
     await expect(row.getByText("Offline", { exact: true })).toBeVisible({
       timeout: 20_000,
     });
