@@ -1,17 +1,16 @@
 "use client";
 
 import { useEffect } from "react";
-import { Bot } from "lucide-react";
 import { agentApi, type Agent } from "@/lib/api";
 import { AGENT_REFRESH_MS } from "@/lib/agent-status";
 import { invalidateApi, useApi } from "@/lib/query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/error-state";
+import { AgentHead } from "@/components/agents/agent-head";
 import { AgentList, type AgentGroup } from "@/components/agents/agent-list";
 import {
   Empty,
   EmptyDescription,
-  EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
 
@@ -88,9 +87,9 @@ export default function AllAgentsPage() {
         </div>
       ) : (agents ?? []).length === 0 ? (
         <Empty className="rounded-lg bg-canvas-soft py-16">
-          <EmptyMedia>
-            <Bot className="size-5" />
-          </EmptyMedia>
+          {/* The same head the workspace roster's empty state draws, with the
+              same settings — one empty state, two copies of the sentence. */}
+          <AgentHead size={96} interactive antenna floorShadow paused={false} />
           <EmptyTitle>No agents yet</EmptyTitle>
           <EmptyDescription>
             An agent belongs to a workspace. Create one there and it will show up

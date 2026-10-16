@@ -424,6 +424,14 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// is the second column, and the index holds only pending rows.
 		{name: "051_tasks_agent_idx", sql: `CREATE INDEX IF NOT EXISTS idx_tasks_agent
 			ON tasks(agent_id, status)`},
+		// Which robot an agent is. The roster now draws the mark's head on every
+		// row, and the shape is the one thing a user picks at creation (see
+		// docs/specs/2026-10-16-agent-head-design.md) — the four plain outlines
+		// or the mark. The default is the mark, so every agent written before
+		// this column existed wears the same head the homepage does, which is
+		// what an unpicked agent is supposed to look like.
+		{name: "052_agents_head_shape", sql: `ALTER TABLE agents
+			ADD COLUMN IF NOT EXISTS head_shape TEXT NOT NULL DEFAULT 'gitsquad'`},
 	}
 
 	for _, m := range migrations {

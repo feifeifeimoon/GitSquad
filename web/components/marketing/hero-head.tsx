@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState, useSyncExternalStore } from "react";
 
-import { TvHead } from "@/components/marketing/tv-head";
+import { TvHead } from "@/components/tv-head";
 import type { RobotHeadState } from "@/vendor/robot-heads/types";
 
 // The hero's head, and the picker for what it is doing.

@@ -13,8 +13,8 @@ import (
 )
 
 const createAgent = `-- name: CreateAgent :one
-INSERT INTO agents (workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id, workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, created_by, created_at, updated_at
+INSERT INTO agents (workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, head_shape, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, head_shape, created_by, created_at, updated_at
 `
 
 type CreateAgentParams struct {
@@ -26,6 +26,7 @@ type CreateAgentParams struct {
 	RuntimeID    uuid.UUID  `json:"runtime_id"`
 	Enabled      bool       `json:"enabled"`
 	AvatarUrl    string     `json:"avatar_url"`
+	HeadShape    string     `json:"head_shape"`
 	CreatedBy    *uuid.UUID `json:"created_by"`
 }
 
@@ -39,6 +40,7 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 		arg.RuntimeID,
 		arg.Enabled,
 		arg.AvatarUrl,
+		arg.HeadShape,
 		arg.CreatedBy,
 	)
 	var i Agent
@@ -52,6 +54,7 @@ func (q *Queries) CreateAgent(ctx context.Context, arg CreateAgentParams) (Agent
 		&i.RuntimeID,
 		&i.Enabled,
 		&i.AvatarUrl,
+		&i.HeadShape,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -74,7 +77,7 @@ func (q *Queries) DeleteAgent(ctx context.Context, arg DeleteAgentParams) error 
 }
 
 const getAgent = `-- name: GetAgent :one
-SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
+SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.head_shape, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
        d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
        d.last_seen_at AS runtime_daemon_last_seen_at,
        workload.running_count, workload.queued_count, workload.total_runs,
@@ -117,6 +120,7 @@ type GetAgentRow struct {
 	RuntimeID               uuid.UUID  `json:"runtime_id"`
 	Enabled                 bool       `json:"enabled"`
 	AvatarUrl               string     `json:"avatar_url"`
+	HeadShape               string     `json:"head_shape"`
 	CreatedBy               *uuid.UUID `json:"created_by"`
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`
@@ -147,6 +151,7 @@ func (q *Queries) GetAgent(ctx context.Context, arg GetAgentParams) (GetAgentRow
 		&i.RuntimeID,
 		&i.Enabled,
 		&i.AvatarUrl,
+		&i.HeadShape,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -191,7 +196,7 @@ func (q *Queries) ListAgentNamesByWorkspace(ctx context.Context, workspaceID uui
 }
 
 const listAgentsByDaemon = `-- name: ListAgentsByDaemon :many
-SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
+SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.head_shape, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
        d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
        d.last_seen_at AS runtime_daemon_last_seen_at,
        w.name AS workspace_name, w.slug AS workspace_slug,
@@ -237,6 +242,7 @@ type ListAgentsByDaemonRow struct {
 	RuntimeID               uuid.UUID  `json:"runtime_id"`
 	Enabled                 bool       `json:"enabled"`
 	AvatarUrl               string     `json:"avatar_url"`
+	HeadShape               string     `json:"head_shape"`
 	CreatedBy               *uuid.UUID `json:"created_by"`
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`
@@ -276,6 +282,7 @@ func (q *Queries) ListAgentsByDaemon(ctx context.Context, arg ListAgentsByDaemon
 			&i.RuntimeID,
 			&i.Enabled,
 			&i.AvatarUrl,
+			&i.HeadShape,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -305,7 +312,7 @@ func (q *Queries) ListAgentsByDaemon(ctx context.Context, arg ListAgentsByDaemon
 }
 
 const listAgentsByWorkspace = `-- name: ListAgentsByWorkspace :many
-SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
+SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.head_shape, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
        d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
        d.last_seen_at AS runtime_daemon_last_seen_at,
        workload.running_count, workload.queued_count, workload.total_runs,
@@ -344,6 +351,7 @@ type ListAgentsByWorkspaceRow struct {
 	RuntimeID               uuid.UUID  `json:"runtime_id"`
 	Enabled                 bool       `json:"enabled"`
 	AvatarUrl               string     `json:"avatar_url"`
+	HeadShape               string     `json:"head_shape"`
 	CreatedBy               *uuid.UUID `json:"created_by"`
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`
@@ -389,6 +397,7 @@ func (q *Queries) ListAgentsByWorkspace(ctx context.Context, workspaceID uuid.UU
 			&i.RuntimeID,
 			&i.Enabled,
 			&i.AvatarUrl,
+			&i.HeadShape,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -416,7 +425,7 @@ func (q *Queries) ListAgentsByWorkspace(ctx context.Context, workspaceID uuid.UU
 }
 
 const listAgentsForUser = `-- name: ListAgentsForUser :many
-SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
+SELECT a.id, a.workspace_id, a.name, a.description, a.instructions, a.model, a.runtime_id, a.enabled, a.avatar_url, a.head_shape, a.created_by, a.created_at, a.updated_at, ar.provider AS runtime_provider, ar.name AS runtime_name, ar.daemon_id AS runtime_daemon_id,
        d.name AS runtime_daemon_name, d.status AS runtime_daemon_status,
        d.last_seen_at AS runtime_daemon_last_seen_at,
        w.name AS workspace_name, w.slug AS workspace_slug,
@@ -457,6 +466,7 @@ type ListAgentsForUserRow struct {
 	RuntimeID               uuid.UUID  `json:"runtime_id"`
 	Enabled                 bool       `json:"enabled"`
 	AvatarUrl               string     `json:"avatar_url"`
+	HeadShape               string     `json:"head_shape"`
 	CreatedBy               *uuid.UUID `json:"created_by"`
 	CreatedAt               time.Time  `json:"created_at"`
 	UpdatedAt               time.Time  `json:"updated_at"`
@@ -503,6 +513,7 @@ func (q *Queries) ListAgentsForUser(ctx context.Context, userID uuid.UUID) ([]Li
 			&i.RuntimeID,
 			&i.Enabled,
 			&i.AvatarUrl,
+			&i.HeadShape,
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
@@ -573,8 +584,8 @@ func (q *Queries) ListWorkspaceAgentsForAssignment(ctx context.Context, workspac
 }
 
 const updateAgent = `-- name: UpdateAgent :one
-UPDATE agents SET name = $3, description = $4, instructions = $5, model = $6, runtime_id = $7, enabled = $8, avatar_url = $9, updated_at = now()
-WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, created_by, created_at, updated_at
+UPDATE agents SET name = $3, description = $4, instructions = $5, model = $6, runtime_id = $7, enabled = $8, avatar_url = $9, head_shape = $10, updated_at = now()
+WHERE id = $1 AND workspace_id = $2 RETURNING id, workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, head_shape, created_by, created_at, updated_at
 `
 
 type UpdateAgentParams struct {
@@ -587,6 +598,7 @@ type UpdateAgentParams struct {
 	RuntimeID    uuid.UUID `json:"runtime_id"`
 	Enabled      bool      `json:"enabled"`
 	AvatarUrl    string    `json:"avatar_url"`
+	HeadShape    string    `json:"head_shape"`
 }
 
 func (q *Queries) UpdateAgent(ctx context.Context, arg UpdateAgentParams) (Agent, error) {
@@ -600,6 +612,7 @@ func (q *Queries) UpdateAgent(ctx context.Context, arg UpdateAgentParams) (Agent
 		arg.RuntimeID,
 		arg.Enabled,
 		arg.AvatarUrl,
+		arg.HeadShape,
 	)
 	var i Agent
 	err := row.Scan(
@@ -612,6 +625,7 @@ func (q *Queries) UpdateAgent(ctx context.Context, arg UpdateAgentParams) (Agent
 		&i.RuntimeID,
 		&i.Enabled,
 		&i.AvatarUrl,
+		&i.HeadShape,
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,

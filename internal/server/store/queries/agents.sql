@@ -1,6 +1,6 @@
 -- name: CreateAgent :one
-INSERT INTO agents (workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, created_by)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *;
+INSERT INTO agents (workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, head_shape, created_by)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 
 -- Workload counts and the in-flight issue ride along on every agent read so the
 -- list can show a live status without a per-agent round trip. A claimed task
@@ -69,7 +69,7 @@ LEFT JOIN LATERAL (
 WHERE a.id = $1 AND a.workspace_id = $2;
 
 -- name: UpdateAgent :one
-UPDATE agents SET name = $3, description = $4, instructions = $5, model = $6, runtime_id = $7, enabled = $8, avatar_url = $9, updated_at = now()
+UPDATE agents SET name = $3, description = $4, instructions = $5, model = $6, runtime_id = $7, enabled = $8, avatar_url = $9, head_shape = $10, updated_at = now()
 WHERE id = $1 AND workspace_id = $2 RETURNING *;
 
 -- name: DeleteAgent :exec

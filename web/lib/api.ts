@@ -295,6 +295,13 @@ export interface Agent {
   runtime_id: string;
   enabled: boolean;
   avatar_url?: string;
+  /**
+   * Which robot the agent wears in the roster: one of HEAD_SHAPES
+   * (lib/agent-shape.ts). Present on every row — the column defaults to the
+   * mark — and read through `headShapeOf`, which falls back to the mark on
+   * anything unknown.
+   */
+  head_shape: string;
   running_count: number;
   queued_count: number;
   total_runs: number;
@@ -475,6 +482,7 @@ export const agentApi = {
     daemon_id: string;
     provider: string;
     avatar_url?: string;
+    head_shape?: string;
     skill_ids?: string[];
     enabled?: boolean;
   }) => api.post<Agent>(`/api/v1/workspaces/${workspaceId}/agents`, body),
@@ -486,6 +494,7 @@ export const agentApi = {
     daemon_id?: string;
     provider?: string;
     avatar_url?: string;
+    head_shape?: string;
     skill_ids?: string[];
     enabled?: boolean;
   }) => api.patch<Agent>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`, body),

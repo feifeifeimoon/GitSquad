@@ -35,6 +35,11 @@ type Agent struct {
 	RuntimeID    uuid.UUID `json:"runtime_id"`
 	Enabled      bool      `json:"enabled"`
 	AvatarURL    string    `json:"avatar_url,omitempty"`
+	// Which robot this agent is: the outline of the head it wears in the roster
+	// (`gitsquad`, `square`, `circle`, `hexagon`, `rectangle`). Empty never
+	// happens on a row — the column defaults to the mark — but an unknown token
+	// is the frontend's to fall back on, not the server's to reject on read.
+	HeadShape string `json:"head_shape"`
 	// Live workload, derived from the task queue rather than stored on the
 	// agent. RunningCount covers dispatched + running tasks; TotalRuns counts
 	// the terminal ones, which is what "N runs" in the UI means.
@@ -72,6 +77,7 @@ type CreateAgentRequest struct {
 	DaemonID     string   `json:"daemon_id" binding:"required"`
 	Provider     string   `json:"provider" binding:"required"`
 	AvatarURL    string   `json:"avatar_url"`
+	HeadShape    string   `json:"head_shape"`
 	SkillIDs     []string `json:"skill_ids"`
 	Enabled      *bool    `json:"enabled"`
 }
@@ -84,6 +90,7 @@ type UpdateAgentRequest struct {
 	DaemonID     *string  `json:"daemon_id"`
 	Provider     *string  `json:"provider"`
 	AvatarURL    *string  `json:"avatar_url"`
+	HeadShape    *string  `json:"head_shape"`
 	SkillIDs     []string `json:"skill_ids"`
 	Enabled      *bool    `json:"enabled"`
 }

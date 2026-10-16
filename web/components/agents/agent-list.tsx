@@ -7,6 +7,7 @@ import type { Agent } from "@/lib/api";
 import { agentStatus, workloadDetail } from "@/lib/agent-status";
 import { paths } from "@/lib/paths";
 import { ProviderIcon } from "@/components/provider-icon";
+import { AgentHead } from "@/components/agents/agent-head";
 import { AgentStatusBadge } from "@/components/status-dot";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 
@@ -153,15 +154,30 @@ function AgentRow({ agent, actions }: { agent: Agent; actions?: ReactNode }) {
       className="flex h-9 items-center gap-3 border-b border-hairline px-4 transition-colors last:border-b-0 hover:bg-muted/40"
     >
       {/* One line, and the same composition as the reference's list row: the
-          identity first (avatar, then the name), then what the agent is for,
+          identity first (the face, then the name), then what the agent is for,
           with the standing facts packed at the right end. It was two lines —
           name over description — which made every row 60px and put the facts
-          you scan for on a second baseline. */}
-      <WorkspaceAvatar
-        name={agent.name}
-        avatarUrl={agent.avatar_url}
-        className="size-5 shrink-0"
-      />
+          you scan for on a second baseline.
+
+          One face, and it is whichever the agent was given: a picture if one is
+          set, the robot otherwise — the create dialog asks for one or the other,
+          so the row draws one or the other. Both are `size-7`, so the column
+          keeps one edge whether an agent has a picture or not.
+
+          The head is also the state: the visor works while the agent does,
+          thinks while it queues, sits while it is free and sleeps while its
+          machine is unreachable. The dot and the word at the right still say it
+          — the head illustrates, the badge states — and a picture simply leaves
+          that half to the badge. */}
+      {agent.avatar_url ? (
+        <WorkspaceAvatar
+          name={agent.name}
+          avatarUrl={agent.avatar_url}
+          className="size-7 shrink-0"
+        />
+      ) : (
+        <AgentHead shape={agent.head_shape} status={status} className="shrink-0" />
+      )}
       <span className="shrink-0 truncate text-copy font-medium text-ink">
         @{agent.name}
       </span>

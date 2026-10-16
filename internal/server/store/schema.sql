@@ -158,6 +158,7 @@ CREATE TABLE agents (
     runtime_id UUID NOT NULL REFERENCES agent_runtimes(id) ON DELETE RESTRICT,
     enabled BOOLEAN NOT NULL DEFAULT true,
     avatar_url TEXT NOT NULL DEFAULT '',
+    head_shape TEXT NOT NULL DEFAULT 'gitsquad',
     created_by UUID REFERENCES users(id),
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
