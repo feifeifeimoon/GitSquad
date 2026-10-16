@@ -11,7 +11,16 @@ import {
   type AgentStatus,
 } from "@/lib/agent-status";
 import { paths } from "@/lib/paths";
+import { AgentHead } from "@/components/agents/agent-head";
 import { AgentList } from "@/components/agents/agent-list";
+import {
+  DEFAULT_HEAD_SHAPE,
+  HEAD_SHAPES,
+  HEAD_SHAPE_LABEL,
+  headShapeOf,
+} from "@/lib/agent-shape";
+import type { RobotHeadShape } from "@/vendor/robot-heads/types";
+import { cn } from "@/lib/utils";
 import { ProviderIcon } from "@/components/provider-icon";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { PageToolbar } from "@/components/page-toolbar";
@@ -21,7 +30,7 @@ import { InlineConfirm } from "@/components/inline-confirm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Empty, EmptyMedia, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
+import { Empty, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -99,6 +108,7 @@ export default function WorkspaceAgentsPage() {
   const [provider, setProvider] = useState("");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarError, setAvatarError] = useState("");
+  const [headShape, setHeadShape] = useState<RobotHeadShape>(DEFAULT_HEAD_SHAPE);
   const [skillIds, setSkillIds] = useState<string[]>([]);
   const [enabled, setEnabled] = useState(true);
 
@@ -128,6 +138,7 @@ export default function WorkspaceAgentsPage() {
     setProvider("");
     setAvatarUrl("");
     setAvatarError("");
+    setHeadShape(DEFAULT_HEAD_SHAPE);
     setSkillIds([]);
     setEnabled(true);
     setOpen(true);
@@ -143,6 +154,7 @@ export default function WorkspaceAgentsPage() {
     setProvider(a.runtime?.provider ?? "");
     setAvatarUrl(a.avatar_url ?? "");
     setAvatarError("");
+    setHeadShape(headShapeOf(a.head_shape));
     setSkillIds((a.skills || []).map((s) => s.id));
     setEnabled(a.enabled);
     setOpen(true);
@@ -176,6 +188,7 @@ export default function WorkspaceAgentsPage() {
       daemon_id: daemonId,
       provider,
       avatar_url: avatarUrl,
+      head_shape: headShape,
       skill_ids: skillIds,
       enabled,
     };
@@ -251,9 +264,13 @@ export default function WorkspaceAgentsPage() {
           </div>
         ) : agentsList.length === 0 ? (
           <Empty className="rounded-lg bg-canvas-soft py-16">
-            <EmptyMedia>
-              <Pencil className="size-5" />
-            </EmptyMedia>
+            {/* The hero's own head — the antenna, the floor shadow and its own
+                life (it blinks, it hops, it follows the pointer), which is what
+                hero-head.tsx passes and what "like the homepage" means.
+                `paused={false}` overrides the roster's default, where a head
+                moves only while its agent has work: an empty roster has nothing
+                to signal, so this one may simply live. */}
+            <AgentHead size={96} interactive antenna floorShadow paused={false} />
             <EmptyTitle>No agents yet</EmptyTitle>
             <EmptyDescription>
               Agents are AI workers bound to a runtime. Create one to start
@@ -334,21 +351,66 @@ export default function WorkspaceAgentsPage() {
             {editing ? "Edit agent" : "Create agent"}
           </DialogTitle>
           <div className="space-y-4">
+            {/* One face, one field: a robot **or** a picture, never both. The
+                five outlines are the same robot (one visor, one three-cell
+                face), so the choice is a silhouette and nothing else; picking
+                one drops the picture, and uploading a picture drops the
+                selection — the roster draws whichever of the two is set.
+                The big head on the left is the preview: alive, showing the
+                agent's own state while editing. The row of small ones is the
+                picker and they are still frames on purpose, because a click
+                here means "choose me", not "poke me". */}
             <Field label="Avatar">
-              <div className="flex items-center gap-3">
-                <WorkspaceAvatar
-                  name={name || "agent"}
-                  avatarUrl={avatarUrl}
-                  className="size-14"
-                />
-                <div className="space-y-1">
-                  <div className="flex gap-2">
+              <div className="flex items-start gap-4">
+                <div className="flex size-24 shrink-0 items-center justify-center rounded-lg bg-canvas-soft-2">
+                  {avatarUrl ? (
+                    <WorkspaceAvatar
+                      name={name || "agent"}
+                      avatarUrl={avatarUrl}
+                      className="size-20"
+                    />
+                  ) : (
+                    <AgentHead
+                      shape={headShape}
+                      status={editing ? agentStatus(editing) : "idle"}
+                      size={96}
+                      interactive
+                      paused={false}
+                    />
+                  )}
+                </div>
+                <div className="min-w-0 space-y-2">
+                  <div role="group" aria-label="Robot" className="flex gap-1">
+                    {HEAD_SHAPES.map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        aria-pressed={!avatarUrl && headShape === s}
+                        aria-label={HEAD_SHAPE_LABEL[s]}
+                        title={HEAD_SHAPE_LABEL[s]}
+                        onClick={() => {
+                          setHeadShape(s);
+                          // 二选一: picking the robot is what drops the picture.
+                          setAvatarUrl("");
+                        }}
+                        className={cn(
+                          "rounded-md p-2 transition-colors",
+                          !avatarUrl && headShape === s
+                            ? "bg-muted ring-2 ring-link"
+                            : "hover:bg-muted",
+                        )}
+                      >
+                        <AgentHead shape={s} size={52} paused />
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-2">
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => fileInputRef.current?.click()}
                     >
-                      Upload
+                      Upload picture
                     </Button>
                     {avatarUrl && (
                       <Button
@@ -359,18 +421,21 @@ export default function WorkspaceAgentsPage() {
                         Remove
                       </Button>
                     )}
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleFileChange}
+                    />
                   </div>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
                   {avatarError ? (
                     <p className="text-caption text-destructive">{avatarError}</p>
                   ) : (
-                    <p className="text-caption text-mute">PNG, JPG or SVG, up to 1MB</p>
+                    <p className="text-caption text-mute">
+                      A robot, or a picture instead of one — PNG, JPG or SVG, up
+                      to 1MB.
+                    </p>
                   )}
                 </div>
               </div>

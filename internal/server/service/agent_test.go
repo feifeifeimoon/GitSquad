@@ -23,3 +23,26 @@ func TestNormalizeAgentName(t *testing.T) {
 		}
 	}
 }
+
+func TestNormalizeHeadShape(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+		err  error
+	}{
+		{"", defaultHeadShape, nil},
+		{"gitsquad", "gitsquad", nil},
+		{" Circle ", "circle", nil},
+		{"square", "square", nil},
+		{"hexagon", "hexagon", nil},
+		{"rectangle", "rectangle", nil},
+		{"pentagon", "", ErrInvalidHeadShape},
+		{"git squad", "", ErrInvalidHeadShape},
+	}
+	for _, c := range cases {
+		got, err := normalizeHeadShape(c.in)
+		if err != c.err || got != c.want {
+			t.Errorf("normalizeHeadShape(%q) = (%q, %v), want (%q, %v)", c.in, got, err, c.want, c.err)
+		}
+	}
+}

@@ -4,6 +4,7 @@ import {
   agentStatus,
   agentStatusWithDaemon,
   daemonStatusOf,
+  HEAD_STATE,
   workloadDetail,
 } from "./agent-status.ts";
 
@@ -95,4 +96,16 @@ test("workload detail names the issue, else counts, else nothing", () => {
     workloadDetail({ running_count: 0, queued_count: 0, current_task: null }),
     null,
   );
+});
+
+test("every status has a face, and the four are the four", () => {
+  // The mapping the roster, the picker and the empty state all read. It is a
+  // table, so the test is a table: work is drawn as work, waiting as thinking,
+  // free as idle, unreachable as asleep.
+  assert.deepEqual(HEAD_STATE, {
+    running: "working",
+    queued: "thinking",
+    idle: "idle",
+    offline: "sleeping",
+  });
 });

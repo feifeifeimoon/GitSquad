@@ -416,11 +416,13 @@ export class TestApiClient {
       daemon_id: string;
       provider: string;
       description?: string;
+      /** Which robot it wears in the roster; the server defaults to `gitsquad`. */
+      head_shape?: string;
       /** false seeds an agent that exists but cannot run, which is what the
        * assignment picker has to render as unpickable. */
       enabled?: boolean;
     },
-  ): Promise<{ id: string; name: string }> {
+  ): Promise<{ id: string; name: string; head_shape: string }> {
     return this.authedFetch(`/api/v1/workspaces/${workspaceId}/agents`, {
       method: "POST",
       body: JSON.stringify(body),

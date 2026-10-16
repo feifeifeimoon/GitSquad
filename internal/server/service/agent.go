@@ -20,6 +20,7 @@ var (
 	ErrAgentNameTaken   = errors.New("agent name already exists in workspace")
 	ErrInvalidAgentName = errors.New("agent name must match ^[a-z0-9][a-z0-9_-]{0,63}$")
 	ErrInvalidProvider  = errors.New("provider must be claude, codex, or agy")
+	ErrInvalidHeadShape = errors.New("head_shape must be gitsquad, square, circle, hexagon, or rectangle")
 	ErrRuntimeNotFound  = errors.New("runtime not found")
 	ErrDaemonMismatch   = errors.New("daemon does not belong to this workspace owner")
 	ErrSkillNotFound    = errors.New("skill not found")
@@ -33,12 +34,33 @@ var agentNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
 // be acceptable here, otherwise the UI offers a choice the API rejects.
 var validProviders = map[string]bool{"claude": true, "codex": true, "agy": true}
 
+// validHeadShapes mirrors the outlines the web head can draw
+// (web/lib/agent-shape.ts, which falls back to the mark on anything it does not
+// know). The default is the same mark as the column's, so an empty request and a
+// row written before the column existed land on the same robot.
+var validHeadShapes = map[string]bool{
+	"gitsquad": true, "square": true, "circle": true, "hexagon": true, "rectangle": true,
+}
+
+const defaultHeadShape = "gitsquad"
+
 func normalizeAgentName(name string) (string, error) {
 	n := strings.ToLower(strings.TrimSpace(name))
 	if !agentNameRe.MatchString(n) {
 		return "", ErrInvalidAgentName
 	}
 	return n, nil
+}
+
+func normalizeHeadShape(shape string) (string, error) {
+	s := strings.ToLower(strings.TrimSpace(shape))
+	if s == "" {
+		return defaultHeadShape, nil
+	}
+	if !validHeadShapes[s] {
+		return "", ErrInvalidHeadShape
+	}
+	return s, nil
 }
 
 type AgentService struct {
@@ -79,6 +101,10 @@ func (s *AgentService) CreateAgent(ctx context.Context, workspaceID, userID uuid
 	if err != nil {
 		return nil, err
 	}
+	headShape, err := normalizeHeadShape(req.HeadShape)
+	if err != nil {
+		return nil, err
+	}
 	daemonID, err := uuid.Parse(req.DaemonID)
 	if err != nil {
 		return nil, ErrDaemonMismatch
@@ -100,6 +126,7 @@ func (s *AgentService) CreateAgent(ctx context.Context, workspaceID, userID uuid
 		RuntimeID:    runtimeID,
 		Enabled:      enabled,
 		AvatarUrl:    req.AvatarURL,
+		HeadShape:    headShape,
 		CreatedBy:    &userID,
 	})
 	if err != nil {
@@ -127,7 +154,7 @@ func (s *AgentService) ListAgents(ctx context.Context, workspaceID uuid.UUID) ([
 			id: r.ID, workspaceID: r.WorkspaceID, runtimeID: r.RuntimeID,
 			name: r.Name, description: r.Description, instructions: r.Instructions,
 			model: r.Model, runtimeProvider: r.RuntimeProvider, runtimeName: r.RuntimeName,
-			avatarURL: r.AvatarUrl, enabled: r.Enabled,
+			avatarURL: r.AvatarUrl, headShape: r.HeadShape, enabled: r.Enabled,
 			runtimeDaemonID:   r.RuntimeDaemonID,
 			runtimeDaemonName: r.RuntimeDaemonName, runtimeDaemonStatus: r.RuntimeDaemonStatus,
 			runtimeDaemonLastSeenAt: r.RuntimeDaemonLastSeenAt,
@@ -157,7 +184,7 @@ func (s *AgentService) ListAllAgents(ctx context.Context, userID uuid.UUID) ([]v
 			id: r.ID, workspaceID: r.WorkspaceID, runtimeID: r.RuntimeID,
 			name: r.Name, description: r.Description, instructions: r.Instructions,
 			model: r.Model, runtimeProvider: r.RuntimeProvider, runtimeName: r.RuntimeName,
-			avatarURL: r.AvatarUrl, enabled: r.Enabled,
+			avatarURL: r.AvatarUrl, headShape: r.HeadShape, enabled: r.Enabled,
 			runtimeDaemonID:   r.RuntimeDaemonID,
 			runtimeDaemonName: r.RuntimeDaemonName, runtimeDaemonStatus: r.RuntimeDaemonStatus,
 			runtimeDaemonLastSeenAt: r.RuntimeDaemonLastSeenAt,
@@ -184,7 +211,7 @@ func (s *AgentService) GetAgent(ctx context.Context, workspaceID, agentID uuid.U
 		id: r.ID, workspaceID: r.WorkspaceID, runtimeID: r.RuntimeID,
 		name: r.Name, description: r.Description, instructions: r.Instructions,
 		model: r.Model, runtimeProvider: r.RuntimeProvider, runtimeName: r.RuntimeName,
-		avatarURL: r.AvatarUrl, enabled: r.Enabled,
+		avatarURL: r.AvatarUrl, headShape: r.HeadShape, enabled: r.Enabled,
 		runtimeDaemonID:   r.RuntimeDaemonID,
 		runtimeDaemonName: r.RuntimeDaemonName, runtimeDaemonStatus: r.RuntimeDaemonStatus,
 		runtimeDaemonLastSeenAt: r.RuntimeDaemonLastSeenAt,
@@ -243,6 +270,7 @@ func (s *AgentService) UpdateAgent(ctx context.Context, workspaceID, agentID uui
 		RuntimeID:    cur.RuntimeID,
 		Enabled:      cur.Enabled,
 		AvatarUrl:    cur.AvatarUrl,
+		HeadShape:    cur.HeadShape,
 	}
 	if req.Name != nil {
 		params.Name, err = normalizeAgentName(*req.Name)
@@ -264,6 +292,12 @@ func (s *AgentService) UpdateAgent(ctx context.Context, workspaceID, agentID uui
 	}
 	if req.AvatarURL != nil {
 		params.AvatarUrl = *req.AvatarURL
+	}
+	if req.HeadShape != nil {
+		params.HeadShape, err = normalizeHeadShape(*req.HeadShape)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if req.DaemonID != nil && req.Provider != nil {
 		daemonID, err := uuid.Parse(*req.DaemonID)
@@ -349,6 +383,7 @@ type agentRow struct {
 	name, description, instructions        string
 	model, runtimeProvider, runtimeName    string
 	avatarURL                              string
+	headShape                              string
 	enabled                                bool
 	runtimeDaemonID                        *uuid.UUID
 	runtimeDaemonName, runtimeDaemonStatus *string
@@ -372,6 +407,7 @@ func buildAgentView(r agentRow) v1.Agent {
 		RuntimeID:    r.runtimeID,
 		Enabled:      r.enabled,
 		AvatarURL:    r.avatarURL,
+		HeadShape:    r.headShape,
 		RunningCount: int(r.runningCount),
 		QueuedCount:  int(r.queuedCount),
 		TotalRuns:    int(r.totalRuns),

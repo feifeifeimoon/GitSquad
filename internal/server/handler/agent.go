@@ -171,6 +171,8 @@ func (h *AgentHandler) writeErr(c *gin.Context, err error) {
 		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid agent name"))
 	case errors.Is(err, service.ErrInvalidProvider):
 		c.JSON(http.StatusBadRequest, v1.ErrorResponse("provider must be claude or codex"))
+	case errors.Is(err, service.ErrInvalidHeadShape):
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("head_shape must be gitsquad, square, circle, hexagon, or rectangle"))
 	case errors.Is(err, service.ErrDaemonMismatch):
 		c.JSON(http.StatusForbidden, v1.ErrorResponse("daemon does not belong to you"))
 	default:

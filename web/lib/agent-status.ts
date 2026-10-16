@@ -11,8 +11,22 @@
 // are honest (they come from the task queue), so mapping them to a word is
 // presentation. `run_count` never was, and is gone.
 
+import type { RobotHeadState } from "@/vendor/robot-heads/types";
+
 export type AgentStatus = "running" | "queued" | "idle" | "offline";
 export type DaemonStatus = "online" | "offline";
+
+/**
+ * The face that goes with a status — one map, so the roster, the picker and the
+ * empty state cannot drift apart. It is an illustration, not the message: the
+ * written label beside it (dot + word) stays the thing that says what is true.
+ */
+export const HEAD_STATE: Record<AgentStatus, RobotHeadState> = {
+  running: "working",
+  queued: "thinking",
+  idle: "idle",
+  offline: "sleeping",
+};
 
 /**
  * How often an agent list re-reads, because status is derived rather than
