@@ -7,8 +7,8 @@
    slides against the bezel as the head turns. The LEDs are drawn crisp,
    then bloomed from a one-pixel-per-LED image scaled up smooth. */
 
-import { COLS, FACES, GITSQUAD_FACES, LIGHTS, ROWS, makeGrid, type Grid } from './faces';
-import { HEAD, INSET, SCREEN, headMeshes, rotate, rotation, type HeadMeshes, type Mesh, type Shape, type V3 } from './geometry';
+import { COLS, GITSQUAD_FACES, LIGHTS, ROWS, makeGrid, type Grid } from './faces';
+import { HEAD, INSET, headMeshes, rotate, rotation, type HeadMeshes, type Mesh, type Shape, type V3 } from './geometry';
 import { KEY, css, radiance, shadeCss, type Material } from './light';
 import type { RobotPose, RobotSim } from './sim';
 import type { RobotHeadState } from '../types';
@@ -99,13 +99,9 @@ export function frameFor(shape: Shape, antenna: boolean, box: number): Frame {
 const SCREEN_OVER = 0.035;
 
 /* the glass's half extents, and the screen image's: the glass or the LED grid, whichever is bigger */
-/* The glass is the outline inset by the rolled edge, the margin and the gasket.
-   On the GitSquad shell the screen is a capsule of its own, so the glass is that
-   capsule inset by the gasket alone. */
-const glassOf = (s: Shape) =>
-  s.name === 'gitsquad'
-    ? { hx: SCREEN.w / 2 - HEAD.gasket, hy: SCREEN.h / 2 - HEAD.gasket }
-    : { hx: s.hx - INSET.glass, hy: s.hy - INSET.glass };
+/* Every shape's screen is the visor capsule of its own width, so the glass is
+   that capsule inset by the gasket alone. */
+const glassOf = (s: Shape) => ({ hx: s.screen.w / 2 - HEAD.gasket, hy: s.screen.h / 2 - HEAD.gasket });
 function screenOf(s: Shape) {
   const g = glassOf(s);
   return {
@@ -345,8 +341,9 @@ export class RobotRenderer {
   private tinyHalf = makeCanvas(COLS / 2, ROWS / 2);
   private tinyImg: ImageData | null = null;
   private grain: CanvasPattern | null = null;
-  /* GitSquad's visor holds three cells, so it gets its own face table. */
-  private faces = FACES;
+  /* Every shape's visor holds three cells, so there is one face table.
+     Upstream's 22 × 14 `FACES` stays in faces.ts, unselected. */
+  private faces = GITSQUAD_FACES;
   private grid: Grid = makeGrid(COLS, ROWS);
   private gridPrev: Grid = makeGrid(COLS, ROWS);
   private proj = new Float32Array(2048 * 3);
@@ -366,7 +363,7 @@ export class RobotRenderer {
       this.ledKey = '';
       /* the matrix covers the whole glass, the face area centred in it */
       const gl = glassOf(shape);
-      this.faces = shape.name === 'gitsquad' ? GITSQUAD_FACES : FACES;
+      this.faces = GITSQUAD_FACES;
       this.grid = makeGrid(Math.ceil((gl.hx * 2) / shape.pitch), Math.ceil((gl.hy * 2) / shape.pitch));
       this.gridPrev = makeGrid(this.grid.cols, this.grid.rows);
       this.tiny = makeCanvas(this.grid.cols, this.grid.rows);
