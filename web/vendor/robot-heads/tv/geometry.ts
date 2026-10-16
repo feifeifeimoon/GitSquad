@@ -1,14 +1,15 @@
-/* The TV head as real geometry: a shell with a rolled edge, two knob
-   ears and an antenna collar, built once per shape as quad meshes in
-   head units (x right, y down, z toward the viewer). Every frame the
-   vertices are turned with the pose and projected orthographically, so a
-   turn, a nod or a full spin shows the true silhouette — the shell is
-   convex, so back-face culling alone hides what cannot be seen.
+/* The TV head as real geometry: a shell with a rolled edge, the antenna collar
+   and the visor, built once per shape as quad meshes in head units (x right,
+   y down, z toward the viewer). Every frame the vertices are turned with the
+   pose and projected orthographically, so a turn, a nod or a full spin shows
+   the true silhouette — the shell is convex, so back-face culling alone hides
+   what cannot be seen.
 
    Every shape is one outline: a convex polygon of corner centres grown
-   by a corner radius (a circle is a single centre). The front plate, the
-   hole for the screen, the gasket and the glass are that outline inset
-   step by step, so each shape carries the same parts. */
+   by a corner radius (a circle is a single centre). The front plate and the
+   shell's edge are that outline inset step by step; the screen layers (hole,
+   gasket, glass) are the visor capsule, scaled to the shell's width, on every
+   shape — so the outline is the only thing that tells the five apart. */
 
 import type { RobotHeadShape } from '../types';
 
@@ -91,6 +92,9 @@ export interface Shape {
   hy: number;
   /* the LED pitch on this screen, in head units */
   pitch: number;
+  /* the visor capsule, scaled to this shell's width — every outline carries the
+     same screen, so the visible cell count is the same everywhere */
+  screen: { w: number; h: number; y: number; r: number };
   /* where the ears meet the shell */
   earX: number;
   /* screws on the face and on the back: x, y, the slot's angle */
@@ -156,37 +160,39 @@ function makeShape(
     });
     ctx.closePath();
   };
-  /* The visor is a 156 × 64 capsule on the 192-wide grid the shell is measured
-     in — a shape no inset of the shell's outline can be. So the screen layers
-     (hole, gasket, glass) trace the capsule and everything else keeps tracing
-     the outline. */
-  const screen = name === 'gitsquad';
-  const sdCap = (x: number, y: number, d: number) => {
-    const dx = Math.abs(x) - (SCREEN.w / 2 - SCREEN.r + d);
-    const dy = Math.abs(y - SCREEN.y) - (SCREEN.h / 2 - SCREEN.r + d);
-    return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - SCREEN.r + d;
-  };
-  const sd = (x: number, y: number, inset: number) =>
-    screen && inset >= INSET.hole ? sdCap(x, y, inset - INSET.hole) : sdOutline(x, y, inset);
-  const path = (ctx: CanvasRenderingContext2D | Path2D, inset: number) => {
-    if (screen && inset >= INSET.hole) {
-      const d = inset - INSET.hole;
-      ctx.roundRect(
-        -SCREEN.w / 2 + d,
-        SCREEN.y - SCREEN.h / 2 + d,
-        Math.max(0.002, SCREEN.w - 2 * d),
-        Math.max(0.002, SCREEN.h - 2 * d),
-        Math.max(0.001, SCREEN.r - d),
-      );
-      return;
-    }
-    pathOutline(ctx, inset);
-  };
   let hx = 0, hy = 0;
   for (const p of pts) {
     hx = Math.max(hx, Math.abs(p.x) + r);
     hy = Math.max(hy, Math.abs(p.y) + r);
   }
+  /* The visor is a 156 × 64 capsule on the 192-wide grid the shell is measured
+     in — a shape no inset of the shell's outline can be. So the screen layers
+     (hole, gasket, glass) trace the capsule and everything else keeps tracing
+     the outline. Scaled by this shell's width every outline carries the same
+     visor, and because the LED pitch scales with it the visible cell count is
+     the same too — the three cells read the same on all five shapes. */
+  const visor = { w: SCREEN.w * 2 * hx, h: SCREEN.h * 2 * hx, y: SCREEN.y * 2 * hx, r: SCREEN.r * 2 * hx };
+  const sdCap = (x: number, y: number, d: number) => {
+    const dx = Math.abs(x) - (visor.w / 2 - visor.r + d);
+    const dy = Math.abs(y - visor.y) - (visor.h / 2 - visor.r + d);
+    return Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - visor.r + d;
+  };
+  const sd = (x: number, y: number, inset: number) =>
+    inset >= INSET.hole ? sdCap(x, y, inset - INSET.hole) : sdOutline(x, y, inset);
+  const path = (ctx: CanvasRenderingContext2D | Path2D, inset: number) => {
+    if (inset >= INSET.hole) {
+      const d = inset - INSET.hole;
+      ctx.roundRect(
+        -visor.w / 2 + d,
+        visor.y - visor.h / 2 + d,
+        Math.max(0.002, visor.w - 2 * d),
+        Math.max(0.002, visor.h - 2 * d),
+        Math.max(0.001, visor.r - d),
+      );
+      return;
+    }
+    pathOutline(ctx, inset);
+  };
   /* the ears go where the outline crosses their height */
   let lo = 0, hi = hx + 0.1;
   for (let i = 0; i < 40; i++) {
@@ -201,12 +207,11 @@ function makeShape(
       const c = corners.find((k) => [a, a + TAU, a - TAU].some((x) => x >= k.a0 - 1e-6 && x <= k.a1 + 1e-6)) ?? corners[0];
       return [c.x + Math.cos(a) * (r - inward), c.y + Math.sin(a) * (r - inward), 0.5 + i * 0.9];
     });
-  /* the LEDs are sized so the face (14 cells wide, 10 tall) fills the same
-     share of every screen, leaving each the rectangle's breathing room */
-  const gw = 2 * (hx - INSET.glass), gh = 2 * (hy - INSET.glass);
-  const pitch = name === 'gitsquad' ? SCREEN.h / 8 : Math.min((FACE_SHARE * gw) / 14, (0.65 * gh) / 10);
+  /* the pitch is the visor's own — eight rows of cells across it — so the grid
+     the face is laid out on is the same on every shape */
+  const pitch = visor.h / 8;
   return {
-    name, r, depth, corners, hx, hy, pitch,
+    name, r, depth, corners, hx, hy, pitch, screen: visor,
     earX: lo - 0.008,
     /* on the face: halfway between the lip round the hole and the rolled edge */
     screws: place(screwAt, (INSET.hole - 0.018 + INSET.plate) / 2),
@@ -216,15 +221,14 @@ function makeShape(
   };
 }
 
-/* where the GitSquad visor sits, in head units: the mark's 156 × 64 capsule on
-   the 192-wide grid, two units below the shell's centre */
+/* Where the visor sits, as a share of the shell's width: the mark's 156 × 64
+   capsule on the 192-wide grid, two units below the shell's centre. Every shape
+   scales this by its own width (see `makeShape`). */
 export const SCREEN = { w: 0.8125, h: 0.3333, y: 0.0104, r: 0.1667 };
 
 /* flat top and bottom, a point at either side */
 const hexCentres = (a: number): Array<[number, number]> =>
   [0, 60, 120, 180, 240, 300].map((d) => [a * Math.cos((d * Math.PI) / 180), a * Math.sin((d * Math.PI) / 180)]);
-
-const FACE_SHARE = 0.6;
 
 const CORNERS = [45, 135];
 const BACK_CORNERS = [-135, -45, 45, 135];
@@ -356,8 +360,9 @@ const COLLAR_PROFILE: Array<[number, number]> = [
 
 export interface HeadMeshes {
   body: Mesh;
-  /* The knob ears, on the shapes that have them. The GitSquad shell wears fins
-     at the crown instead, so both sets are optional and the renderer guards. */
+  /* Upstream's knob ears, parked on every shape (see `headMeshes`). The
+     GitSquad shell wore fins at the crown instead — also parked. Both sets are
+     optional and the renderer guards. */
   earL: Mesh | null;
   earR: Mesh | null;
   finL: Mesh | null;
@@ -407,14 +412,19 @@ export function headMeshes(shape: Shape): HeadMeshes {
   if (!m) {
     const own = shape.name === 'gitsquad';
     /* Parked: the fins read as someone else's ears bolted to this head. The
-       screen is the next piece of work; the prisms and the outline below are
-       kept so bringing them back is one line. */
+       prisms and the outline below are kept so bringing them back is one line. */
     const FINS = false;
+    /* Parked: upstream's knob ears. The GitSquad shell never had them, and the
+       console now picks a shape at 28px where the outline is meant to be the
+       whole difference — two knobs on four of the five outlines make them read
+       as other robots. `EAR_PROFILE` and this line are kept for the same
+       reason as the fins. */
+    const EARS = false;
     const finZ = shape.depth / 2 - 0.008;
     m = {
       body: buildBody(shape),
-      earL: own ? null : buildLathe(EAR_PROFILE, [-shape.earX, HEAD.earY, 0], [-1, 0, 0]),
-      earR: own ? null : buildLathe(EAR_PROFILE, [shape.earX, HEAD.earY, 0], [1, 0, 0]),
+      earL: EARS ? buildLathe(EAR_PROFILE, [-shape.earX, HEAD.earY, 0], [-1, 0, 0]) : null,
+      earR: EARS ? buildLathe(EAR_PROFILE, [shape.earX, HEAD.earY, 0], [1, 0, 0]) : null,
       finL: own && FINS ? buildPrism(GITSQUAD_FIN_L, finZ, -finZ) : null,
       finR: own && FINS ? buildPrism(GITSQUAD_FIN_R, finZ, -finZ) : null,
       collar: buildLathe(COLLAR_PROFILE, [0, -shape.hy, 0], [0, -1, 0], 16),

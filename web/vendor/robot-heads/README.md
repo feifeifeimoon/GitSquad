@@ -6,15 +6,20 @@
 Copied rather than installed because GitSquad needs to change two things a
 dependency could not give us:
 
-1. **A shape of its own.** `tv/geometry.ts` builds every head from an outline of
-   corner centres grown by one radius, then derives the ears, the antenna collar
-   and the screen insets from it. Our mark is a wide squircle with two fins, and
-   its outline is *not convex* — the renderer relies on convexity for back-face
-   culling, so a concave region would need a painter's order.
-2. **A palette and a tone curve that belong to this project's design system.**
-   Upstream's material is a glossy studio render in its own three colours; the
-   console's is flat ink on paper. `tv/light.ts` holds that model, and the three
-   colours are props.
+1. **A shape of its own, and outlines that are only outlines.** `tv/geometry.ts`
+   builds every head from an outline of corner centres grown by one radius, then
+   derives the ears, the antenna collar and the screen insets from it. Our mark
+   is a wide squircle, and its outline is *not convex* — the renderer relies on
+   convexity for back-face culling, so a concave region would need a painter's
+   order. The console then picks that mark **or one of the four plain outlines**
+   at creation, and all five have to read as one robot: the visor is the mark's
+   capsule scaled to each shell's width, on every shape, with the knob ears
+   parked.
+2. **A face of its own.** `tv/faces.ts` draws a 22 × 14 LED matrix; the mark's
+   visor holds three cells, so `GITSQUAD_FACES` replaces the matrix on every
+   shape. The colours, in the end, are upstream's own: the console wears the
+   same head the homepage does, and the three colours are props if that ever
+   needs to change.
 
 ## Local patches to upstream
 
@@ -25,9 +30,9 @@ what was copied, and nothing else in the folder was touched:
 |---|---|
 | `types.ts` | `RobotHeadShape` gains `'gitsquad'` |
 | `RobotHead.tsx` | `robotHeadShapes` lists it, or the prop falls back to `rectangle` |
-| `tv/geometry.ts` | `buildPrism` (a flat polygon extruded through the depth); the `gitsquad` shape, its two fins and its screen box; `HeadMeshes`' ears and fins are nullable; the screen layers (hole, gasket, glass) trace a capsule on this shape instead of an inset of the shell's outline. **The fins are parked behind a `FINS` flag** — they read as someone else's ears bolted to this head |
-| `tv/render.ts` | draws the fins into the shell's own layer (when they are on); guards the ears; `glassOf` follows the capsule; the face table is chosen per shape |
-| `tv/faces.ts` | `GITSQUAD_FACES`: three cells instead of a 22 × 14 matrix, one behaviour per state |
+| `tv/geometry.ts` | `buildPrism` (a flat polygon extruded through the depth); the `gitsquad` shape and its two fins; `HeadMeshes`' ears and fins are nullable; the screen layers (hole, gasket, glass) trace a capsule on **every** shape instead of an inset of the shell's outline — the capsule is a share of the shell's width (`SCREEN`, 0.8125 / 0.3333 / 0.0104, r 0.1667), and the LED pitch is the capsule's own (`h / 8`), so all five shapes carry the same visor and the same cell count. **The ears are parked behind an `EARS` flag, on every shape** — the console picks an outline at creation, and two knobs on four of the five made them read as other robots; **the fins** are parked the same way, behind `FINS` |
+| `tv/render.ts` | draws the fins into the shell's own layer (when they are on); guards the ears; `glassOf` follows each shape's capsule; **the face table is `GITSQUAD_FACES` on every shape** — upstream's 22 × 14 `FACES` stays in `faces.ts`, unselected |
+| `tv/faces.ts` | `GITSQUAD_FACES`: three cells instead of a 22 × 14 matrix, one behaviour per state — and now the table every shape draws |
 | `tv/sim.ts` | the idle hop comes every 4–8 s instead of 7–14: twice as long as a reader's glance at a hero, so the thing read as motionless |
 
 Upstream's own numbers for our shape, so the arithmetic can be checked: the mark
