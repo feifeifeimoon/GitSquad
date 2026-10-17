@@ -24,9 +24,21 @@ test.describe("Navigation", () => {
   test("navigates between workspace sections via the sidebar", async ({ page }) => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
+    // The workspace's front door is its overview, and the home row names it.
     await expect(
-      page.getByRole("button", { name: "New Issue" }),
+      page.getByRole("heading", { name: "Overview", exact: true }),
     ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole("link", { name: "Overview", exact: true }),
+    ).toHaveAttribute("href", `/${workspace.slug}`);
+    await expect(
+      page.getByRole("link", { name: "Workspaces", exact: true }),
+    ).toHaveCount(0);
+
+    await page.getByRole("link", { name: "Issues", exact: true }).click();
+    await expect(page.getByRole("button", { name: "New Issue" })).toBeVisible({
+      timeout: 15_000,
+    });
 
     await page.getByRole("link", { name: "Agents" }).click();
     await expect(page.getByRole("button", { name: "New Agent" })).toBeVisible({
@@ -72,10 +84,21 @@ test.describe("Navigation", () => {
     await expect(
       page.getByRole("heading", { name: "Workspaces", exact: true }),
     ).toBeVisible();
+    // The first row in the sidebar is the list itself. It is the home slot:
+    // inside a workspace the same row becomes Overview (the switcher test).
+    const nav = page.getByRole("navigation", { name: "Console" });
+    await expect(nav.getByRole("link").first()).toHaveAttribute(
+      "href",
+      "/workspaces",
+    );
+    await expect(nav.getByRole("link").first()).toContainText("Workspaces");
     // The band headings are gone — what separates the bands is a rule. They
     // are kept for screen readers, so the assertion is on the treatment rather
     // than on absence: `sr-only` is still a box on screen as far as Playwright
     // is concerned, which is the whole point of the class.
+    await expect(
+      page.getByRole("heading", { name: "Home", exact: true }),
+    ).toHaveClass(/sr-only/);
     await expect(
       page.getByRole("heading", { name: "Product", exact: true }),
     ).toHaveClass(/sr-only/);
@@ -126,26 +149,36 @@ test.describe("Navigation", () => {
     await page.getByPlaceholder("Find workspace…").fill(workspace.name);
     await page.getByRole("menuitem", { name: workspace.name }).click();
 
-    // In the workspace: the band is drawn, the switcher names it, and the row
-    // that led here is gone — leaving a workspace is the switcher's job.
+    // In the workspace it lands on the overview: the home row becomes
+    // Overview, and the list row is gone — leaving a workspace is the
+    // switcher's job.
     await expect(page).toHaveURL(new RegExp(`/${workspace.slug}$`));
-    await expect(page.getByRole("button", { name: "New Issue" })).toBeVisible({
-      timeout: 20_000,
-    });
+    await expect(
+      page.getByRole("heading", { name: "Overview", exact: true }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole("link", { name: "Overview", exact: true }),
+    ).toHaveAttribute("href", `/${workspace.slug}`);
     await expect(
       page.getByRole("link", { name: "Issues", exact: true }),
-    ).toBeVisible();
+    ).toHaveAttribute("href", `/${workspace.slug}/issues`);
     await expect(
       page.getByRole("link", { name: "Workspaces", exact: true }),
     ).toHaveCount(0);
     await expect(page.getByRole("button", { name: workspace.name })).toBeVisible();
 
-    // And back, in one click — to the *same page* in the other scope, not to
-    // the workspace list. The switcher changes the scope; the page is what you
-    // were reading, and Issues is the board across every workspace now.
+    // And back, in one click. The overview has no All Workspaces counterpart,
+    // so the switcher falls to the list — and the home row flips back to
+    // Workspaces.
     await page.getByRole("button", { name: workspace.name }).click();
     await page.getByRole("menuitem", { name: "All Workspaces" }).click();
-    await expect(page).toHaveURL(/\/workspaces\/issues$/);
+    await expect(page).toHaveURL(/\/workspaces$/);
+    await expect(
+      page.getByRole("link", { name: "Overview", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", { name: "Workspaces", exact: true }),
+    ).toHaveAttribute("href", "/workspaces");
     await expect(
       page.getByRole("link", { name: "Issues", exact: true }),
     ).toHaveAttribute("href", "/workspaces/issues");
@@ -169,7 +202,9 @@ test.describe("Navigation", () => {
     page,
   }) => {
     await loginAsE2E(page, api);
-    await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/${workspace.slug}/issues`, {
+      waitUntil: "domcontentloaded",
+    });
     await expect(
       page.getByRole("button", { name: "New Issue" }),
     ).toBeVisible({ timeout: 20_000 });
@@ -187,6 +222,13 @@ test.describe("Navigation", () => {
       await expect(
         page.getByRole("button", { name: "All Workspaces" }),
       ).toBeVisible();
+      // The home row is the list again, not the workspace's overview.
+      await expect(
+        page.getByRole("link", { name: "Workspaces", exact: true }),
+      ).toHaveAttribute("href", "/workspaces");
+      await expect(
+        page.getByRole("link", { name: "Overview", exact: true }),
+      ).toHaveCount(0);
       // The rows that need a workspace are gone; the ones with an All
       // Workspaces page of their own are not.
       await expect(
@@ -234,7 +276,9 @@ test.describe("Navigation", () => {
 
   test("logs out and clears the session", async ({ page }) => {
     await loginAsE2E(page, api);
-    await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/${workspace.slug}/issues`, {
+      waitUntil: "domcontentloaded",
+    });
     await expect(
       page.getByRole("button", { name: "New Issue" }),
     ).toBeVisible({ timeout: 20_000 });

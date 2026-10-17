@@ -3,6 +3,7 @@ import {
   CircleDot,
   FolderGit2,
   Gauge,
+  LayoutDashboard,
   Monitor,
   Settings,
   Sparkles,
@@ -22,13 +23,18 @@ import { paths } from "@/lib/paths";
 //
 // A page declares two things about itself, and they are not the same thing:
 //
-//   - `group` is the band it sits in: the pages of the workspace you are in, or
-//     the pages that exist outside any workspace at all.
+//   - `group` is the band it sits in: the home slot at the very top (the list in
+//     All Workspaces, the workspace's overview inside one), the pages of the
+//     workspace you are in, or the pages that exist outside any workspace.
 //   - `scopes` is where it is drawn. The console has exactly two scopes —
 //     `all` (All Workspaces) and `workspace` — and a row that is not in the
 //     current one is **not drawn**, rather than drawn greyed out. A dead row
 //     says "this exists and you may not have it"; a missing row says "this page
 //     belongs to a workspace, and you are not in one", which is the truth.
+//
+// The home band is the one place where two pages share a slot: Workspaces and
+// Overview have disjoint scopes, so exactly one of them is drawn at the top and
+// it changes identity with the scope.
 //
 // The two scopes are Vercel's team/project split with the team collapsed into
 // "all of them": there is no third level to be outside of.
@@ -36,8 +42,8 @@ import { paths } from "@/lib/paths";
 /** The scope the console is in. */
 export type NavScope = "all" | "workspace";
 
-/** The two bands of the sidebar. */
-export type NavGroup = "workspace" | "product";
+/** The three bands of the sidebar. */
+export type NavGroup = "home" | "workspace" | "product";
 
 interface NavPageBase {
   key: string;
@@ -48,10 +54,16 @@ interface NavPageBase {
   scopes: NavScope[];
   /** The letter that follows `g` to jump here, when it has one. */
   jump?: string;
+  /**
+   * Whether the href needs the workspace slug. This describes the shape of the
+   * page, not the band it is drawn in — the home band holds a global page and a
+   * slug page in the same slot.
+   */
+  slugScoped: boolean;
 }
 
 export interface WorkspaceNavPage extends NavPageBase {
-  group: "workspace";
+  slugScoped: true;
   href: (slug: string) => string;
   /**
    * Where the row goes in the All Workspaces scope. A row without one is not
@@ -61,11 +73,42 @@ export interface WorkspaceNavPage extends NavPageBase {
 }
 
 export interface ProductNavPage extends NavPageBase {
-  group: "product";
+  slugScoped: false;
   href: () => string;
 }
 
 export type NavPage = WorkspaceNavPage | ProductNavPage;
+
+/**
+ * The first row: one slot whose identity follows the scope.
+ *
+ * In All Workspaces it is the list of every workspace; inside one it is that
+ * workspace's overview. The two entries never coexist — their scopes are
+ * disjoint — so the sidebar draws exactly one of them at the top, and entering
+ * a workspace flips the row in place rather than moving it.
+ */
+export const HOME_PAGES: NavPage[] = [
+  {
+    key: "workspaces",
+    label: "Workspaces",
+    icon: FolderGit2,
+    group: "home",
+    scopes: ["all"],
+    jump: "w",
+    slugScoped: false,
+    href: () => paths.workspaces(),
+  },
+  {
+    key: "overview",
+    label: "Overview",
+    icon: LayoutDashboard,
+    group: "home",
+    scopes: ["workspace"],
+    jump: "o",
+    slugScoped: true,
+    href: (slug) => paths.workspace(slug).overview(),
+  },
+];
 
 /** Scoped to the workspace in view. All of these need a slug to resolve. */
 export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
@@ -79,7 +122,8 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
     // is for — the work does not stop at a workspace boundary.
     scopes: ["all", "workspace"],
     jump: "i",
-    href: (slug) => paths.workspace(slug).board(),
+    slugScoped: true,
+    href: (slug) => paths.workspace(slug).issues(),
     allHref: () => paths.allIssues(),
   },
   {
@@ -92,6 +136,7 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
     // that spans workspaces, since one machine can back runtimes in several.
     scopes: ["all", "workspace"],
     jump: "a",
+    slugScoped: true,
     href: (slug) => paths.workspace(slug).agents(),
     allHref: () => paths.allAgents(),
   },
@@ -102,6 +147,7 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
     group: "workspace",
     scopes: ["workspace"],
     jump: "s",
+    slugScoped: true,
     href: (slug) => paths.workspace(slug).skills(),
   },
   {
@@ -115,6 +161,7 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
     icon: Settings,
     group: "workspace",
     scopes: ["workspace"],
+    slugScoped: true,
     href: (slug) => paths.workspace(slug).settings(),
   },
 ];
@@ -128,24 +175,13 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
  */
 export const PRODUCT_PAGES: ProductNavPage[] = [
   {
-    // The All Workspaces scope's own home: the list of everything you have.
-    // Inside a workspace this row is not drawn — leaving one is the switcher's
-    // job, the way it is on Vercel and multica.
-    key: "workspaces",
-    label: "Workspaces",
-    icon: FolderGit2,
-    group: "product",
-    scopes: ["all"],
-    jump: "w",
-    href: () => paths.workspaces(),
-  },
-  {
     key: "daemons",
     label: "Daemons",
     icon: Monitor,
     group: "product",
     scopes: ["all", "workspace"],
     jump: "d",
+    slugScoped: false,
     href: () => paths.daemons(),
   },
   {
@@ -155,14 +191,20 @@ export const PRODUCT_PAGES: ProductNavPage[] = [
     group: "product",
     scopes: ["all", "workspace"],
     jump: "u",
+    slugScoped: false,
     href: () => paths.usage(),
   },
 ];
 
-export const NAV_PAGES: NavPage[] = [...WORKSPACE_PAGES, ...PRODUCT_PAGES];
+export const NAV_PAGES: NavPage[] = [
+  ...HOME_PAGES,
+  ...WORKSPACE_PAGES,
+  ...PRODUCT_PAGES,
+];
 
-/** The two group headings. Drawn for screen readers only — see SidebarNav. */
+/** The band headings. Drawn for screen readers only — see SidebarNav. */
 export const NAV_GROUP_LABEL: Record<NavGroup, string> = {
+  home: "Home",
   workspace: "Workspace",
   product: "Product",
 };
@@ -188,18 +230,19 @@ export function navPageByJump(key: string): NavPage | undefined {
  */
 export function navPageHref(page: NavPage, slug: string | null): string | null {
   if (!page.scopes.includes(slug ? "workspace" : "all")) return null;
-  if (page.group === "product") return page.href();
-  if (slug) return page.href(slug);
-  return page.allHref?.() ?? null;
+  if (page.slugScoped) {
+    return slug ? page.href(slug) : (page.allHref?.() ?? null);
+  }
+  return page.href();
 }
 
 /**
  * The page a path belongs to, or undefined when it belongs to none.
  *
- * **Longest href wins, and that is not a detail.** The board's href is
+ * **Longest href wins, and that is not a detail.** The overview's href is
  * `/{slug}`, a prefix of every other page inside that workspace, so a plain
- * `find` answers "Issues" for `/acme/agents` — and it lit two rows at once on
- * every workspace sub-page, the board's and the page's own. The same rule is
+ * `find` answers "Overview" for `/acme/agents` — and it lit two rows at once on
+ * every workspace sub-page, the overview's and the page's own. The same rule is
  * what keeps `/workspaces` from lighting up on `/workspaces/issues`.
  */
 export function navPageForPath(
@@ -224,12 +267,12 @@ export function navPageForPath(
  *
  * **The switcher changes the scope, not the page.** Picking a workspace while
  * reading Agents lands on that workspace's Agents; picking All Workspaces from
- * a workspace's board lands on the board across all of them. Vercel's project
- * switcher keeps you on the page you are on, for the same reason: the page is
- * what you were reading, and the scope is what it should be read in.
+ * a workspace's issues board lands on the board across all of them. Vercel's
+ * project switcher keeps you on the page you are on, for the same reason: the
+ * page is what you were reading, and the scope is what it should be read in.
  *
- * Two cases fall back to the scope's front door — the workspace's board, or the
- * All Workspaces list:
+ * Two cases fall back to the scope's front door — the workspace's overview, or
+ * the All Workspaces list:
  *
  *   - the page has no counterpart in the target scope (Settings has no All
  *     Workspaces page, the workspace list has no workspace page);
@@ -252,7 +295,7 @@ export function scopeTargetHref(
     // checked row used to throw the reader off the page.
     if (there && (there !== here || targetSlug === slug)) return there;
   }
-  return targetSlug ? paths.workspace(targetSlug).board() : paths.workspaces();
+  return targetSlug ? paths.workspace(targetSlug).overview() : paths.workspaces();
 }
 
 /**

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 const board = readFileSync(
-  new URL("../app/(app)/[slug]/page.tsx", import.meta.url),
+  new URL("../app/(app)/[slug]/issues/page.tsx", import.meta.url),
   "utf8",
 );
 const card = readFileSync(

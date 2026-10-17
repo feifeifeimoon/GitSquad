@@ -203,7 +203,7 @@ test.describe("All Workspaces board", () => {
     page,
   }) => {
     await loginAsE2E(page, api);
-    await page.goto(`/${alpha.slug}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/${alpha.slug}/issues`, { waitUntil: "domcontentloaded" });
     await expect(
       page.getByRole("button", { name: "New Issue" }),
     ).toBeVisible({ timeout: 20_000 });

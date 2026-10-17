@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  HOME_PAGES,
   NAV_GROUP_LABEL,
   NAV_PAGES,
   PRODUCT_PAGES,
@@ -28,10 +29,14 @@ test("every page is declared once, with a unique key and label", () => {
 });
 
 test("every page declares a band and the scopes it is drawn in", () => {
-  assert.deepEqual(Object.keys(NAV_GROUP_LABEL).sort(), ["product", "workspace"]);
+  assert.deepEqual(Object.keys(NAV_GROUP_LABEL).sort(), [
+    "home",
+    "product",
+    "workspace",
+  ]);
   for (const page of NAV_PAGES) {
     assert.ok(
-      page.group === "workspace" || page.group === "product",
+      page.group === "home" || page.group === "workspace" || page.group === "product",
       `${page.key} has no band`,
     );
     assert.ok(page.scopes.length > 0, `${page.key} is drawn in no scope at all`);
@@ -44,28 +49,50 @@ test("every page declares a band and the scopes it is drawn in", () => {
   }
   assert.equal(
     NAV_PAGES.length,
-    WORKSPACE_PAGES.length + PRODUCT_PAGES.length,
+    HOME_PAGES.length + WORKSPACE_PAGES.length + PRODUCT_PAGES.length,
     "a page is missing from NAV_PAGES",
   );
+});
+
+test("the home band changes identity with the scope", () => {
+  // The first row is the workspace list in All Workspaces and the workspace's
+  // overview inside one. Two entries, disjoint scopes: exactly one is drawn,
+  // so entering a workspace flips the row in place instead of moving it.
+  const allHome = navPagesInScope("all").filter((p) => p.group === "home");
+  const workspaceHome = navPagesInScope("workspace").filter(
+    (p) => p.group === "home",
+  );
+  assert.deepEqual(allHome.map((p) => p.key), ["workspaces"]);
+  assert.deepEqual(workspaceHome.map((p) => p.key), ["overview"]);
+  assert.equal(navPagesInScope("all")[0].key, "workspaces");
+  assert.equal(navPagesInScope("workspace")[0].key, "overview");
 });
 
 test("All Workspaces draws the pages that exist without a workspace", () => {
   // The exact set matters: this is the scope the console is in whenever the URL
   // names no workspace, and every row here has to be a page that exists without
-  // one. Issues joined it when the cross-workspace board shipped.
+  // one. The list is the home row now, not a product row.
   assert.deepEqual(
     navPagesInScope("all").map((p) => p.key),
-    ["issues", "agents", "workspaces", "daemons", "usage"],
+    ["workspaces", "issues", "agents", "daemons", "usage"],
   );
 });
 
-test("a workspace draws its own pages, and not the list it came from", () => {
+test("a workspace draws its own pages, and the list becomes the overview", () => {
   assert.deepEqual(
     navPagesInScope("workspace").map((p) => p.key),
-    ["issues", "agents", "skills", "workspace-settings", "daemons", "usage"],
+    [
+      "overview",
+      "issues",
+      "agents",
+      "skills",
+      "workspace-settings",
+      "daemons",
+      "usage",
+    ],
   );
-  // Leaving a workspace is the switcher's job — Vercel has no Teams row and
-  // multica has no Workspaces row either.
+  // Leaving a workspace is the switcher's job: the home row became Overview,
+  // and the list is no longer among the rows.
   assert.ok(
     !navPagesInScope("workspace").some((p) => p.key === "workspaces"),
     "the workspace scope still draws the Workspaces row",
@@ -100,11 +127,18 @@ test("a jump letter is unique, and resolves in the scopes that draw it", () => {
   assert.equal(issues?.key, "issues");
   // Both letters answer in both scopes, with a different destination: `g i` is
   // this scope's board either way.
-  assert.equal(navPageHref(issues, "acme"), "/acme");
+  assert.equal(navPageHref(issues, "acme"), "/acme/issues");
   assert.equal(navPageHref(issues, null), "/workspaces/issues");
   const agents = navPageByJump("a");
   assert.equal(navPageHref(agents, "acme"), "/acme/agents");
   assert.equal(navPageHref(agents, null), "/workspaces/agents");
+  // The home slot's two letters are scope-exclusive, like the rows themselves.
+  const workspaces = navPageByJump("w");
+  assert.equal(navPageHref(workspaces, null), "/workspaces");
+  assert.equal(navPageHref(workspaces, "acme"), null);
+  const overview = navPageByJump("o");
+  assert.equal(navPageHref(overview, "acme"), "/acme");
+  assert.equal(navPageHref(overview, null), null);
   assert.equal(navPageByJump("z"), undefined);
 });
 
@@ -117,14 +151,14 @@ test("a row with no page in a scope resolves to nothing there", () => {
 });
 
 test("exactly one row is current, and it is the most specific one", () => {
-  // The board's href is `/{slug}`, a prefix of every other page inside that
+  // The overview's href is `/{slug}`, a prefix of every other page inside that
   // workspace — so a prefix-only rule lit two rows on every sub-page, the
-  // board's and the page's own.
+  // overview's and the page's own.
   assert.equal(navPageForPath("/acme/settings", "acme")?.key, "workspace-settings");
   assert.equal(navPageForPath("/acme/agents", "acme")?.key, "agents");
   assert.equal(navPageForPath("/acme/issues/E2E-1", "acme")?.key, "issues");
-  assert.equal(navPageForPath("/acme", "acme")?.key, "issues");
-  // …and the same rule keeps the list row dark on the aggregate board, which
+  assert.equal(navPageForPath("/acme", "acme")?.key, "overview");
+  // …and the same rule keeps the home row dark on the aggregate board, which
   // lives under it.
   assert.equal(navPageForPath("/workspaces/issues", null)?.key, "issues");
   assert.equal(navPageForPath("/workspaces", null)?.key, "workspaces");
@@ -132,7 +166,7 @@ test("exactly one row is current, and it is the most specific one", () => {
 });
 
 test("a workspace page resolves under the slug it is given", () => {
-  for (const page of WORKSPACE_PAGES) {
+  for (const page of [...WORKSPACE_PAGES, ...HOME_PAGES.filter((p) => p.slugScoped)]) {
     const href = page.href("acme");
     assert.ok(href.startsWith("/acme"), `${page.key} → ${href}`);
     // Encoded, so a slug with a space cannot produce a broken href.
@@ -184,15 +218,15 @@ test("the active row keeps its own treatment while hovered", () => {
 });
 
 test("the bar names the section a path is in, longest href first", () => {
-  // The board's href is `/{slug}`, a prefix of every other page inside that
-  // workspace — so a plain `find` answers "Issues" for /acme/agents.
+  // The overview's href is `/{slug}`, a prefix of every other page inside that
+  // workspace — so a plain `find` answers "Overview" for /acme/agents.
   assert.equal(navPageForPath("/acme/agents", "acme")?.key, "agents");
   assert.equal(consoleTitle("/acme/agents", "acme"), "Agents");
   assert.equal(consoleTitle("/acme/skills", "acme"), "Skills");
   assert.equal(consoleTitle("/acme/settings", "acme"), "Settings");
   // A detail page keeps its section, the way Vercel's bar does.
   assert.equal(consoleTitle("/acme/issues/E2E-1", "acme"), "Issues");
-  assert.equal(consoleTitle("/acme", "acme"), "Issues");
+  assert.equal(consoleTitle("/acme", "acme"), "Overview");
   assert.equal(consoleTitle("/workspaces", null), "Workspaces");
   assert.equal(consoleTitle("/daemons", null), "Daemons");
   assert.equal(consoleTitle("/daemons/abc", null), "Daemons");
@@ -208,7 +242,7 @@ test("the bar names the account settings, which are not a nav row", () => {
   // and never looked at the row this asks about.
   assert.ok(
     !NAV_PAGES.some((p) =>
-      (p.group === "workspace" ? p.href("acme") : p.href()).startsWith("/settings"),
+      (p.slugScoped ? p.href("acme") : p.href()).startsWith("/settings"),
     ),
   );
 });
@@ -225,14 +259,16 @@ test("the switcher changes the scope, not the page", () => {
   // Picking a workspace while reading the Agents roster stays on Agents — the
   // bug was landing on that workspace's board instead.
   assert.equal(scopeTargetHref("/workspaces/agents", null, "acme"), "/acme/agents");
-  assert.equal(scopeTargetHref("/workspaces/issues", null, "acme"), "/acme");
+  assert.equal(scopeTargetHref("/workspaces/issues", null, "acme"), "/acme/issues");
   // …and the other way: from a workspace's Agents to the roster across all.
   assert.equal(scopeTargetHref("/acme/agents", "acme", null), "/workspaces/agents");
-  assert.equal(scopeTargetHref("/acme", "acme", null), "/workspaces/issues");
+  assert.equal(scopeTargetHref("/acme/issues", "acme", null), "/workspaces/issues");
+  // The overview has no All Workspaces counterpart, so it falls to the list.
+  assert.equal(scopeTargetHref("/acme", "acme", null), "/workspaces");
   assert.equal(scopeTargetHref("/acme/skills", "acme", "other"), "/other/skills");
   // A detail page keeps its section: the issue is not in the other workspace,
-  // but its board is.
-  assert.equal(scopeTargetHref("/acme/issues/E1", "acme", "other"), "/other");
+  // but its issues board is.
+  assert.equal(scopeTargetHref("/acme/issues/E1", "acme", "other"), "/other/issues");
 });
 
 test("a page with no counterpart falls back to the target scope's front door", () => {
