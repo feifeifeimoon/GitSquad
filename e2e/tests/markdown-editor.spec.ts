@@ -37,7 +37,7 @@ test.describe("Markdown editor", () => {
     });
     await loginAsE2E(page, api);
 
-    await page.goto(`/${workspace.slug}`);
+    await page.goto(`/${workspace.slug}/issues`);
     await page.getByRole("button", { name: "New Issue" }).click();
     await page.locator(".ProseMirror").waitFor();
   });

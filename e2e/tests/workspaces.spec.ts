@@ -14,7 +14,7 @@ test.describe("Workspaces", () => {
     await api.cleanup();
   });
 
-  test("seeded workspace appears in the list and opens the issue board", async ({
+  test("seeded workspace appears in the list and opens the overview", async ({
     page,
   }) => {
     const suffix = Date.now().toString(36);
@@ -31,11 +31,25 @@ test.describe("Workspaces", () => {
     // The seeded workspace renders as a card.
     await expect(page.getByText(workspace.name)).toBeVisible({ timeout: 20_000 });
 
-    // Clicking the card navigates to the slug-scoped issue board.
+    // Clicking the card opens the workspace's front door: the overview.
     await page.getByText(workspace.name).click();
     await page.waitForURL(new RegExp(`/${workspace.slug}$`));
+    await expect(
+      page.getByRole("heading", { name: "Overview", exact: true }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole("heading", { name: "Active issues", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Squad", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Repository", exact: true }),
+    ).toBeVisible();
 
-    // The 7-column kanban board renders even with zero issues.
+    // The board is one click down, and it is the 7-column kanban board even
+    // with zero issues.
+    await page.getByRole("link", { name: "Issues", exact: true }).click();
     await expect(page.getByText("Backlog")).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText("In Progress")).toBeVisible();
     await expect(page.getByText("Done")).toBeVisible();

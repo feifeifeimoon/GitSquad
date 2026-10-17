@@ -36,11 +36,12 @@ export const paths = {
   usage: () => "/usage",
   settings: () => "/settings",
   workspace: (slug: string) => ({
-    board: () => `/${encode(slug)}`,
+    overview: () => `/${encode(slug)}`,
+    issues: () => `/${encode(slug)}/issues`,
+    issue: (key: string) => `/${encode(slug)}/issues/${encode(key)}`,
     settings: () => `/${encode(slug)}/settings`,
     agents: () => `/${encode(slug)}/agents`,
     skills: () => `/${encode(slug)}/skills`,
-    issue: (key: string) => `/${encode(slug)}/issues/${encode(key)}`,
   }),
 };
 

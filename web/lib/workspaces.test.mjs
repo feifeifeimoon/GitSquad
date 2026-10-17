@@ -97,9 +97,20 @@ test("the sidebar header is the product; the scope is named above the page", () 
   // workspace from the Agents roster landed on that workspace's board.
   assert.match(scopeSwitcher, /scopeTargetHref\(/);
   assert.doesNotMatch(scopeSwitcher, /paths\.workspace\(/);
+  // The switcher did not move: it is still in the content bar, and the sidebar
+  // still opens with the product's own header.
+  assert.match(shell, /<ScopeSwitcher/);
   // Nothing remembers the last workspace. A remembered scope is one that can be
   // missing, and a missing scope is what drew the four grey rows.
   assert.doesNotMatch(shell, /lastWorkspaceSlug/);
+});
+
+test("a workspace card opens its overview, not the issue board", () => {
+  // The workspace's front door is the overview now; the board lives one level
+  // down at /{slug}/issues. The list is the main way into a workspace, so it
+  // has to point at the same place the switcher's fallback does.
+  assert.match(list, /paths\.workspace\([^)]*\)\.overview\(\)/);
+  assert.doesNotMatch(list, /\.board\(\)/);
 });
 
 test("shared time util formats relative time", () => {
@@ -134,6 +145,7 @@ test("the sidebar is generated from the nav registry, in scope", () => {
   // One list, two surfaces. The sidebar and the palette each used to keep their
   // own copy, and they had already drifted — including on which pages exist at
   // all, since each decided the scope for itself.
+  assert.match(nav, /HOME_PAGES/);
   assert.match(nav, /WORKSPACE_PAGES/);
   assert.match(nav, /PRODUCT_PAGES/);
   assert.match(nav, /navPagesInScope/);

@@ -179,7 +179,7 @@ export default function WorkspacesPage() {
           workspaces={sorted}
           sort={sort}
           onSort={toggleSort}
-          onOpen={(slug) => router.push(paths.workspace(slug).board())}
+          onOpen={(slug) => router.push(paths.workspace(slug).overview())}
         />
       )}
     </div>
@@ -193,7 +193,7 @@ function WorkspaceCard({ workspace }: { workspace: Workspace }) {
           open-in-new-tab, and being announced as a destination all come free —
           the same reason the sidebar's rows are links. */}
       <Link
-        href={paths.workspace(workspace.slug).board()}
+        href={paths.workspace(workspace.slug).overview()}
         className="flex flex-col rounded-lg border border-hairline bg-canvas p-4 shadow-level-2 transition-all hover:border-hairline-strong hover:shadow-level-3"
       >
         <div className="mb-2 flex min-w-0 items-center gap-2">

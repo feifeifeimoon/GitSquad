@@ -186,7 +186,7 @@ export function CommandPalette({
                 <CommandItem
                   key={w.id}
                   value={`${w.name} ${w.repo_full_name || ""}`}
-                  onSelect={() => run(paths.workspace(w.slug).board())}
+                  onSelect={() => run(paths.workspace(w.slug).overview())}
                 >
                   <WorkspaceAvatar
                     name={w.name}

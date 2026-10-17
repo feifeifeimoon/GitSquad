@@ -38,10 +38,10 @@ export function SidebarNav({ slug }: { slug?: string }) {
   const scope: NavScope = slug ? "workspace" : "all";
   const pages = navPagesInScope(scope);
   // One row is current, and it is the most specific match rather than every
-  // prefix: the board's href is `/{slug}`, which is a prefix of the rest of the
-  // workspace, and treating that as "active" lit two rows at once everywhere.
+  // prefix: the overview's href is `/{slug}`, which is a prefix of the rest of
+  // the workspace, and treating that as "active" lit two rows at once everywhere.
   const active = navPageForPath(pathname, slug ?? null);
-  const bands = (["workspace", "product"] as NavGroup[])
+  const bands = (["home", "workspace", "product"] as NavGroup[])
     .map((group) => ({ group, rows: pages.filter((page) => page.group === group) }))
     // A band with nothing to draw in this scope carries no divider either.
     .filter((band) => band.rows.length > 0);

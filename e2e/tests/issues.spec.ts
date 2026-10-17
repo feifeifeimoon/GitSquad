@@ -28,7 +28,9 @@ test.describe("Issues", () => {
 
   test("creates an issue from the board", async ({ page }) => {
     await loginAsE2E(page, api);
-    await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/${workspace.slug}/issues`, {
+      waitUntil: "domcontentloaded",
+    });
 
     await expect(
       page.getByRole("button", { name: "New Issue" }),
@@ -220,7 +222,9 @@ test.describe("Issue pull requests", () => {
     await api.seedPullRequest(workspace.id, issue.id, { number: 43, title: `badge ${suffix}` });
 
     await loginAsE2E(page, api);
-    await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/${workspace.slug}/issues`, {
+      waitUntil: "domcontentloaded",
+    });
 
     await expect(page.getByText(`#43`)).toBeVisible({ timeout: 20_000 });
   });
@@ -446,7 +450,9 @@ test.describe("Issue assignment", () => {
     await api.assignAgents(workspace.id, assigned.issue_key, [agent.id]);
 
     await loginAsE2E(page, api);
-    await page.goto(`/${workspace.slug}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`/${workspace.slug}/issues`, {
+      waitUntil: "domcontentloaded",
+    });
 
     await expect(page.getByText(assigned.title)).toBeVisible({ timeout: 20_000 });
     // The monogram carries the name, which the old joined string only did as

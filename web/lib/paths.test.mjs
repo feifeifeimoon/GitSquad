@@ -78,8 +78,12 @@ test("path builders produce the routes the layout navigates to", () => {
   assert.equal(paths.daemons(), "/daemons");
   assert.equal(paths.daemon("abc"), "/daemons/abc");
   assert.equal(paths.daemon("a/b"), "/daemons/a%2Fb");
-  assert.equal(paths.workspace("acme").agents(), "/acme/agents");
+  assert.equal(paths.workspace("acme").overview(), "/acme");
+  assert.equal(paths.workspace("acme").issues(), "/acme/issues");
   assert.equal(paths.workspace("acme").issue("ACME-1"), "/acme/issues/ACME-1");
+  assert.equal(paths.workspace("acme").settings(), "/acme/settings");
+  assert.equal(paths.workspace("acme").agents(), "/acme/agents");
+  assert.equal(paths.workspace("acme").skills(), "/acme/skills");
 });
 
 // The backend keeps its own copy so a workspace can never be created with a

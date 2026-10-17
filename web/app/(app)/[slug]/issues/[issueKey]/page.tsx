@@ -42,10 +42,10 @@ export default function IssueDetailPage() {
     () => agentApi.list(slug),
   );
 
-  // A failed read here means the issue is gone or not ours; the board is the
-  // place to be. `lib/api.ts` already cleared the token if it was a 401.
+  // A failed read here means the issue is gone or not ours; the issues board is
+  // the place to be. `lib/api.ts` already cleared the token if it was a 401.
   useEffect(() => {
-    if (error) router.push(paths.workspace(slug).board());
+    if (error) router.push(paths.workspace(slug).issues());
   }, [error, router, slug]);
 
   const agentNames = useMemo(
