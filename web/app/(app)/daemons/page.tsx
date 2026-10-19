@@ -1,6 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import Link from "next/link";
 import {
   Monitor,
@@ -17,6 +22,14 @@ import { STATUS_DOT } from "@/lib/agent-status";
 import { DaemonStatusBadge } from "@/components/status-dot";
 import { paths } from "@/lib/paths";
 import { timeAgo } from "@/lib/time";
+import {
+  detectPlatform,
+  installSteps,
+  PLATFORMS,
+  PLATFORM_HINT,
+  PLATFORM_LABEL,
+  type Platform,
+} from "@/lib/platform";
 import { ProviderIcon } from "@/components/provider-icon";
 import { PageToolbar, PageToolbarSkeleton } from "@/components/page-toolbar";
 import { ErrorState } from "@/components/error-state";
@@ -39,6 +52,12 @@ import {
 type SortKey = "name" | "last_seen";
 
 const VIEW_KEY = "gitsquad_daemons_view";
+
+// The platform snapshot is browser-only. A null server snapshot lets the
+// server render the macOS default and the first client render agree; the real
+// OS arrives after hydration, and the tabs let the reader override it.
+const subscribePlatform = () => () => {};
+const getServerPlatform = () => null;
 
 export default function DaemonsPage() {
   const {
@@ -415,15 +434,15 @@ function ConnectStep({
 }) {
   return (
     <>
-      <div className="flex items-center justify-between">
-        <span className="flex items-center gap-1.5">
-          <Terminal className="size-3" />
-          {label}
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <Terminal className="size-3 shrink-0" />
+          <span className="truncate">{label}</span>
         </span>
         <button
           onClick={() => onCopy(command, id)}
           aria-label={`Copy ${label}`}
-          className="text-mute hover:text-ink"
+          className="shrink-0 text-mute hover:text-ink"
         >
           {copied === id ? (
             <Check className="size-3 text-success" />
@@ -432,7 +451,9 @@ function ConnectStep({
           )}
         </button>
       </div>
-      <p className="text-mute">{command}</p>
+      {/* A URL is one unbreakable token. `break-words` keeps it inside the
+          dialog instead of letting its min-content width push the card out. */}
+      <p className="min-w-0 break-words text-mute">{command}</p>
     </>
   );
 }
@@ -446,6 +467,18 @@ function ConnectDaemonModal({
   copied: string;
   onCopy: (text: string, id: string) => void;
 }) {
+  const detected = useSyncExternalStore(
+    subscribePlatform,
+    detectPlatform,
+    getServerPlatform,
+  );
+  // Null until the reader picks a tab; the detected OS stays the default while
+  // the dialog is open. The modal unmounts on close, so reopening starts from
+  // the current machine again.
+  const [picked, setPicked] = useState<Platform | null>(null);
+  const platform = picked ?? detected ?? "macos";
+  const steps = installSteps(platform);
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
@@ -453,45 +486,60 @@ function ConnectDaemonModal({
           Connect a daemon
         </DialogTitle>
 
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           {/* Local */}
-          <div className="rounded-md border border-hairline p-4">
-            <div className="mb-3 flex items-center gap-3">
-              <div className="flex size-8 items-center justify-center rounded-sm bg-muted">
-                <Laptop className="size-4 text-ink" />
+          <div className="min-w-0 rounded-md border border-hairline p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-3">
+                <div className="flex size-8 items-center justify-center rounded-sm bg-muted">
+                  <Laptop className="size-4 text-ink" />
+                </div>
+                <div>
+                  <p className="text-copy font-semibold text-ink">Local machine</p>
+                  <p className="text-caption text-mute">Run on your own hardware</p>
+                </div>
               </div>
-              <div>
-                <p className="text-copy font-semibold text-ink">Local machine</p>
-                <p className="text-caption text-mute">Run on your own hardware</p>
+              <div
+                role="group"
+                aria-label="Operating system"
+                className="flex shrink-0 items-center rounded-sm border border-hairline bg-canvas p-0.5"
+              >
+                {PLATFORMS.map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    aria-pressed={platform === p}
+                    onClick={() => setPicked(p)}
+                    className={`rounded-xs px-2.5 py-1 text-caption font-medium transition-colors ${
+                      platform === p
+                        ? "bg-muted text-ink"
+                        : "text-mute hover:text-ink"
+                    }`}
+                  >
+                    {PLATFORM_LABEL[p]}
+                  </button>
+                ))}
               </div>
             </div>
-            <div className="space-y-2 rounded-sm bg-muted p-3 font-mono text-caption text-body">
-              <ConnectStep
-                label="Step 1: Install GitSquad CLI"
-                command="curl -fsSL https://raw.githubusercontent.com/feifeifeimoon/GitSquad/main/scripts/install.sh | bash"
-                id="install"
-                copied={copied}
-                onCopy={onCopy}
-              />
-              <ConnectStep
-                label="Step 2: Login"
-                command="gitsquad daemon login"
-                id="login"
-                copied={copied}
-                onCopy={onCopy}
-              />
-              <ConnectStep
-                label="Step 3: Start the daemon"
-                command="gitsquad daemon run"
-                id="run"
-                copied={copied}
-                onCopy={onCopy}
-              />
+            <p className="mb-2 text-caption text-mute">
+              {PLATFORM_HINT[platform]}
+            </p>
+            <div className="min-w-0 space-y-2 rounded-sm bg-muted p-3 font-mono text-caption text-body">
+              {steps.map((step) => (
+                <ConnectStep
+                  key={`${platform}-${step.id}`}
+                  label={step.label}
+                  command={step.command}
+                  id={`${step.id}-${platform}`}
+                  copied={copied}
+                  onCopy={onCopy}
+                />
+              ))}
             </div>
           </div>
 
           {/* Cloud */}
-          <div className="pointer-events-none rounded-md border border-dashed border-hairline p-4 opacity-60">
+          <div className="pointer-events-none min-w-0 rounded-md border border-dashed border-hairline p-4 opacity-60">
             <div className="flex items-center gap-3">
               <div className="flex size-8 items-center justify-center rounded-sm bg-muted">
                 <Cloud className="size-4 text-mute" />

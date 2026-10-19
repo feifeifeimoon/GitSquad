@@ -26,6 +26,46 @@ test.describe("Daemons", () => {
     await api.cleanup();
   });
 
+  test("defaults the installer to the reader's OS, and switches platform", async ({
+    page,
+  }) => {
+    await loginAsE2E(page, api);
+    await page.goto("/daemons", { waitUntil: "domcontentloaded" });
+    await page.getByRole("button", { name: "Connect Daemon" }).click();
+
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible({ timeout: 20_000 });
+
+    const current = await page.evaluate(() => {
+      const ua = navigator.userAgent;
+      if (/Windows/i.test(ua)) return "Windows";
+      if (/Mac/i.test(ua)) return "macOS";
+      return "Linux";
+    });
+    await expect(
+      dialog.getByRole("button", { name: current, exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+
+    // macOS and Linux share the shell installer; Windows gets PowerShell.
+    await dialog.getByRole("button", { name: "Windows", exact: true }).click();
+    await expect(dialog.getByText(/install\.ps1/)).toBeVisible();
+    await expect(dialog.getByText(/install\.sh/)).toHaveCount(0);
+    await expect(dialog.getByText("Run these in PowerShell.")).toBeVisible();
+
+    await dialog.getByRole("button", { name: "macOS", exact: true }).click();
+    await expect(dialog.getByText(/install\.sh/)).toBeVisible();
+    await expect(dialog.getByText("Run these in Terminal.")).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Linux", exact: true }).click();
+    await expect(dialog.getByText(/install\.sh/)).toBeVisible();
+    await expect(dialog.getByText("Run these in your terminal.")).toBeVisible();
+
+    // The long installer URL wraps inside the dialog instead of widening it.
+    expect(
+      await dialog.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+    ).toBe(true);
+  });
+
   test("opens the daemon detail page from the list", async ({ page }) => {
     await loginAsE2E(page, api);
     await page.goto("/daemons", { waitUntil: "domcontentloaded" });
