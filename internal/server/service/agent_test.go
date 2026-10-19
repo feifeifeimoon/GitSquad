@@ -12,8 +12,13 @@ func TestNormalizeAgentName(t *testing.T) {
 		{" Coder ", "coder", nil},
 		{"backend-coder", "backend-coder", nil},
 		{"frontend_coder", "frontend_coder", nil},
+		{"首席架构师", "首席架构师", nil},
+		{" 首席架构师 ", "首席架构师", nil},
+		{"架构师-1", "架构师-1", nil},
 		{"", "", ErrInvalidAgentName},
 		{"bad name", "", ErrInvalidAgentName},
+		{"首席 架构师", "", ErrInvalidAgentName},
+		{"架构师！", "", ErrInvalidAgentName},
 		{"-lead", "", ErrInvalidAgentName},
 	}
 	for _, c := range cases {

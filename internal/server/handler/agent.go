@@ -168,7 +168,7 @@ func (h *AgentHandler) writeErr(c *gin.Context, err error) {
 	case errors.Is(err, service.ErrAgentNameTaken):
 		c.JSON(http.StatusConflict, v1.ErrorResponse("agent name already exists"))
 	case errors.Is(err, service.ErrInvalidAgentName):
-		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid agent name"))
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("agent name may use letters, numbers, hyphens and underscores"))
 	case errors.Is(err, service.ErrInvalidProvider):
 		c.JSON(http.StatusBadRequest, v1.ErrorResponse("provider must be claude or codex"))
 	case errors.Is(err, service.ErrInvalidHeadShape):
