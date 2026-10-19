@@ -56,6 +56,33 @@ test.describe("Agent mentions", () => {
     await expect(editor).toContainText(`@${agentName}`);
   });
 
+  test("typing @ right after a Han character still suggests", async ({ page }) => {
+    // Chinese runs without spaces, so the server reads `请@名字` as a mention.
+    // The menu has to open on the same boundary, not just after whitespace.
+    await api.createAgent(workspace.id, {
+      name: "首席架构师",
+      daemon_id: daemon.id,
+      provider: "claude",
+    });
+    const issue = await api.createIssue(workspace.id, `Han mention ${suffix}`);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+    await expect(
+      page.getByRole("heading", { name: "Activity" }),
+    ).toBeVisible({ timeout: 20_000 });
+
+    const editor = page.getByRole("textbox", { name: "Write a comment" });
+    await editor.click();
+    await page.keyboard.type("请@首");
+
+    await expect(
+      page.getByRole("button", { name: "@首席架构师" }),
+    ).toBeVisible({ timeout: 10_000 });
+  });
+
   test("mentioning an agent queues a task", async ({ page }) => {
     const issue = await api.createIssue(workspace.id, `Dispatch target ${suffix}`);
 
