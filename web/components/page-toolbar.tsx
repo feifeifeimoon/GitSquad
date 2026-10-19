@@ -11,7 +11,12 @@ import type { ReactNode } from "react";
 //
 // What is left down here is what belongs to the page rather than to the
 // destination: its search field, its filters, its create button.
-const ROW = "flex items-center justify-end gap-3 border-b border-hairline px-8 py-4";
+//
+// The row draws no divider of its own. The bar above already ends in one, and
+// two identical hairlines 64px apart framed the controls as an empty band
+// instead of as the page's first row. The Issues board has always read this
+// way; now every page does.
+const ROW = "flex items-center justify-end gap-3 px-8 py-4";
 
 /**
  * The page's own toolbar, under the bar.
