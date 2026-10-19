@@ -23,7 +23,7 @@ test.describe("Workspace overview", () => {
     await api.cleanup();
   });
 
-  test("summarises what is in flight and who is on the squad", async ({
+  test("summarises what is in flight and which agents are enabled", async ({
     page,
   }) => {
     const inProgress = await api.createIssue(
@@ -72,23 +72,44 @@ test.describe("Workspace overview", () => {
       page.getByRole("link", { name: "Workspaces", exact: true }),
     ).toHaveCount(0);
 
-    // The stat strip's labels. The numbers are asserted in the unit tests; the
-    // browser test is here to prove the rows reached the page at all.
-    await expect(page.getByText("Open issues", { exact: true })).toBeVisible();
-    await expect(page.getByText("In progress", { exact: true })).toBeVisible();
-    await expect(page.getByText("In review", { exact: true })).toBeVisible();
-    // "Blocked" is also an issue status in the rows below, so this one is
-    // scoped to its first appearance: the stat label sits above them.
-    await expect(page.getByText("Blocked", { exact: true }).first()).toBeVisible();
+    // The four readouts answer different questions now. Scope to the band:
+    // "Agents" is also a sidebar destination and "Blocked" is a row status.
+    const glance = page.getByRole("group", { name: "Workspace at a glance" });
+    await expect(glance.getByText("Open issues", { exact: true })).toBeVisible();
+    await expect(glance.getByText("In flight", { exact: true })).toBeVisible();
+    await expect(glance.getByText("Blocked", { exact: true })).toBeVisible();
+    await expect(glance.getByText("Agents", { exact: true })).toBeVisible();
 
     // Active issues: the three work states, not the queue and not the archive.
-    await expect(page.getByText(inProgress.title)).toBeVisible();
-    await expect(page.getByText(inReview.title)).toBeVisible();
-    await expect(page.getByText(blocked.title)).toBeVisible();
-    await expect(page.getByText(backlog.title)).toHaveCount(0);
-    await expect(page.getByText(done.title)).toHaveCount(0);
+    const active = page
+      .locator("section")
+      .filter({ hasText: "Active issues" })
+      .first();
+    await expect(active.getByText(inProgress.title)).toBeVisible();
+    await expect(active.getByText(inReview.title)).toBeVisible();
+    await expect(active.getByText(blocked.title)).toBeVisible();
+    await expect(active.getByText(backlog.title)).toHaveCount(0);
+    await expect(active.getByText(done.title)).toHaveCount(0);
 
-    // The squad: the agent's name and its derived status.
+    // Recently landed is the progress feed: the done issue belongs here, not
+    // in the in-flight list above.
+    const landed = page
+      .locator("section")
+      .filter({ hasText: "Recently landed" })
+      .first();
+    await expect(landed.getByText(done.title)).toBeVisible();
+
+    // The rail's distribution and identity blocks. "Queued" is also an agent
+    // status in the Agents section below, so it is scoped to the mix section.
+    const mix = page
+      .locator("section")
+      .filter({ hasText: "Issue mix" })
+      .first();
+    await expect(mix.getByText("Queued", { exact: true })).toBeVisible();
+    await expect(page.getByText("Issue mix", { exact: true })).toBeVisible();
+    await expect(page.getByText("About", { exact: true })).toBeVisible();
+
+    // The Agents section: the agent's name and its derived status.
     await expect(page.getByText("@planner", { exact: true })).toBeVisible();
     await expect(page.getByText("Idle", { exact: true })).toBeVisible();
 
@@ -105,13 +126,14 @@ test.describe("Workspace overview", () => {
       `/${workspace.slug}/agents`,
     );
 
-    // The repository card names the repo and links out to it.
-    await expect(
-      page.getByText(`overview-owner-${suffix}/overview-repo-${suffix}`).first(),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Open on GitHub" }),
-    ).toHaveAttribute(
+    // The repository line itself is the link now — header and About, with no
+    // separate "Open on GitHub" footer.
+    const repoLink = page.getByRole("link", {
+      name: `overview-owner-${suffix}/overview-repo-${suffix}`,
+    });
+    await expect(repoLink).toHaveCount(2);
+    await expect(repoLink.first()).toBeVisible();
+    await expect(repoLink.first()).toHaveAttribute(
       "href",
       `https://github.com/overview-owner-${suffix}/overview-repo-${suffix}`,
     );
@@ -127,14 +149,17 @@ test.describe("Workspace overview", () => {
       page.getByRole("heading", { name: "Overview", exact: true }),
     ).toBeVisible({ timeout: 20_000 });
 
-    // No issues in flight, no squad, no commits — each pane says so in place,
-    // and the ways out stay one click away.
+    // No issues at all: the work lists, the mix, the Agents section and the
+    // commit block each say so in place, and the ways out stay one click away.
     await expect(page.getByText("Nothing in flight.")).toBeVisible();
+    await expect(page.getByText("Nothing landed this week.")).toBeVisible();
+    await expect(page.getByText("No open issues.")).toBeVisible();
     await expect(page.getByText("No agents yet.")).toBeVisible();
     await expect(page.getByText("No commits yet")).toBeVisible();
-    await expect(
-      page.getByRole("link", { name: "Open on GitHub" }),
-    ).toBeVisible();
+    const repoLink = page.getByRole("link", {
+      name: `overview-owner-${suffix}/overview-repo-${suffix}`,
+    });
+    await expect(repoLink).toHaveCount(2);
     await expect(
       page.getByRole("link", { name: "Open repository" }),
     ).toHaveAttribute(
