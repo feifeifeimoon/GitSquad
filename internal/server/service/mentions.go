@@ -2,10 +2,12 @@ package service
 
 import "regexp"
 
-// mentionRe matches @mention tokens: @ followed by word chars, hyphen or
-// underscore. The (^|[^\w]) prefix keeps emails (a@b.com) from matching —
-// RE2 has no lookbehind, so the preceding char is captured in group 1.
-var mentionRe = regexp.MustCompile(`(^|[^\w])@([a-zA-Z0-9_-]+)`)
+// mentionRe matches @mention tokens: @ followed by letters, digits, hyphen or
+// underscore, in any script. The (^|[^\w]) prefix keeps emails (a@b.com) from
+// matching — RE2 has no lookbehind, so the preceding char is captured in group
+// 1. That prefix stays ASCII-only on purpose: Chinese runs without spaces, so
+// a Han character immediately before the @ must still count as a boundary.
+var mentionRe = regexp.MustCompile(`(^|[^\w])@([\p{L}\p{N}_-]+)`)
 
 // codeBlockRe matches fenced code blocks (```...```, non-greedy across lines).
 var codeBlockRe = regexp.MustCompile("(?s)```.*?```")

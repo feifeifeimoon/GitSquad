@@ -21,6 +21,10 @@ func TestParseMentions(t *testing.T) {
 		{"skips fenced code block", "```\n@coder inside fence\n```\nafter @coder", []string{"coder"}},
 		{"skips inline code", "use `@coder literal` and @coder", []string{"coder"}},
 		{"mention with trailing punctuation", "@coder, please", []string{"coder"}},
+		{"Han name", "让 @首席架构师 看一下", []string{"首席架构师"}},
+		{"Han name without a preceding space", "请@首席架构师 看一下", []string{"首席架构师"}},
+		{"Han name ending at Han punctuation", "@首席架构师，请看", []string{"首席架构师"}},
+		{"mixed-script name", "@首席-architect please", []string{"首席-architect"}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -44,5 +48,13 @@ func TestProcessMentions(t *testing.T) {
 	matched, unmatched = processMentions("no mentions here", []string{"coder"})
 	if len(matched) != 0 || len(unmatched) != 0 {
 		t.Errorf("expected empty splits, got %v / %v", matched, unmatched)
+	}
+
+	matched, unmatched = processMentions("@首席架构师 看一下", []string{"首席架构师"})
+	if !reflect.DeepEqual(matched, []string{"首席架构师"}) {
+		t.Errorf("matched = %v, want [首席架构师]", matched)
+	}
+	if len(unmatched) != 0 {
+		t.Errorf("unmatched = %v, want none", unmatched)
 	}
 }

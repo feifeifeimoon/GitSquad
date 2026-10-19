@@ -18,7 +18,7 @@ import (
 var (
 	ErrAgentNotFound    = errors.New("agent not found")
 	ErrAgentNameTaken   = errors.New("agent name already exists in workspace")
-	ErrInvalidAgentName = errors.New("agent name must match ^[a-z0-9][a-z0-9_-]{0,63}$")
+	ErrInvalidAgentName = errors.New("agent name may use letters, numbers, hyphens and underscores (max 64)")
 	ErrInvalidProvider  = errors.New("provider must be claude, codex, or agy")
 	ErrInvalidHeadShape = errors.New("head_shape must be gitsquad, square, circle, hexagon, or rectangle")
 	ErrRuntimeNotFound  = errors.New("runtime not found")
@@ -27,7 +27,10 @@ var (
 	ErrSkillNameTaken   = errors.New("skill name already exists in workspace")
 )
 
-var agentNameRe = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]{0,63}$`)
+// A name is both the roster's display name and the @mention handle, so it
+// takes any script's letters and digits — a Han name is a name — but no spaces
+// or punctuation, which is what lets a mention end where the name ends.
+var agentNameRe = regexp.MustCompile(`^[\p{L}\p{N}][\p{L}\p{N}_-]{0,63}$`)
 
 // validProviders mirrors the daemon's runtime registry (see
 // internal/daemon/runtime_specs.go): a provider the daemon can detect must also

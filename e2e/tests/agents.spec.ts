@@ -195,4 +195,23 @@ test.describe("Agents", () => {
         .locator('[data-head-shape="circle"]'),
     ).toBeVisible();
   });
+
+  test("accepts a name in Chinese", async ({ page }) => {
+    // A name is a name in any script: Han characters are letters, and the
+    // roster prints them with the same @ it gives an ASCII handle.
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/agents`, { waitUntil: "domcontentloaded" });
+
+    await page.getByRole("button", { name: "New Agent" }).click();
+    await page.getByPlaceholder("coder").fill("首席架构师");
+
+    await page.getByRole("combobox").first().click();
+    await page.getByRole("option", { name: daemon.name }).click();
+    await page.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: "claude" }).click();
+
+    await page.getByRole("button", { name: "Create agent" }).click();
+
+    await expect(page.getByText("@首席架构师")).toBeVisible({ timeout: 15_000 });
+  });
 });
