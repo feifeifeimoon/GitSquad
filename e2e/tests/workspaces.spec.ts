@@ -41,10 +41,10 @@ test.describe("Workspaces", () => {
       page.getByRole("heading", { name: "Active issues", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Squad", exact: true }),
+      page.getByRole("heading", { name: "Agents", exact: true }),
     ).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Repository", exact: true }),
+      page.getByRole("heading", { name: "About", exact: true }),
     ).toBeVisible();
 
     // The board is one click down, and it is the 7-column kanban board even
