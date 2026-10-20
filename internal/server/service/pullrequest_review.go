@@ -229,6 +229,7 @@ func (s *ReviewService) Complete(ctx context.Context, task db.Task, report v1.Ta
 		} else {
 			filtered := comments[:0]
 			for _, comment := range comments {
+				comment.Path = normalizeReviewPath(comment.Path)
 				if paths[comment.Path] {
 					filtered = append(filtered, comment)
 				}
@@ -302,6 +303,16 @@ func (s *ReviewService) comment(ctx context.Context, task db.Task, agentName, co
 func formatReviewBody(agentName, summary, sha string) string {
 	return fmt.Sprintf("🤖 **GitSquad review** · @%s\n\n%s\n\n<!-- gitsquad-review: %s -->",
 		agentName, strings.TrimSpace(summary), sha)
+}
+
+// normalizeReviewPath turns what a model actually writes into the GitHub
+// changed-path form: backslashes, a leading "./", or an absolute-looking path.
+func normalizeReviewPath(path string) string {
+	path = strings.ReplaceAll(strings.TrimSpace(path), "\\", "/")
+	for strings.HasPrefix(path, "./") {
+		path = strings.TrimPrefix(path, "./")
+	}
+	return strings.TrimPrefix(path, "/")
 }
 
 // SyncOpenPullRequests backfills the console's list from the repository's open

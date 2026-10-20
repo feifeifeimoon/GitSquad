@@ -4,7 +4,18 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
+
+func TestTriggerPromptReviewUsesPullRequest(t *testing.T) {
+	task := testTask()
+	task.Kind = "review"
+	task.PullRequest = &v1.TaskPullRequestContext{Number: 42}
+	if got := triggerPrompt(task); got != "Review pull request #42." {
+		t.Fatalf("prompt = %q, want the pull request prompt", got)
+	}
+}
 
 func TestReadReviewResultStripsFence(t *testing.T) {
 	dir := t.TempDir()

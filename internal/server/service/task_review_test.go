@@ -74,6 +74,10 @@ func TestReportReviewLifecycle(t *testing.T) {
 			Output: "summary",
 			Review: &v1.ReviewResult{Summary: "summary", HeadSHA: "sha-review"},
 		},
+		Usage: []v1.TaskUsage{{
+			Provider: "claude", Model: "test-model",
+			InputTokens: 10, OutputTokens: 5,
+		}},
 	}); err != nil {
 		t.Fatalf("report succeeded: %v", err)
 	}
@@ -90,6 +94,13 @@ func TestReportReviewLifecycle(t *testing.T) {
 	}
 	if completedTask.Status != "completed" {
 		t.Fatalf("task status = %q, want completed", completedTask.Status)
+	}
+	tokens, err := s.GetTaskUsageTotal(ctx, task.ID)
+	if err != nil {
+		t.Fatalf("usage total: %v", err)
+	}
+	if tokens != 15 {
+		t.Fatalf("tokens = %d, want 15 (review usage must be recorded)", tokens)
 	}
 }
 

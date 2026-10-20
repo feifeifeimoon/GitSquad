@@ -22,6 +22,21 @@ func reviewConfig() db.GetWorkspacePRReviewConfigRow {
 	}
 }
 
+func TestNormalizeReviewPath(t *testing.T) {
+	cases := map[string]string{
+		"internal/server/ws/hub.go":   "internal/server/ws/hub.go",
+		"./internal/server/ws/hub.go": "internal/server/ws/hub.go",
+		`internal\server\ws\hub.go`:   "internal/server/ws/hub.go",
+		"/internal/server/ws/hub.go":  "internal/server/ws/hub.go",
+		"":                            "",
+	}
+	for in, want := range cases {
+		if got := normalizeReviewPath(in); got != want {
+			t.Errorf("normalizeReviewPath(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestShouldReview(t *testing.T) {
 	svc := &ReviewService{appName: "gitsquad"}
 	base := GitHubPullRequestEvent{

@@ -271,10 +271,13 @@ func commitMessage(task v1.Task) string {
 // triggerPrompt is the short prompt passed to the provider; full context lives
 // in the execenv files (brief + issue_context + skills).
 func triggerPrompt(task v1.Task) string {
-	if task.Issue == nil {
+	if task.Kind == "review" {
 		if task.PullRequest != nil {
 			return fmt.Sprintf("Review pull request #%d.", task.PullRequest.Number)
 		}
+		return "Review pull request."
+	}
+	if task.Issue == nil {
 		return ""
 	}
 	if n := len(task.Issue.Comments); n > 0 {

@@ -266,10 +266,6 @@ func (s *TaskService) Report(ctx context.Context, daemonID uuid.UUID, taskID uui
 	if task.AssignedDaemonID == nil || *task.AssignedDaemonID != daemonID {
 		return errors.New("task not assigned to this daemon")
 	}
-	if task.Kind == "review" {
-		return s.reportReview(ctx, task, report)
-	}
-
 	// Usage is recorded before the lifecycle switch, and independently of it.
 	// Two reasons: a report that loses the terminal CAS race still came from the
 	// daemon that ran the task, so its numbers are worth keeping; and a replayed
@@ -283,6 +279,12 @@ func (s *TaskService) Report(ctx context.Context, daemonID uuid.UUID, taskID uui
 		if err := s.recordUsage(ctx, taskID, report.Usage); err != nil {
 			slog.Error("record task usage", "error", err, "task", taskID)
 		}
+	}
+
+	// Review tasks have their own state machine. The branch comes after usage so
+	// a review run is counted in the ledger like any other run.
+	if task.Kind == "review" {
+		return s.reportReview(ctx, task, report)
 	}
 
 	switch report.Status {
