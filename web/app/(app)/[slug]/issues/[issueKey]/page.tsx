@@ -69,14 +69,14 @@ export default function IssueDetailPage() {
     return (
       <div className="flex h-full flex-col">
         <div className="flex-1 overflow-y-auto lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
-          <div className="mx-auto flex w-full max-w-5xl flex-col px-8 py-8 lg:min-h-0 lg:flex-1">
+          <div className="flex w-full flex-col px-8 py-8 lg:min-h-0 lg:flex-1">
             {/* The read-only row and the title below it, the shape the loaded
                 page uses, so the two columns do not shift when it arrives. */}
             <div className="shrink-0 border-b border-hairline pb-4">
               <Skeleton className="h-5 w-3/5" />
             </div>
-            <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,42rem)_15rem] lg:gap-x-12">
-              <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto">
+            <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_15rem]">
+              <div className="min-w-0 lg:mx-auto lg:min-h-0 lg:w-[calc(100%_-_6rem)] lg:max-w-[42rem] lg:overflow-y-auto">
                 <Skeleton className="mb-5 h-8 w-4/5" />
                 <div className="space-y-2">
                   <Skeleton className="h-3 w-full" />
@@ -140,13 +140,25 @@ export default function IssueDetailPage() {
           column and one scroll: a document, which is what a phone-width issue
           is.
 
-          One capped block for the whole page, so the title, the prose and the
-          rail all share a left edge. Left uncapped, the gutter between the two
-          columns was the only thing on the page that grew with the window —
-          68px at 1280, 557px at 1920, 1197px at 2560 — and the two halves read
-          as unrelated. */}
+          The page's own chrome sits at the page's padding, like every other
+          page's: the key and title at the top-left, where the sidebar
+          navigates to, rather than floating in the middle of a capped column.
+
+          Under it the grid is two tracks: the middle one — everything between
+          the sidebar and the facts — and the 15rem rail. The reading column is
+          centred *in the middle track*, not in the page. Centring it on the
+          page counts the rail as margin and pushes the prose ~136px right of
+          the lane it belongs to (measured at 1883); centring the prose and the
+          rail as one block pushes it the same distance left, which is what the
+          capped block did. The rail holds the right edge, where the overview
+          page's rail sits, and the middle track's leftover space becomes the
+          gutter on both sides of the prose. Where the track is narrower than
+          the measure that leftover would be zero and the prose would touch the
+          rail, so the column always keeps 6rem of the lane for the two gutters
+          (`w-[calc(100%_-_6rem)]`) — 48px on each side, the same floor the old
+          15rem rail's `gap-x-12` gave. */}
       <div className="flex-1 overflow-y-auto lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
-        <div className="mx-auto flex w-full max-w-5xl flex-col px-8 py-8 lg:min-h-0 lg:flex-1">
+        <div className="flex w-full flex-col px-8 py-8 lg:min-h-0 lg:flex-1">
           {/* The read-only first row, and the panel's only chrome: the issue
               named the way multica's header leaf names it — `identifier title`,
               one run of text, one space between them, `font-medium` — and the
@@ -160,21 +172,19 @@ export default function IssueDetailPage() {
             {issue.issue_key} {issue.title}
           </div>
 
-          {/* Two columns under the title: the issue on the left, the facts
-              about it on the right. The left track *is* the reading measure —
-              42rem, ~48 characters a line — and the two tracks plus a 48px
-              gutter are the whole block: 42 + 3 + 15 = 60rem of content, which
-              is `max-w-5xl` (64rem) less the container's own `px-8`. Capping at
-              the content width instead also shrinks the prose track, since the
-              tracks are a fixed 42rem and the padding comes out of the same
-              box. */}
-          <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,42rem)_15rem] lg:gap-x-12">
+          {/* Two columns under the title: the middle lane and the facts. The
+              prose inside the lane is the reading measure — 42rem, ~48
+              characters a line — and the lane holds it centred. The lane is
+              `minmax(0,1fr)` so it gives way before the rail does: the rail is
+              the thing that has to stay 15rem, and the column's 6rem shortfall
+              is what keeps it from ending up against the prose. */}
+          <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_15rem]">
             {/* The thread is the thing that scrolls, and it owns the ref the
                 activity rail measures against: the rail is the scroll viewport's
                 minimap, so the viewport has to be this box now. */}
             <div
               ref={scrollerRef}
-              className="min-w-0 lg:min-h-0 lg:overflow-y-auto"
+              className="min-w-0 lg:mx-auto lg:min-h-0 lg:w-[calc(100%_-_6rem)] lg:max-w-[42rem] lg:overflow-y-auto"
             >
               {/* The issue's own title, at display size and editable where it
                   is read — the body's first element, so it is what the page
@@ -225,7 +235,9 @@ export default function IssueDetailPage() {
 
             {/* Fixed against the thread, not sticky inside it: this column
                 never moves, and scrolls on its own only when the facts are
-                taller than the window. */}
+                taller than the window. It is the row's fixed track, and that
+                is what makes the middle lane's width — and the prose's centre
+                in it — computable at any window size. */}
             <aside className="min-w-0 lg:min-h-0 lg:overflow-y-auto">
               {/* "Properties", not "Details": those two words are not synonyms
                   in the tools this page is modelled on. multica keeps
