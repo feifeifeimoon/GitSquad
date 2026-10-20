@@ -76,7 +76,7 @@ export default function IssueDetailPage() {
               <Skeleton className="h-5 w-3/5" />
             </div>
             <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_15rem]">
-              <div className="min-w-0 lg:mx-auto lg:min-h-0 lg:w-full lg:max-w-[42rem] lg:overflow-y-auto">
+              <div className="min-w-0 lg:mx-auto lg:min-h-0 lg:w-[calc(100%_-_6rem)] lg:max-w-[42rem] lg:overflow-y-auto">
                 <Skeleton className="mb-5 h-8 w-4/5" />
                 <div className="space-y-2">
                   <Skeleton className="h-3 w-full" />
@@ -152,8 +152,11 @@ export default function IssueDetailPage() {
           rail as one block pushes it the same distance left, which is what the
           capped block did. The rail holds the right edge, where the overview
           page's rail sits, and the middle track's leftover space becomes the
-          gutter on both sides of the prose — so that gutter needs no number of
-          its own and cannot collapse. */}
+          gutter on both sides of the prose. Where the track is narrower than
+          the measure that leftover would be zero and the prose would touch the
+          rail, so the column always keeps 6rem of the lane for the two gutters
+          (`w-[calc(100%_-_6rem)]`) — 48px on each side, the same floor the old
+          15rem rail's `gap-x-12` gave. */}
       <div className="flex-1 overflow-y-auto lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
         <div className="flex w-full flex-col px-8 py-8 lg:min-h-0 lg:flex-1">
           {/* The read-only first row, and the panel's only chrome: the issue
@@ -173,14 +176,15 @@ export default function IssueDetailPage() {
               prose inside the lane is the reading measure — 42rem, ~48
               characters a line — and the lane holds it centred. The lane is
               `minmax(0,1fr)` so it gives way before the rail does: the rail is
-              the thing that has to stay 15rem. */}
+              the thing that has to stay 15rem, and the column's 6rem shortfall
+              is what keeps it from ending up against the prose. */}
           <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_15rem]">
             {/* The thread is the thing that scrolls, and it owns the ref the
                 activity rail measures against: the rail is the scroll viewport's
                 minimap, so the viewport has to be this box now. */}
             <div
               ref={scrollerRef}
-              className="min-w-0 lg:mx-auto lg:min-h-0 lg:w-full lg:max-w-[42rem] lg:overflow-y-auto"
+              className="min-w-0 lg:mx-auto lg:min-h-0 lg:w-[calc(100%_-_6rem)] lg:max-w-[42rem] lg:overflow-y-auto"
             >
               {/* The issue's own title, at display size and editable where it
                   is read — the body's first element, so it is what the page
