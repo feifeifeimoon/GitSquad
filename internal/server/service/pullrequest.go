@@ -18,19 +18,27 @@ import (
 // relationship needs. Kept as a plain struct so the rules can be exercised
 // without constructing a GitHub payload.
 type GitHubPullRequestEvent struct {
-	InstallationID int64
-	RepoOwner      string
-	RepoName       string
-	Number         int32
-	Title          string
-	State          string // open | closed
-	Merged         bool
-	Draft          bool
-	HeadBranch     string
-	BaseBranch     string
-	Author         string
-	HTMLURL        string
-	UpdatedAt      time.Time
+	Action            string
+	InstallationID    int64
+	RepoOwner         string
+	RepoName          string
+	Number            int32
+	Title             string
+	Body              string
+	State             string // open | closed
+	Merged            bool
+	Draft             bool
+	HeadBranch        string
+	BaseBranch        string
+	HeadSHA           string
+	Author            string
+	AuthorAssociation string
+	HeadRepo          string
+	Additions         int
+	Deletions         int
+	ChangedFiles      int
+	HTMLURL           string
+	UpdatedAt         time.Time
 }
 
 // PullRequestService owns the issue ↔ pull request relationship: the two entries
@@ -61,9 +69,10 @@ func (s *PullRequestService) LinkCreated(ctx context.Context, task db.Task, full
 	if full.Issue.ID == uuid.Nil {
 		return errors.New("task context has no issue id")
 	}
+	issueID := full.Issue.ID
 	_, err := s.store.RecordPullRequest(ctx, db.InsertPullRequestParams{
 		WorkspaceID:     task.WorkspaceID,
-		IssueID:         full.Issue.ID,
+		IssueID:         &issueID,
 		RepoOwner:       full.Repo.Owner,
 		RepoName:        full.Repo.Name,
 		Number:          int32(prNum),
@@ -85,70 +94,88 @@ func (s *PullRequestService) LinkCreated(ctx context.Context, task db.Task, full
 	return nil
 }
 
-// SyncFromWebhook applies one pull_request event: link the PR to whatever
-// issues it names, then let the issue status follow the PR state.
-//
-// It is idempotent and order-tolerant — GitHub redelivers events and does not
-// guarantee their order — so it never fails on "nothing to do".
-// ApplyState records what GitHub reports about a pull request the platform
-// already knows about, and lets the issue follow.
+// ApplyState records what GitHub reports about a pull request. Every PR in a
+// bound repo is recorded, even when no issue is linked; only the issue-side
+// status change is skipped for an unlinked row.
 //
 // It deliberately cannot bind. A PR is linked when the platform opens it or when
-// a human says so — never because an event arrived — so an event for a PR nobody
-// linked is somebody else's business and is ignored rather than stored. That is
-// what keeps `source` honest: only the two certain entries ever write a row, and
-// no event can arrive first and claim one for a guess.
+// a human says so — never because an event arrived — so recording a webhook row
+// writes issue_id NULL and leaves it there.
 //
 // Order tolerance lives in the store: a redelivered or reordered event that is
 // older than what is stored does not roll the state back.
 func (s *PullRequestService) ApplyState(ctx context.Context, ev GitHubPullRequestEvent) error {
-	ws, err := s.store.GetWorkspaceByRepo(ctx, db.GetWorkspaceByRepoParams{
+	row, err := s.store.GetPullRequestByRepoNumber(ctx, db.GetPullRequestByRepoNumberParams{
 		InstallationID: ev.InstallationID,
-		Owner:          ev.RepoOwner,
-		Name:           ev.RepoName,
+		RepoOwner:      ev.RepoOwner,
+		RepoName:       ev.RepoName,
+		Number:         ev.Number,
 	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, pgx.ErrNoRows) {
+		ws, werr := s.store.GetWorkspaceByRepo(ctx, db.GetWorkspaceByRepoParams{
+			InstallationID: ev.InstallationID,
+			Owner:          ev.RepoOwner,
+			Name:           ev.RepoName,
+		})
+		if errors.Is(werr, pgx.ErrNoRows) {
 			return nil // a repository no workspace is bound to
 		}
-		return fmt.Errorf("resolve workspace for repo: %w", err)
-	}
-
-	row, err := s.store.GetPullRequestByNumber(ctx, db.GetPullRequestByNumberParams{
-		WorkspaceID: ws.ID,
-		RepoOwner:   ev.RepoOwner,
-		RepoName:    ev.RepoName,
-		Number:      ev.Number,
-	})
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil // never linked: not ours to track
+		if werr != nil {
+			return fmt.Errorf("resolve workspace for repo: %w", werr)
 		}
-		return fmt.Errorf("find pull request: %w", err)
+		row, err = s.store.RecordRepoPullRequest(ctx, repoPullRequestParams(ws.ID, ev))
+	} else if err == nil {
+		row, err = s.store.RecordRepoPullRequest(ctx, repoPullRequestParams(row.WorkspaceID, ev))
 	}
-
-	updated, err := s.store.RecordPullRequest(ctx, db.InsertPullRequestParams{
-		WorkspaceID:     row.WorkspaceID,
-		IssueID:         row.IssueID,
-		RepoOwner:       ev.RepoOwner,
-		RepoName:        ev.RepoName,
-		Number:          ev.Number,
-		Title:           ev.Title,
-		Url:             ev.HTMLURL,
-		State:           pullRequestState(ev),
-		Draft:           ev.Draft,
-		HeadBranch:      ev.HeadBranch,
-		BaseBranch:      ev.BaseBranch,
-		Author:          ev.Author,
-		Source:          row.Source,
-		CloseIntent:     row.CloseIntent,
-		MergedAt:        mergedAt(ev),
-		GithubUpdatedAt: &ev.UpdatedAt,
-	})
 	if err != nil {
-		return fmt.Errorf("record pull request state: %w", err)
+		return fmt.Errorf("record repository pull request: %w", err)
 	}
-	return s.afterPullRequestChange(ctx, row.WorkspaceID, row.IssueID, updated)
+	if row.State != "open" {
+		// A closed/merged PR makes a queued review pointless. Running reviews are
+		// left alone; their daemon will report and the ledger will settle.
+		if tasks, err := s.store.CancelQueuedReviewTasks(ctx, row.ID); err != nil {
+			slog.Warn("cancel queued reviews for closed pull request", "pr", row.Number, "error", err)
+		} else if len(tasks) > 0 {
+			ids := make([]uuid.UUID, 0, len(tasks))
+			for _, task := range tasks {
+				ids = append(ids, task.ID)
+			}
+			if _, err := s.store.CancelPRReviewsByTasks(ctx, ids); err != nil {
+				slog.Warn("cancel review ledger rows", "pr", row.Number, "error", err)
+			}
+		}
+	}
+	if row.IssueID == nil {
+		return nil // recorded, not bound; nothing issue-side to update
+	}
+	return s.afterPullRequestChange(ctx, row.WorkspaceID, *row.IssueID, row)
+}
+
+// repoPullRequestParams maps a webhook to the repo-scoped insert. It never sets
+// issue_id, source or close_intent: those belong to the two binding entries.
+func repoPullRequestParams(workspaceID uuid.UUID, ev GitHubPullRequestEvent) db.InsertRepoPullRequestParams {
+	return db.InsertRepoPullRequestParams{
+		WorkspaceID:       workspaceID,
+		RepoOwner:         ev.RepoOwner,
+		RepoName:          ev.RepoName,
+		Number:            ev.Number,
+		Title:             ev.Title,
+		Url:               ev.HTMLURL,
+		State:             pullRequestState(ev),
+		Draft:             ev.Draft,
+		HeadBranch:        ev.HeadBranch,
+		BaseBranch:        ev.BaseBranch,
+		Author:            ev.Author,
+		MergedAt:          mergedAt(ev),
+		GithubUpdatedAt:   &ev.UpdatedAt,
+		HeadSha:           ev.HeadSHA,
+		Body:              ev.Body,
+		Additions:         int32(ev.Additions),
+		Deletions:         int32(ev.Deletions),
+		ChangedFiles:      int32(ev.ChangedFiles),
+		AuthorAssociation: ev.AuthorAssociation,
+		HeadRepo:          ev.HeadRepo,
+	}
 }
 
 // pullRequestState reduces an event to the stored vocabulary. A merge is how
@@ -258,7 +285,7 @@ func (s *PullRequestService) Suppress(ctx context.Context, workspaceID, issueID,
 	if err != nil {
 		return fmt.Errorf("get pull request: %w", err)
 	}
-	if row.IssueID != issueID || row.WorkspaceID != workspaceID {
+	if row.IssueID == nil || *row.IssueID != issueID || row.WorkspaceID != workspaceID {
 		return errors.New("pull request does not belong to this issue")
 	}
 	if err := s.store.SuppressPullRequest(ctx, prID); err != nil {
@@ -276,7 +303,7 @@ func (s *PullRequestService) Unsuppress(ctx context.Context, workspaceID, issueI
 	if err != nil {
 		return fmt.Errorf("get pull request: %w", err)
 	}
-	if row.IssueID != issueID || row.WorkspaceID != workspaceID {
+	if row.IssueID == nil || *row.IssueID != issueID || row.WorkspaceID != workspaceID {
 		return errors.New("pull request does not belong to this issue")
 	}
 	if err := s.store.UnsuppressPullRequest(ctx, prID); err != nil {
@@ -299,4 +326,74 @@ func (s *PullRequestService) appendSystemComment(ctx context.Context, workspaceI
 		// point, and the next event will say the same thing again.
 		slog.Warn("append pull request comment", "issue", issueID, "error", err)
 	}
+}
+
+// ListWorkspacePullRequests is the console's Pull requests page: every recorded
+// PR in the workspace, with the latest review and its token cost. The list is a
+// read model over pull_requests; GitHub remains the source of truth for the PR.
+func (s *PullRequestService) ListWorkspacePullRequests(ctx context.Context, workspaceID uuid.UUID, state string, limit int32) ([]v1.PullRequestSummary, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 100
+	}
+	rows, err := s.store.ListPullRequestsByWorkspace(ctx, db.ListPullRequestsByWorkspaceParams{
+		WorkspaceID: workspaceID, Column2: state, Limit: limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list pull requests: %w", err)
+	}
+
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	latest := map[uuid.UUID]db.LatestReviewsByPullRequestIDsRow{}
+	if len(ids) > 0 {
+		reviews, err := s.store.LatestReviewsByPullRequestIDs(ctx, ids)
+		if err != nil {
+			return nil, fmt.Errorf("latest reviews: %w", err)
+		}
+		for _, review := range reviews {
+			latest[review.PullRequestID] = review
+		}
+	}
+
+	out := make([]v1.PullRequestSummary, 0, len(rows))
+	for _, row := range rows {
+		updatedAt := row.UpdatedAt
+		if row.GithubUpdatedAt != nil {
+			updatedAt = *row.GithubUpdatedAt
+		}
+		item := v1.PullRequestSummary{
+			ID: row.ID, Number: row.Number, Title: row.Title, URL: row.Url,
+			State: row.State, Draft: row.Draft, Author: row.Author,
+			HeadBranch: row.HeadBranch, BaseBranch: row.BaseBranch,
+			HeadSHA: row.HeadSha, UpdatedAt: updatedAt,
+		}
+		if row.IssueNumber != nil {
+			item.IssueKey = fmt.Sprintf("%s-%d", row.IssuePrefix, *row.IssueNumber)
+			if row.IssueTitle != nil {
+				item.IssueTitle = *row.IssueTitle
+			}
+		}
+		if review, ok := latest[row.ID]; ok {
+			var tokens int64
+			if review.TaskID != nil {
+				n, err := s.store.GetTaskUsageTotal(ctx, *review.TaskID)
+				if err != nil {
+					slog.Warn("review usage total", "review", review.ID, "error", err)
+				} else {
+					tokens = n
+				}
+			}
+			item.LatestReview = &v1.PullRequestReview{
+				ID: review.ID, Status: review.Status, AgentName: review.AgentName,
+				HeadSHA: review.HeadSha, Summary: review.Summary,
+				Findings: review.Findings, URL: review.Url,
+				Stale:  review.HeadSha != "" && review.HeadSha != row.HeadSha,
+				Tokens: tokens, CreatedAt: review.CreatedAt,
+			}
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }

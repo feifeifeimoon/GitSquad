@@ -20,20 +20,27 @@ import (
 // state is already on record (return that).
 func (s *Store) RecordPullRequest(ctx context.Context, p db.InsertPullRequestParams) (db.PullRequest, error) {
 	row, err := s.Queries.TouchPullRequest(ctx, db.TouchPullRequestParams{
-		WorkspaceID:     p.WorkspaceID,
-		RepoOwner:       p.RepoOwner,
-		RepoName:        p.RepoName,
-		Number:          p.Number,
-		Title:           p.Title,
-		Url:             p.Url,
-		State:           p.State,
-		Draft:           p.Draft,
-		HeadBranch:      p.HeadBranch,
-		BaseBranch:      p.BaseBranch,
-		Author:          p.Author,
-		CloseIntent:     p.CloseIntent,
-		MergedAt:        p.MergedAt,
-		GithubUpdatedAt: p.GithubUpdatedAt,
+		WorkspaceID:       p.WorkspaceID,
+		RepoOwner:         p.RepoOwner,
+		RepoName:          p.RepoName,
+		Number:            p.Number,
+		Title:             p.Title,
+		Url:               p.Url,
+		State:             p.State,
+		Draft:             p.Draft,
+		HeadBranch:        p.HeadBranch,
+		BaseBranch:        p.BaseBranch,
+		Author:            p.Author,
+		CloseIntent:       p.CloseIntent,
+		MergedAt:          p.MergedAt,
+		GithubUpdatedAt:   p.GithubUpdatedAt,
+		HeadSha:           p.HeadSha,
+		Body:              p.Body,
+		Additions:         p.Additions,
+		Deletions:         p.Deletions,
+		ChangedFiles:      p.ChangedFiles,
+		AuthorAssociation: p.AuthorAssociation,
+		HeadRepo:          p.HeadRepo,
 	})
 	if err == nil {
 		return row, nil
@@ -60,4 +67,36 @@ func (s *Store) RecordPullRequest(ctx context.Context, p db.InsertPullRequestPar
 	// A concurrent delivery may have inserted it between the two statements;
 	// the insert's conflict clause keeps that a refresh rather than an error.
 	return s.Queries.InsertPullRequest(ctx, p)
+}
+
+// RecordRepoPullRequest records a pull request discovered by a webhook. Unlike
+// RecordPullRequest it never writes issue_id, source, close_intent or
+// suppressed_at: recording a PR is not binding it to an issue, and a webhook
+// must not clear a human's link or take the active closing slot.
+//
+// The ordering rule is the same: a stale event returns the stored row rather
+// than rolling state or head_sha back.
+func (s *Store) RecordRepoPullRequest(ctx context.Context, p db.InsertRepoPullRequestParams) (db.PullRequest, error) {
+	row, err := s.Queries.TouchRepoPullRequest(ctx, db.TouchRepoPullRequestParams(p))
+	if err == nil {
+		return row, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return db.PullRequest{}, err
+	}
+
+	existing, err := s.Queries.GetPullRequestByNumber(ctx, db.GetPullRequestByNumberParams{
+		WorkspaceID: p.WorkspaceID,
+		RepoOwner:   p.RepoOwner,
+		RepoName:    p.RepoName,
+		Number:      p.Number,
+	})
+	if err == nil {
+		return existing, nil
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return db.PullRequest{}, err
+	}
+
+	return s.Queries.InsertRepoPullRequest(ctx, p)
 }

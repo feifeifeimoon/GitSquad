@@ -17,7 +17,7 @@ SELECT
     COUNT(*) FILTER (WHERE state = 'open' AND suppressed_at IS NULL)::bigint AS open_count,
     COUNT(*) FILTER (WHERE state = 'merged' AND close_intent AND suppressed_at IS NULL)::bigint AS merged_closing_count
 FROM pull_requests
-WHERE issue_id = $1
+WHERE issue_id = $1::uuid
 `
 
 type CountOpenClosingPullRequestsRow struct {
@@ -27,16 +27,16 @@ type CountOpenClosingPullRequestsRow struct {
 
 // Feeds the aggregate that decides whether the issue is finished: the issue is
 // done when nothing is in flight and something merged with closing intent.
-func (q *Queries) CountOpenClosingPullRequests(ctx context.Context, issueID uuid.UUID) (CountOpenClosingPullRequestsRow, error) {
-	row := q.db.QueryRow(ctx, countOpenClosingPullRequests, issueID)
+func (q *Queries) CountOpenClosingPullRequests(ctx context.Context, dollar_1 uuid.UUID) (CountOpenClosingPullRequestsRow, error) {
+	row := q.db.QueryRow(ctx, countOpenClosingPullRequests, dollar_1)
 	var i CountOpenClosingPullRequestsRow
 	err := row.Scan(&i.OpenCount, &i.MergedClosingCount)
 	return i, err
 }
 
 const getActivePullRequest = `-- name: GetActivePullRequest :one
-SELECT id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at FROM pull_requests
-WHERE issue_id = $1
+SELECT id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at FROM pull_requests
+WHERE issue_id = $1::uuid
   AND state = 'open'
   AND close_intent
   AND suppressed_at IS NULL
@@ -51,8 +51,8 @@ LIMIT 1
 // the two certain entries: the platform opens a PR for a task, or a human links
 // one. Nothing infers a link, so every row here is a statement rather than a
 // guess. An inferred entry would have to be kept out of this query.
-func (q *Queries) GetActivePullRequest(ctx context.Context, issueID uuid.UUID) (PullRequest, error) {
-	row := q.db.QueryRow(ctx, getActivePullRequest, issueID)
+func (q *Queries) GetActivePullRequest(ctx context.Context, dollar_1 uuid.UUID) (PullRequest, error) {
+	row := q.db.QueryRow(ctx, getActivePullRequest, dollar_1)
 	var i PullRequest
 	err := row.Scan(
 		&i.ID,
@@ -68,6 +68,13 @@ func (q *Queries) GetActivePullRequest(ctx context.Context, issueID uuid.UUID) (
 		&i.HeadBranch,
 		&i.BaseBranch,
 		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
 		&i.Source,
 		&i.CloseIntent,
 		&i.SuppressedAt,
@@ -80,7 +87,7 @@ func (q *Queries) GetActivePullRequest(ctx context.Context, issueID uuid.UUID) (
 }
 
 const getPullRequest = `-- name: GetPullRequest :one
-SELECT id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at FROM pull_requests WHERE id = $1
+SELECT id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at FROM pull_requests WHERE id = $1
 `
 
 func (q *Queries) GetPullRequest(ctx context.Context, id uuid.UUID) (PullRequest, error) {
@@ -100,6 +107,13 @@ func (q *Queries) GetPullRequest(ctx context.Context, id uuid.UUID) (PullRequest
 		&i.HeadBranch,
 		&i.BaseBranch,
 		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
 		&i.Source,
 		&i.CloseIntent,
 		&i.SuppressedAt,
@@ -112,7 +126,7 @@ func (q *Queries) GetPullRequest(ctx context.Context, id uuid.UUID) (PullRequest
 }
 
 const getPullRequestByNumber = `-- name: GetPullRequestByNumber :one
-SELECT id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at FROM pull_requests
+SELECT id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at FROM pull_requests
 WHERE workspace_id = $1 AND repo_owner = $2 AND repo_name = $3 AND number = $4
 `
 
@@ -145,6 +159,72 @@ func (q *Queries) GetPullRequestByNumber(ctx context.Context, arg GetPullRequest
 		&i.HeadBranch,
 		&i.BaseBranch,
 		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
+		&i.Source,
+		&i.CloseIntent,
+		&i.SuppressedAt,
+		&i.MergedAt,
+		&i.GithubUpdatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getPullRequestByRepoNumber = `-- name: GetPullRequestByRepoNumber :one
+SELECT pr.id, pr.workspace_id, pr.issue_id, pr.repo_owner, pr.repo_name, pr.number, pr.title, pr.url, pr.state, pr.draft, pr.head_branch, pr.base_branch, pr.author, pr.head_sha, pr.body, pr.additions, pr.deletions, pr.changed_files, pr.author_association, pr.head_repo, pr.source, pr.close_intent, pr.suppressed_at, pr.merged_at, pr.github_updated_at, pr.created_at, pr.updated_at FROM pull_requests pr
+JOIN workspaces w ON w.id = pr.workspace_id
+JOIN github_installations gi ON gi.id = w.installation_id
+WHERE gi.installation_id = $1
+  AND pr.repo_owner = $2 AND pr.repo_name = $3 AND pr.number = $4
+ORDER BY pr.created_at ASC
+LIMIT 1
+`
+
+type GetPullRequestByRepoNumberParams struct {
+	InstallationID int64  `json:"installation_id"`
+	RepoOwner      string `json:"repo_owner"`
+	RepoName       string `json:"repo_name"`
+	Number         int32  `json:"number"`
+}
+
+// The webhook's entry: the PR may be linked to any workspace bound to the repo,
+// or to none. The installation ID is the external one from the payload.
+func (q *Queries) GetPullRequestByRepoNumber(ctx context.Context, arg GetPullRequestByRepoNumberParams) (PullRequest, error) {
+	row := q.db.QueryRow(ctx, getPullRequestByRepoNumber,
+		arg.InstallationID,
+		arg.RepoOwner,
+		arg.RepoName,
+		arg.Number,
+	)
+	var i PullRequest
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.RepoOwner,
+		&i.RepoName,
+		&i.Number,
+		&i.Title,
+		&i.Url,
+		&i.State,
+		&i.Draft,
+		&i.HeadBranch,
+		&i.BaseBranch,
+		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
 		&i.Source,
 		&i.CloseIntent,
 		&i.SuppressedAt,
@@ -160,9 +240,11 @@ const insertPullRequest = `-- name: InsertPullRequest :one
 INSERT INTO pull_requests (
     workspace_id, issue_id, repo_owner, repo_name, number, title, url,
     state, draft, head_branch, base_branch, author, source, close_intent,
-    merged_at, github_updated_at
+    merged_at, github_updated_at, head_sha, body, additions, deletions,
+    changed_files, author_association, head_repo
 ) VALUES (
-    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+    $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16,
+    $17, $18, $19, $20, $21, $22, $23
 )
 ON CONFLICT (workspace_id, repo_owner, repo_name, number) DO UPDATE SET
     title = EXCLUDED.title,
@@ -175,27 +257,41 @@ ON CONFLICT (workspace_id, repo_owner, repo_name, number) DO UPDATE SET
     close_intent = EXCLUDED.close_intent,
     merged_at = EXCLUDED.merged_at,
     github_updated_at = EXCLUDED.github_updated_at,
+    head_sha = EXCLUDED.head_sha,
+    body = EXCLUDED.body,
+    additions = EXCLUDED.additions,
+    deletions = EXCLUDED.deletions,
+    changed_files = EXCLUDED.changed_files,
+    author_association = EXCLUDED.author_association,
+    head_repo = EXCLUDED.head_repo,
     updated_at = now()
-RETURNING id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at
+RETURNING id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at
 `
 
 type InsertPullRequestParams struct {
-	WorkspaceID     uuid.UUID  `json:"workspace_id"`
-	IssueID         uuid.UUID  `json:"issue_id"`
-	RepoOwner       string     `json:"repo_owner"`
-	RepoName        string     `json:"repo_name"`
-	Number          int32      `json:"number"`
-	Title           string     `json:"title"`
-	Url             string     `json:"url"`
-	State           string     `json:"state"`
-	Draft           bool       `json:"draft"`
-	HeadBranch      string     `json:"head_branch"`
-	BaseBranch      string     `json:"base_branch"`
-	Author          string     `json:"author"`
-	Source          string     `json:"source"`
-	CloseIntent     bool       `json:"close_intent"`
-	MergedAt        *time.Time `json:"merged_at"`
-	GithubUpdatedAt *time.Time `json:"github_updated_at"`
+	WorkspaceID       uuid.UUID  `json:"workspace_id"`
+	IssueID           *uuid.UUID `json:"issue_id"`
+	RepoOwner         string     `json:"repo_owner"`
+	RepoName          string     `json:"repo_name"`
+	Number            int32      `json:"number"`
+	Title             string     `json:"title"`
+	Url               string     `json:"url"`
+	State             string     `json:"state"`
+	Draft             bool       `json:"draft"`
+	HeadBranch        string     `json:"head_branch"`
+	BaseBranch        string     `json:"base_branch"`
+	Author            string     `json:"author"`
+	Source            string     `json:"source"`
+	CloseIntent       bool       `json:"close_intent"`
+	MergedAt          *time.Time `json:"merged_at"`
+	GithubUpdatedAt   *time.Time `json:"github_updated_at"`
+	HeadSha           string     `json:"head_sha"`
+	Body              string     `json:"body"`
+	Additions         int32      `json:"additions"`
+	Deletions         int32      `json:"deletions"`
+	ChangedFiles      int32      `json:"changed_files"`
+	AuthorAssociation string     `json:"author_association"`
+	HeadRepo          string     `json:"head_repo"`
 }
 
 // Writes a PR row, or refreshes it when the same PR is seen again. The caller
@@ -219,6 +315,13 @@ func (q *Queries) InsertPullRequest(ctx context.Context, arg InsertPullRequestPa
 		arg.CloseIntent,
 		arg.MergedAt,
 		arg.GithubUpdatedAt,
+		arg.HeadSha,
+		arg.Body,
+		arg.Additions,
+		arg.Deletions,
+		arg.ChangedFiles,
+		arg.AuthorAssociation,
+		arg.HeadRepo,
 	)
 	var i PullRequest
 	err := row.Scan(
@@ -235,6 +338,175 @@ func (q *Queries) InsertPullRequest(ctx context.Context, arg InsertPullRequestPa
 		&i.HeadBranch,
 		&i.BaseBranch,
 		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
+		&i.Source,
+		&i.CloseIntent,
+		&i.SuppressedAt,
+		&i.MergedAt,
+		&i.GithubUpdatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const insertRepoPullRequest = `-- name: InsertRepoPullRequest :one
+INSERT INTO pull_requests (
+    workspace_id, issue_id, repo_owner, repo_name, number, title, url,
+    state, draft, head_branch, base_branch, author, source, close_intent,
+    merged_at, github_updated_at, head_sha, body, additions, deletions,
+    changed_files, author_association, head_repo
+) VALUES (
+    $1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'github', false,
+    $12, $13, $14, $15, $16, $17, $18, $19, $20
+)
+ON CONFLICT (workspace_id, repo_owner, repo_name, number) DO UPDATE SET
+    title = EXCLUDED.title,
+    url = EXCLUDED.url,
+    state = EXCLUDED.state,
+    draft = EXCLUDED.draft,
+    head_branch = EXCLUDED.head_branch,
+    base_branch = EXCLUDED.base_branch,
+    author = EXCLUDED.author,
+    merged_at = EXCLUDED.merged_at,
+    github_updated_at = EXCLUDED.github_updated_at,
+    head_sha = EXCLUDED.head_sha,
+    body = EXCLUDED.body,
+    additions = EXCLUDED.additions,
+    deletions = EXCLUDED.deletions,
+    changed_files = EXCLUDED.changed_files,
+    author_association = EXCLUDED.author_association,
+    head_repo = EXCLUDED.head_repo,
+    updated_at = now()
+RETURNING id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at
+`
+
+type InsertRepoPullRequestParams struct {
+	WorkspaceID       uuid.UUID  `json:"workspace_id"`
+	RepoOwner         string     `json:"repo_owner"`
+	RepoName          string     `json:"repo_name"`
+	Number            int32      `json:"number"`
+	Title             string     `json:"title"`
+	Url               string     `json:"url"`
+	State             string     `json:"state"`
+	Draft             bool       `json:"draft"`
+	HeadBranch        string     `json:"head_branch"`
+	BaseBranch        string     `json:"base_branch"`
+	Author            string     `json:"author"`
+	MergedAt          *time.Time `json:"merged_at"`
+	GithubUpdatedAt   *time.Time `json:"github_updated_at"`
+	HeadSha           string     `json:"head_sha"`
+	Body              string     `json:"body"`
+	Additions         int32      `json:"additions"`
+	Deletions         int32      `json:"deletions"`
+	ChangedFiles      int32      `json:"changed_files"`
+	AuthorAssociation string     `json:"author_association"`
+	HeadRepo          string     `json:"head_repo"`
+}
+
+// Records a PR the webhook discovered, with no issue binding. The conflict
+// update is deliberately limited to GitHub-owned fields: a concurrent insert
+// or a later webhook must not clear issue_id/source/close_intent.
+func (q *Queries) InsertRepoPullRequest(ctx context.Context, arg InsertRepoPullRequestParams) (PullRequest, error) {
+	row := q.db.QueryRow(ctx, insertRepoPullRequest,
+		arg.WorkspaceID,
+		arg.RepoOwner,
+		arg.RepoName,
+		arg.Number,
+		arg.Title,
+		arg.Url,
+		arg.State,
+		arg.Draft,
+		arg.HeadBranch,
+		arg.BaseBranch,
+		arg.Author,
+		arg.MergedAt,
+		arg.GithubUpdatedAt,
+		arg.HeadSha,
+		arg.Body,
+		arg.Additions,
+		arg.Deletions,
+		arg.ChangedFiles,
+		arg.AuthorAssociation,
+		arg.HeadRepo,
+	)
+	var i PullRequest
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.RepoOwner,
+		&i.RepoName,
+		&i.Number,
+		&i.Title,
+		&i.Url,
+		&i.State,
+		&i.Draft,
+		&i.HeadBranch,
+		&i.BaseBranch,
+		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
+		&i.Source,
+		&i.CloseIntent,
+		&i.SuppressedAt,
+		&i.MergedAt,
+		&i.GithubUpdatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const linkPullRequestToIssue = `-- name: LinkPullRequestToIssue :one
+UPDATE pull_requests
+SET issue_id = $2, close_intent = true, source = 'manual', suppressed_at = NULL, updated_at = now()
+WHERE id = $1
+RETURNING id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at
+`
+
+type LinkPullRequestToIssueParams struct {
+	ID      uuid.UUID  `json:"id"`
+	IssueID *uuid.UUID `json:"issue_id"`
+}
+
+// A human's link attaches the existing repo-scoped row rather than creating a
+// second one. The active-slot index refuses when another closing PR holds it.
+func (q *Queries) LinkPullRequestToIssue(ctx context.Context, arg LinkPullRequestToIssueParams) (PullRequest, error) {
+	row := q.db.QueryRow(ctx, linkPullRequestToIssue, arg.ID, arg.IssueID)
+	var i PullRequest
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.RepoOwner,
+		&i.RepoName,
+		&i.Number,
+		&i.Title,
+		&i.Url,
+		&i.State,
+		&i.Draft,
+		&i.HeadBranch,
+		&i.BaseBranch,
+		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
 		&i.Source,
 		&i.CloseIntent,
 		&i.SuppressedAt,
@@ -247,13 +519,13 @@ func (q *Queries) InsertPullRequest(ctx context.Context, arg InsertPullRequestPa
 }
 
 const listPullRequestsByIssue = `-- name: ListPullRequestsByIssue :many
-SELECT id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at FROM pull_requests
-WHERE issue_id = $1
+SELECT id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at FROM pull_requests
+WHERE issue_id = $1::uuid
 ORDER BY created_at DESC
 `
 
-func (q *Queries) ListPullRequestsByIssue(ctx context.Context, issueID uuid.UUID) ([]PullRequest, error) {
-	rows, err := q.db.Query(ctx, listPullRequestsByIssue, issueID)
+func (q *Queries) ListPullRequestsByIssue(ctx context.Context, dollar_1 uuid.UUID) ([]PullRequest, error) {
+	rows, err := q.db.Query(ctx, listPullRequestsByIssue, dollar_1)
 	if err != nil {
 		return nil, err
 	}
@@ -275,6 +547,13 @@ func (q *Queries) ListPullRequestsByIssue(ctx context.Context, issueID uuid.UUID
 			&i.HeadBranch,
 			&i.BaseBranch,
 			&i.Author,
+			&i.HeadSha,
+			&i.Body,
+			&i.Additions,
+			&i.Deletions,
+			&i.ChangedFiles,
+			&i.AuthorAssociation,
+			&i.HeadRepo,
 			&i.Source,
 			&i.CloseIntent,
 			&i.SuppressedAt,
@@ -282,6 +561,107 @@ func (q *Queries) ListPullRequestsByIssue(ctx context.Context, issueID uuid.UUID
 			&i.GithubUpdatedAt,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listPullRequestsByWorkspace = `-- name: ListPullRequestsByWorkspace :many
+SELECT pr.id, pr.workspace_id, pr.issue_id, pr.repo_owner, pr.repo_name, pr.number, pr.title, pr.url, pr.state, pr.draft, pr.head_branch, pr.base_branch, pr.author, pr.head_sha, pr.body, pr.additions, pr.deletions, pr.changed_files, pr.author_association, pr.head_repo, pr.source, pr.close_intent, pr.suppressed_at, pr.merged_at, pr.github_updated_at, pr.created_at, pr.updated_at, i.number AS issue_number, i.title AS issue_title, w.issue_prefix
+FROM pull_requests pr
+JOIN workspaces w ON w.id = pr.workspace_id
+LEFT JOIN issues i ON i.id = pr.issue_id
+WHERE pr.workspace_id = $1
+  AND ($2::text = '' OR pr.state = $2::text)
+ORDER BY COALESCE(pr.github_updated_at, pr.updated_at) DESC
+LIMIT $3
+`
+
+type ListPullRequestsByWorkspaceParams struct {
+	WorkspaceID uuid.UUID `json:"workspace_id"`
+	Column2     string    `json:"column_2"`
+	Limit       int32     `json:"limit"`
+}
+
+type ListPullRequestsByWorkspaceRow struct {
+	ID                uuid.UUID  `json:"id"`
+	WorkspaceID       uuid.UUID  `json:"workspace_id"`
+	IssueID           *uuid.UUID `json:"issue_id"`
+	RepoOwner         string     `json:"repo_owner"`
+	RepoName          string     `json:"repo_name"`
+	Number            int32      `json:"number"`
+	Title             string     `json:"title"`
+	Url               string     `json:"url"`
+	State             string     `json:"state"`
+	Draft             bool       `json:"draft"`
+	HeadBranch        string     `json:"head_branch"`
+	BaseBranch        string     `json:"base_branch"`
+	Author            string     `json:"author"`
+	HeadSha           string     `json:"head_sha"`
+	Body              string     `json:"body"`
+	Additions         int32      `json:"additions"`
+	Deletions         int32      `json:"deletions"`
+	ChangedFiles      int32      `json:"changed_files"`
+	AuthorAssociation string     `json:"author_association"`
+	HeadRepo          string     `json:"head_repo"`
+	Source            string     `json:"source"`
+	CloseIntent       bool       `json:"close_intent"`
+	SuppressedAt      *time.Time `json:"suppressed_at"`
+	MergedAt          *time.Time `json:"merged_at"`
+	GithubUpdatedAt   *time.Time `json:"github_updated_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	IssueNumber       *int32     `json:"issue_number"`
+	IssueTitle        *string    `json:"issue_title"`
+	IssuePrefix       string     `json:"issue_prefix"`
+}
+
+func (q *Queries) ListPullRequestsByWorkspace(ctx context.Context, arg ListPullRequestsByWorkspaceParams) ([]ListPullRequestsByWorkspaceRow, error) {
+	rows, err := q.db.Query(ctx, listPullRequestsByWorkspace, arg.WorkspaceID, arg.Column2, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPullRequestsByWorkspaceRow
+	for rows.Next() {
+		var i ListPullRequestsByWorkspaceRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.IssueID,
+			&i.RepoOwner,
+			&i.RepoName,
+			&i.Number,
+			&i.Title,
+			&i.Url,
+			&i.State,
+			&i.Draft,
+			&i.HeadBranch,
+			&i.BaseBranch,
+			&i.Author,
+			&i.HeadSha,
+			&i.Body,
+			&i.Additions,
+			&i.Deletions,
+			&i.ChangedFiles,
+			&i.AuthorAssociation,
+			&i.HeadRepo,
+			&i.Source,
+			&i.CloseIntent,
+			&i.SuppressedAt,
+			&i.MergedAt,
+			&i.GithubUpdatedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.IssueNumber,
+			&i.IssueTitle,
+			&i.IssuePrefix,
 		); err != nil {
 			return nil, err
 		}
@@ -318,27 +698,41 @@ UPDATE pull_requests SET
     close_intent = $12,
     merged_at = $13,
     github_updated_at = $14,
+    head_sha = $15,
+    body = $16,
+    additions = $17,
+    deletions = $18,
+    changed_files = $19,
+    author_association = $20,
+    head_repo = $21,
     updated_at = now()
 WHERE workspace_id = $1 AND repo_owner = $2 AND repo_name = $3 AND number = $4
   AND (github_updated_at IS NULL OR $14::timestamptz IS NULL OR $14::timestamptz >= github_updated_at)
-RETURNING id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at
+RETURNING id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at
 `
 
 type TouchPullRequestParams struct {
-	WorkspaceID     uuid.UUID  `json:"workspace_id"`
-	RepoOwner       string     `json:"repo_owner"`
-	RepoName        string     `json:"repo_name"`
-	Number          int32      `json:"number"`
-	Title           string     `json:"title"`
-	Url             string     `json:"url"`
-	State           string     `json:"state"`
-	Draft           bool       `json:"draft"`
-	HeadBranch      string     `json:"head_branch"`
-	BaseBranch      string     `json:"base_branch"`
-	Author          string     `json:"author"`
-	CloseIntent     bool       `json:"close_intent"`
-	MergedAt        *time.Time `json:"merged_at"`
-	GithubUpdatedAt *time.Time `json:"github_updated_at"`
+	WorkspaceID       uuid.UUID  `json:"workspace_id"`
+	RepoOwner         string     `json:"repo_owner"`
+	RepoName          string     `json:"repo_name"`
+	Number            int32      `json:"number"`
+	Title             string     `json:"title"`
+	Url               string     `json:"url"`
+	State             string     `json:"state"`
+	Draft             bool       `json:"draft"`
+	HeadBranch        string     `json:"head_branch"`
+	BaseBranch        string     `json:"base_branch"`
+	Author            string     `json:"author"`
+	CloseIntent       bool       `json:"close_intent"`
+	MergedAt          *time.Time `json:"merged_at"`
+	GithubUpdatedAt   *time.Time `json:"github_updated_at"`
+	HeadSha           string     `json:"head_sha"`
+	Body              string     `json:"body"`
+	Additions         int32      `json:"additions"`
+	Deletions         int32      `json:"deletions"`
+	ChangedFiles      int32      `json:"changed_files"`
+	AuthorAssociation string     `json:"author_association"`
+	HeadRepo          string     `json:"head_repo"`
 }
 
 // Refreshes an existing row from an event, but only when that event is at least
@@ -370,6 +764,13 @@ func (q *Queries) TouchPullRequest(ctx context.Context, arg TouchPullRequestPara
 		arg.CloseIntent,
 		arg.MergedAt,
 		arg.GithubUpdatedAt,
+		arg.HeadSha,
+		arg.Body,
+		arg.Additions,
+		arg.Deletions,
+		arg.ChangedFiles,
+		arg.AuthorAssociation,
+		arg.HeadRepo,
 	)
 	var i PullRequest
 	err := row.Scan(
@@ -386,6 +787,119 @@ func (q *Queries) TouchPullRequest(ctx context.Context, arg TouchPullRequestPara
 		&i.HeadBranch,
 		&i.BaseBranch,
 		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
+		&i.Source,
+		&i.CloseIntent,
+		&i.SuppressedAt,
+		&i.MergedAt,
+		&i.GithubUpdatedAt,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const touchRepoPullRequest = `-- name: TouchRepoPullRequest :one
+UPDATE pull_requests SET
+    title = $5,
+    url = $6,
+    state = $7,
+    draft = $8,
+    head_branch = $9,
+    base_branch = $10,
+    author = $11,
+    merged_at = $12,
+    github_updated_at = $13,
+    head_sha = $14,
+    body = $15,
+    additions = $16,
+    deletions = $17,
+    changed_files = $18,
+    author_association = $19,
+    head_repo = $20,
+    updated_at = now()
+WHERE workspace_id = $1 AND repo_owner = $2 AND repo_name = $3 AND number = $4
+  AND (github_updated_at IS NULL OR $13::timestamptz IS NULL OR $13::timestamptz >= github_updated_at)
+RETURNING id, workspace_id, issue_id, repo_owner, repo_name, number, title, url, state, draft, head_branch, base_branch, author, head_sha, body, additions, deletions, changed_files, author_association, head_repo, source, close_intent, suppressed_at, merged_at, github_updated_at, created_at, updated_at
+`
+
+type TouchRepoPullRequestParams struct {
+	WorkspaceID       uuid.UUID  `json:"workspace_id"`
+	RepoOwner         string     `json:"repo_owner"`
+	RepoName          string     `json:"repo_name"`
+	Number            int32      `json:"number"`
+	Title             string     `json:"title"`
+	Url               string     `json:"url"`
+	State             string     `json:"state"`
+	Draft             bool       `json:"draft"`
+	HeadBranch        string     `json:"head_branch"`
+	BaseBranch        string     `json:"base_branch"`
+	Author            string     `json:"author"`
+	MergedAt          *time.Time `json:"merged_at"`
+	GithubUpdatedAt   *time.Time `json:"github_updated_at"`
+	HeadSha           string     `json:"head_sha"`
+	Body              string     `json:"body"`
+	Additions         int32      `json:"additions"`
+	Deletions         int32      `json:"deletions"`
+	ChangedFiles      int32      `json:"changed_files"`
+	AuthorAssociation string     `json:"author_association"`
+	HeadRepo          string     `json:"head_repo"`
+}
+
+// The webhook-discovered variant: it refreshes only the fields GitHub owns and
+// never touches issue_id, source, close_intent, suppressed_at or created_at.
+// A webhook must not clear a human's link, nor take the active closing slot.
+func (q *Queries) TouchRepoPullRequest(ctx context.Context, arg TouchRepoPullRequestParams) (PullRequest, error) {
+	row := q.db.QueryRow(ctx, touchRepoPullRequest,
+		arg.WorkspaceID,
+		arg.RepoOwner,
+		arg.RepoName,
+		arg.Number,
+		arg.Title,
+		arg.Url,
+		arg.State,
+		arg.Draft,
+		arg.HeadBranch,
+		arg.BaseBranch,
+		arg.Author,
+		arg.MergedAt,
+		arg.GithubUpdatedAt,
+		arg.HeadSha,
+		arg.Body,
+		arg.Additions,
+		arg.Deletions,
+		arg.ChangedFiles,
+		arg.AuthorAssociation,
+		arg.HeadRepo,
+	)
+	var i PullRequest
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.IssueID,
+		&i.RepoOwner,
+		&i.RepoName,
+		&i.Number,
+		&i.Title,
+		&i.Url,
+		&i.State,
+		&i.Draft,
+		&i.HeadBranch,
+		&i.BaseBranch,
+		&i.Author,
+		&i.HeadSha,
+		&i.Body,
+		&i.Additions,
+		&i.Deletions,
+		&i.ChangedFiles,
+		&i.AuthorAssociation,
+		&i.HeadRepo,
 		&i.Source,
 		&i.CloseIntent,
 		&i.SuppressedAt,

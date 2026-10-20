@@ -31,6 +31,23 @@ type Workspace struct {
 	LastCommitMessage string `json:"last_commit_message"`
 	LastCommitAuthor  string `json:"last_commit_author"`
 	LastCommitAt      string `json:"last_commit_at"`
+
+	// PRReview is the workspace's pull-request review configuration. Nil means
+	// the feature was never configured; Enabled false means it is off.
+	PRReview *PRReviewConfig `json:"pr_review,omitempty"`
+}
+
+// PRReviewConfig is the workspace-level reviewer configuration. The reviewer
+// agent must belong to the workspace, be enabled, and have a runtime daemon;
+// the service enforces that because a plain FK cannot express it.
+type PRReviewConfig struct {
+	Enabled        bool       `json:"enabled"`
+	AgentID        *uuid.UUID `json:"agent_id"`
+	Trigger        string     `json:"trigger"` // opened | push | manual
+	IgnoreDrafts   bool       `json:"ignore_drafts"`
+	AuthorScope    string     `json:"author_scope"` // collaborators | all
+	IncludeBots    bool       `json:"include_bots"`
+	InlineComments bool       `json:"inline_comments"`
 }
 
 // Member is a person an issue in this workspace can be assigned to. A workspace

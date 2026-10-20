@@ -15,7 +15,7 @@ func prParams(t *testing.T, f taskFixture, number int, state string, closeIntent
 	t.Helper()
 	return db.InsertPullRequestParams{
 		WorkspaceID:     f.workspace.ID,
-		IssueID:         f.issue.ID,
+		IssueID:         &f.issue.ID,
 		RepoOwner:       "tk-owner",
 		RepoName:        "tk-repo",
 		Number:          int32(number),
@@ -61,7 +61,7 @@ func TestOneActiveClosingPullRequestPerIssue(t *testing.T) {
 
 	// Merging the first releases the slot.
 	if _, err := s.RecordPullRequest(ctx, db.InsertPullRequestParams{
-		WorkspaceID: f.workspace.ID, IssueID: f.issue.ID,
+		WorkspaceID: f.workspace.ID, IssueID: &f.issue.ID,
 		RepoOwner: "tk-owner", RepoName: "tk-repo", Number: 1,
 		State: "merged", CloseIntent: true, HeadBranch: first.HeadBranch,
 		Source: "platform", GithubUpdatedAt: pgTime(t),
@@ -109,7 +109,7 @@ func TestUpsertPullRequestIsIdempotentAndOrdered(t *testing.T) {
 	}
 	newer := time.Now().UTC().Add(time.Minute).Truncate(time.Second)
 	merged, err := s.RecordPullRequest(ctx, db.InsertPullRequestParams{
-		WorkspaceID: f.workspace.ID, IssueID: f.issue.ID,
+		WorkspaceID: f.workspace.ID, IssueID: &f.issue.ID,
 		RepoOwner: "tk-owner", RepoName: "tk-repo", Number: 7,
 		State: "merged", CloseIntent: true, HeadBranch: first.HeadBranch,
 		Source: "platform", GithubUpdatedAt: &newer,
@@ -124,7 +124,7 @@ func TestUpsertPullRequestIsIdempotentAndOrdered(t *testing.T) {
 	// A stale event (older than what is stored) must not roll the state back.
 	stale := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
 	staleRow, err := s.RecordPullRequest(ctx, db.InsertPullRequestParams{
-		WorkspaceID: f.workspace.ID, IssueID: f.issue.ID,
+		WorkspaceID: f.workspace.ID, IssueID: &f.issue.ID,
 		RepoOwner: "tk-owner", RepoName: "tk-repo", Number: 7,
 		State: "open", CloseIntent: true, HeadBranch: first.HeadBranch,
 		Source: "platform", GithubUpdatedAt: &stale,
@@ -194,4 +194,106 @@ func TestSuppressPullRequestFreesTheSlot(t *testing.T) {
 		t.Errorf("rows = %d, want 2 (the tombstone keeps its history)", len(rows))
 	}
 	_ = uuid.Nil
+}
+
+// A webhook for a PR nobody linked is recorded as a repo-scoped row, not
+// ignored and not turned into an issue.
+func TestApplyStateRecordsUnlinkedPullRequest(t *testing.T) {
+	s, pool := openTestStore(t)
+	ctx := context.Background()
+	f := seedTaskFixture(t, ctx, s, pool)
+	svc := NewPullRequestService(s)
+
+	ev := GitHubPullRequestEvent{
+		Action: "opened", InstallationID: f.installationID,
+		RepoOwner: "tk-owner", RepoName: "tk-repo", Number: 33,
+		Title: "external change", Body: "body", State: "open",
+		HeadBranch: "someone/fix", BaseBranch: "main", HeadSHA: "abc123",
+		Author: "alice", AuthorAssociation: "MEMBER", HeadRepo: "tk-owner/tk-repo",
+		Additions: 10, Deletions: 2, ChangedFiles: 1,
+		HTMLURL:   "https://github.com/tk-owner/tk-repo/pull/33",
+		UpdatedAt: time.Now().UTC().Truncate(time.Second),
+	}
+	if err := svc.ApplyState(ctx, ev); err != nil {
+		t.Fatalf("ApplyState: %v", err)
+	}
+	row, err := s.GetPullRequestByNumber(ctx, db.GetPullRequestByNumberParams{
+		WorkspaceID: f.workspace.ID, RepoOwner: "tk-owner", RepoName: "tk-repo", Number: 33,
+	})
+	if err != nil {
+		t.Fatalf("get row: %v", err)
+	}
+	if row.IssueID != nil {
+		t.Fatalf("issue_id = %v, want NULL", row.IssueID)
+	}
+	if row.Source != "github" {
+		t.Fatalf("source = %q, want github", row.Source)
+	}
+	if row.HeadSha != "abc123" {
+		t.Fatalf("head_sha = %q, want abc123", row.HeadSha)
+	}
+	if row.CloseIntent {
+		t.Fatal("a webhook-discovered PR must not claim closing intent")
+	}
+}
+
+// A webhook refresh must not clear a link a human or the platform wrote, and a
+// stale event must not roll head_sha or state back.
+func TestApplyStateKeepsExistingLinkOnWebhookRefresh(t *testing.T) {
+	s, pool := openTestStore(t)
+	ctx := context.Background()
+	f := seedTaskFixture(t, ctx, s, pool)
+	svc := NewPullRequestService(s)
+
+	first, err := s.RecordPullRequest(ctx, prParams(t, f, 44, "open", true))
+	if err != nil {
+		t.Fatalf("seed linked PR: %v", err)
+	}
+
+	newer := time.Now().UTC().Add(time.Minute).Truncate(time.Second)
+	ev := GitHubPullRequestEvent{
+		Action: "synchronize", InstallationID: f.installationID,
+		RepoOwner: "tk-owner", RepoName: "tk-repo", Number: 44,
+		Title: "updated", State: "open", HeadBranch: first.HeadBranch,
+		BaseBranch: "main", HeadSHA: "def456", Author: "gitsquad[bot]",
+		HTMLURL: first.Url, UpdatedAt: newer,
+	}
+	if err := svc.ApplyState(ctx, ev); err != nil {
+		t.Fatalf("ApplyState: %v", err)
+	}
+	row, err := s.GetPullRequestByNumber(ctx, db.GetPullRequestByNumberParams{
+		WorkspaceID: f.workspace.ID, RepoOwner: "tk-owner", RepoName: "tk-repo", Number: 44,
+	})
+	if err != nil {
+		t.Fatalf("get row: %v", err)
+	}
+	if row.IssueID == nil || *row.IssueID != f.issue.ID {
+		t.Fatalf("issue_id = %v, want %v", row.IssueID, f.issue.ID)
+	}
+	if row.Source != "platform" {
+		t.Fatalf("source = %q, want platform", row.Source)
+	}
+	if !row.CloseIntent {
+		t.Fatal("close_intent was cleared by a webhook")
+	}
+	if row.HeadSha != "def456" {
+		t.Fatalf("head_sha = %q, want def456", row.HeadSha)
+	}
+
+	stale := time.Now().UTC().Add(-time.Hour).Truncate(time.Second)
+	ev.HeadSHA = "old999"
+	ev.UpdatedAt = stale
+	ev.State = "closed"
+	if err := svc.ApplyState(ctx, ev); err != nil {
+		t.Fatalf("ApplyState stale: %v", err)
+	}
+	row, err = s.GetPullRequestByNumber(ctx, db.GetPullRequestByNumberParams{
+		WorkspaceID: f.workspace.ID, RepoOwner: "tk-owner", RepoName: "tk-repo", Number: 44,
+	})
+	if err != nil {
+		t.Fatalf("get row after stale: %v", err)
+	}
+	if row.HeadSha != "def456" || row.State != "open" {
+		t.Fatalf("stale event rolled back: sha=%q state=%q", row.HeadSha, row.State)
+	}
 }

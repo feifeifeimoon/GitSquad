@@ -2,6 +2,13 @@
 INSERT INTO agents (workspace_id, name, description, instructions, model, runtime_id, enabled, avatar_url, head_shape, created_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 
+-- name: GetAgentWithRuntime :one
+SELECT a.id, a.workspace_id, a.name, a.instructions, a.model, a.enabled,
+       ar.daemon_id AS runtime_daemon_id, ar.provider AS runtime_provider
+FROM agents a
+JOIN agent_runtimes ar ON ar.id = a.runtime_id
+WHERE a.id = $1 AND a.workspace_id = $2;
+
 -- Workload counts and the in-flight issue ride along on every agent read so the
 -- list can show a live status without a per-agent round trip. A claimed task
 -- sits in 'dispatched' until the daemon reports "started", but it is already

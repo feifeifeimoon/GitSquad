@@ -30,6 +30,18 @@ type fakeGit struct {
 func (f *fakeGit) CloneOrFetch(_ context.Context, _ string, _ string, _ Credential) error {
 	return f.cloneErr
 }
+func (f *fakeGit) FetchPullRequest(_ context.Context, _ string, _ int, _ Credential) error {
+	return nil
+}
+func (f *fakeGit) FetchBranch(_ context.Context, _, _ string, _ Credential) error {
+	return nil
+}
+func (f *fakeGit) CheckoutDetached(_ context.Context, _, _ string) error {
+	return nil
+}
+func (f *fakeGit) HeadSHA(_ context.Context, _ string) (string, error) {
+	return "review-sha", nil
+}
 func (f *fakeGit) ResetToDefault(_ context.Context, _ string, _ string) error {
 	f.resetToDefault = true
 	return nil
@@ -111,7 +123,8 @@ func testTask() v1.Task {
 	return v1.Task{
 		ID:          uuid.New(),
 		WorkspaceID: uuid.New(),
-		Issue: v1.TaskIssueContext{
+		Kind:        "issue",
+		Issue: &v1.TaskIssueContext{
 			Key:         "GTS-42",
 			Title:       "login null pointer",
 			Description: "fix it",

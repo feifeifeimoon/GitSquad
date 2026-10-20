@@ -432,6 +432,90 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
 		// what an unpicked agent is supposed to look like.
 		{name: "052_agents_head_shape", sql: `ALTER TABLE agents
 			ADD COLUMN IF NOT EXISTS head_shape TEXT NOT NULL DEFAULT 'gitsquad'`},
+		// PR review is configured per workspace. A NULL agent means the feature
+		// is off; a deleted agent clears the pointer rather than the switch.
+		{name: "053_workspace_pr_review_config", sql: `ALTER TABLE workspaces
+			ADD COLUMN IF NOT EXISTS pr_review_enabled BOOLEAN NOT NULL DEFAULT false,
+			ADD COLUMN IF NOT EXISTS pr_review_agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
+			ADD COLUMN IF NOT EXISTS pr_review_trigger TEXT NOT NULL DEFAULT 'opened'
+				CHECK (pr_review_trigger IN ('opened','push','manual')),
+			ADD COLUMN IF NOT EXISTS pr_review_ignore_drafts BOOLEAN NOT NULL DEFAULT true,
+			ADD COLUMN IF NOT EXISTS pr_review_author_scope TEXT NOT NULL DEFAULT 'collaborators'
+				CHECK (pr_review_author_scope IN ('collaborators','all')),
+			ADD COLUMN IF NOT EXISTS pr_review_include_bots BOOLEAN NOT NULL DEFAULT false,
+			ADD COLUMN IF NOT EXISTS pr_review_inline_comments BOOLEAN NOT NULL DEFAULT true`},
+		// pull_requests stops being only the issue ↔ PR relationship and becomes
+		// the repo-scoped PR registry. issue_id stays the optional binding; a
+		// webhook records the PR without inventing an issue for it. Deleting an
+		// issue unlinks the PR instead of deleting the record.
+		{name: "054_pull_requests_repo_scope", sql: `ALTER TABLE pull_requests ALTER COLUMN issue_id DROP NOT NULL;
+			ALTER TABLE pull_requests DROP CONSTRAINT IF EXISTS pull_requests_issue_id_fkey;
+			ALTER TABLE pull_requests ADD CONSTRAINT pull_requests_issue_id_fkey
+				FOREIGN KEY (issue_id) REFERENCES issues(id) ON DELETE SET NULL;
+			ALTER TABLE pull_requests
+				ADD COLUMN IF NOT EXISTS head_sha TEXT NOT NULL DEFAULT '',
+				ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT '',
+				ADD COLUMN IF NOT EXISTS additions INT NOT NULL DEFAULT 0,
+				ADD COLUMN IF NOT EXISTS deletions INT NOT NULL DEFAULT 0,
+				ADD COLUMN IF NOT EXISTS changed_files INT NOT NULL DEFAULT 0,
+				ADD COLUMN IF NOT EXISTS author_association TEXT NOT NULL DEFAULT '',
+				ADD COLUMN IF NOT EXISTS head_repo TEXT NOT NULL DEFAULT '';
+			DO $$
+			BEGIN
+				ALTER TABLE pull_requests DROP CONSTRAINT IF EXISTS pull_requests_source_check;
+				ALTER TABLE pull_requests ADD CONSTRAINT pull_requests_source_check
+					CHECK (source IN ('platform','branch','body','manual','github')) NOT VALID;
+			END $$;
+			CREATE INDEX IF NOT EXISTS idx_pull_requests_workspace_state
+				ON pull_requests(workspace_id, state, github_updated_at DESC)`},
+		// One row per review run. The partial unique index is the in-flight lock:
+		// a queued/running row must always have a live task, and a terminal task
+		// must release it (see the task failure sweeper and reconciler).
+		{name: "055_pr_reviews", sql: `CREATE TABLE IF NOT EXISTS pr_reviews (
+				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+				workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+				pull_request_id UUID NOT NULL REFERENCES pull_requests(id) ON DELETE CASCADE,
+				task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+				agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
+				head_sha TEXT NOT NULL DEFAULT '',
+				trigger_kind TEXT NOT NULL DEFAULT 'auto' CHECK (trigger_kind IN ('auto','manual')),
+				status TEXT NOT NULL DEFAULT 'queued'
+					CHECK (status IN ('queued','running','completed','failed','cancelled')),
+				summary TEXT NOT NULL DEFAULT '',
+				findings INT NOT NULL DEFAULT 0,
+				github_review_id BIGINT,
+				url TEXT NOT NULL DEFAULT '',
+				error TEXT NOT NULL DEFAULT '',
+				completed_at TIMESTAMPTZ,
+				created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+				updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+			);
+			CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr_created
+				ON pr_reviews(pull_request_id, created_at DESC);
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_one_inflight_review_per_pr
+				ON pr_reviews(pull_request_id) WHERE status IN ('queued','running')`},
+		// A review task has a PR subject and no issue (or both, when the PR is
+		// linked). The issue-side pending rule now only applies to kind='issue',
+		// so a reviewer and an implementer never block each other.
+		{name: "056_tasks_review_subject", sql: `ALTER TABLE tasks ALTER COLUMN issue_id DROP NOT NULL;
+			ALTER TABLE tasks
+				ADD COLUMN IF NOT EXISTS kind TEXT NOT NULL DEFAULT 'issue'
+					CHECK (kind IN ('issue','review')),
+				ADD COLUMN IF NOT EXISTS pull_request_id UUID REFERENCES pull_requests(id) ON DELETE CASCADE;
+			DO $$
+			BEGIN
+				ALTER TABLE tasks DROP CONSTRAINT IF EXISTS tasks_subject_check;
+				ALTER TABLE tasks ADD CONSTRAINT tasks_subject_check
+					CHECK (issue_id IS NOT NULL OR pull_request_id IS NOT NULL) NOT VALID;
+			END $$;
+			DROP INDEX IF EXISTS idx_one_pending_task_per_agent;
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_issue_task_per_agent
+				ON tasks(issue_id, agent_id)
+				WHERE status IN ('queued','dispatched') AND kind = 'issue';
+			CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_review_per_pr
+				ON tasks(pull_request_id)
+				WHERE status IN ('queued','dispatched') AND kind = 'review';
+			CREATE INDEX IF NOT EXISTS idx_tasks_pull_request ON tasks(pull_request_id)`},
 	}
 
 	for _, m := range migrations {

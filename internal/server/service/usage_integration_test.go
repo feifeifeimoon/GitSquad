@@ -261,7 +261,8 @@ func seedTaskForUsage(ctx context.Context, t *testing.T, s *store.Store, wsID, i
 	t.Helper()
 	task, err := s.CreateTask(ctx, db.CreateTaskParams{
 		WorkspaceID:      wsID,
-		IssueID:          issueID,
+		Kind:             "issue",
+		IssueID:          &issueID,
 		AgentID:          agentID,
 		AssignedDaemonID: &daemonID,
 		Provider:         "claude",

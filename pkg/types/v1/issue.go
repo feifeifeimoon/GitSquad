@@ -122,6 +122,8 @@ type PullRequest struct {
 	Active      bool       `json:"active"`
 	MergedAt    *time.Time `json:"merged_at,omitempty"`
 	CreatedAt   time.Time  `json:"created_at"`
+	// LatestReview is the newest review run for this PR, when one exists.
+	LatestReview *PullRequestReview `json:"latest_review,omitempty"`
 }
 
 // IssueComment is one entry in an issue's activity feed. Status changes and

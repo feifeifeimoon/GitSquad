@@ -165,6 +165,19 @@ CREATE TABLE agents (
     UNIQUE (workspace_id, name)
 );
 
+-- PR review configuration. The reviewer agent must belong to the workspace and
+-- have a runtime daemon; that is enforced in the service, not by a composite FK.
+ALTER TABLE workspaces
+    ADD COLUMN pr_review_enabled BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN pr_review_agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
+    ADD COLUMN pr_review_trigger TEXT NOT NULL DEFAULT 'opened'
+        CHECK (pr_review_trigger IN ('opened','push','manual')),
+    ADD COLUMN pr_review_ignore_drafts BOOLEAN NOT NULL DEFAULT true,
+    ADD COLUMN pr_review_author_scope TEXT NOT NULL DEFAULT 'collaborators'
+        CHECK (pr_review_author_scope IN ('collaborators','all')),
+    ADD COLUMN pr_review_include_bots BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN pr_review_inline_comments BOOLEAN NOT NULL DEFAULT true;
+
 -- Who works on an issue. A join table with real foreign keys rather than an
 -- array of names on issues: renaming or deleting an agent used to leave a
 -- dangling name behind, and a cascade cannot go stale.
@@ -199,7 +212,9 @@ CREATE INDEX IF NOT EXISTS idx_skills_workspace ON skills(workspace_id);
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    issue_id UUID REFERENCES issues(id) ON DELETE CASCADE,
+    pull_request_id UUID,
+    kind TEXT NOT NULL DEFAULT 'issue' CHECK (kind IN ('issue','review')),
     agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
     status TEXT NOT NULL DEFAULT 'queued'
         CHECK (status IN ('queued','dispatched','running','completed','failed','cancelled')),
@@ -215,18 +230,23 @@ CREATE TABLE tasks (
     started_at TIMESTAMPTZ,
     completed_at TIMESTAMPTZ,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    CHECK (issue_id IS NOT NULL OR pull_request_id IS NOT NULL)
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_pending
     ON tasks(assigned_daemon_id, priority DESC, created_at ASC)
     WHERE status IN ('queued','dispatched');
 
--- At most one pending task per (issue, agent): an issue may have several
--- agents working in parallel, but the same agent must not be queued twice.
-CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_task_per_agent
+-- At most one pending issue task per (issue, agent); reviews are keyed by PR
+-- instead, so a reviewer and an implementer never block each other.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_issue_task_per_agent
     ON tasks(issue_id, agent_id)
-    WHERE status IN ('queued','dispatched');
+    WHERE status IN ('queued','dispatched') AND kind = 'issue';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_pending_review_per_pr
+    ON tasks(pull_request_id)
+    WHERE status IN ('queued','dispatched') AND kind = 'review';
 
 CREATE INDEX IF NOT EXISTS idx_tasks_workspace ON tasks(workspace_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_tasks_issue ON tasks(issue_id);
@@ -235,15 +255,16 @@ CREATE INDEX IF NOT EXISTS idx_tasks_issue ON tasks(issue_id);
 -- issue in flight — twice per row, so agent_id has to lead. The unique index
 -- above is on (issue_id, agent_id) and holds only pending rows.
 CREATE INDEX IF NOT EXISTS idx_tasks_agent ON tasks(agent_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_pull_request ON tasks(pull_request_id);
 
--- The issue ↔ pull request relationship. One issue has at most one active PR at
--- a time — the one that declares closing intent — and keeps the older ones as
--- history, so the issue page can show how the issue got here. Unrelated PRs are
--- not mirrored; suppressed_at is a tombstone so an explicit unlink survives.
+-- Every pull request in a bound repo is recorded. issue_id is the optional
+-- binding: the platform writes it when it opens a PR, a human writes it when
+-- linking one, and webhooks never bind. suppressed_at is a tombstone so an
+-- explicit unlink survives.
 CREATE TABLE pull_requests (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
-    issue_id UUID NOT NULL REFERENCES issues(id) ON DELETE CASCADE,
+    issue_id UUID REFERENCES issues(id) ON DELETE SET NULL,
     repo_owner TEXT NOT NULL,
     repo_name TEXT NOT NULL,
     number INT NOT NULL,
@@ -254,8 +275,15 @@ CREATE TABLE pull_requests (
     head_branch TEXT NOT NULL DEFAULT '',
     base_branch TEXT NOT NULL DEFAULT '',
     author TEXT NOT NULL DEFAULT '',
+    head_sha TEXT NOT NULL DEFAULT '',
+    body TEXT NOT NULL DEFAULT '',
+    additions INT NOT NULL DEFAULT 0,
+    deletions INT NOT NULL DEFAULT 0,
+    changed_files INT NOT NULL DEFAULT 0,
+    author_association TEXT NOT NULL DEFAULT '',
+    head_repo TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT 'platform'
-        CHECK (source IN ('platform','branch','body','manual')),
+        CHECK (source IN ('platform','branch','body','manual','github')),
     close_intent BOOLEAN NOT NULL DEFAULT false,
     suppressed_at TIMESTAMPTZ,
     merged_at TIMESTAMPTZ,
@@ -270,6 +298,43 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_one_active_closing_pr_per_issue
     WHERE state = 'open' AND close_intent AND suppressed_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_pull_requests_issue ON pull_requests(issue_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_pull_requests_workspace_state
+    ON pull_requests(workspace_id, state, github_updated_at DESC);
+
+-- tasks.pull_request_id is declared as a plain column above because tasks is
+-- created before pull_requests; the FK lands here.
+ALTER TABLE tasks
+    ADD CONSTRAINT tasks_pull_request_id_fkey
+    FOREIGN KEY (pull_request_id) REFERENCES pull_requests(id) ON DELETE CASCADE;
+
+-- One row per review run. An in-flight row is the lock that prevents two
+-- reviews of the same PR at once; completed/failed rows are history and do not
+-- block a manual re-review.
+CREATE TABLE pr_reviews (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+    pull_request_id UUID NOT NULL REFERENCES pull_requests(id) ON DELETE CASCADE,
+    task_id UUID REFERENCES tasks(id) ON DELETE SET NULL,
+    agent_id UUID REFERENCES agents(id) ON DELETE SET NULL,
+    head_sha TEXT NOT NULL DEFAULT '',
+    trigger_kind TEXT NOT NULL DEFAULT 'auto' CHECK (trigger_kind IN ('auto','manual')),
+    status TEXT NOT NULL DEFAULT 'queued'
+        CHECK (status IN ('queued','running','completed','failed','cancelled')),
+    summary TEXT NOT NULL DEFAULT '',
+    findings INT NOT NULL DEFAULT 0,
+    github_review_id BIGINT,
+    url TEXT NOT NULL DEFAULT '',
+    error TEXT NOT NULL DEFAULT '',
+    completed_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_pr_reviews_pr_created
+    ON pr_reviews(pull_request_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_one_inflight_review_per_pr
+    ON pr_reviews(pull_request_id)
+    WHERE status IN ('queued','running');
 
 CREATE TABLE task_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

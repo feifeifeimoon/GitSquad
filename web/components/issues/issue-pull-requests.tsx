@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field } from "@/components/form-field";
+import { reviewStatus } from "@/lib/pr-review";
 import { toast } from "sonner";
 
 /** The colour of a PR's state, in one place rather than a chain of ternaries. */
@@ -27,6 +28,7 @@ function PullRequestRow({
   onRestore?: (pr: PullRequest) => void;
 }) {
   const stateClass = STATE_CLASS[pr.state] ?? STATE_CLASS.open;
+  const review = pr.latest_review ? reviewStatus(pr.latest_review) : null;
   return (
     <div className="flex items-start gap-2 text-copy" data-testid={`pull-request-${pr.number}`}>
       <GitPullRequest className={`mt-0.5 size-3.5 shrink-0 ${stateClass}`} />
@@ -48,6 +50,26 @@ function PullRequestRow({
             <span className="font-mono text-[11px] text-mute">unlinked</span>
           )}
         </div>
+        {review && (
+          <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
+            <span className={review.tone}>{review.label}</span>
+            {pr.latest_review?.status === "completed" && (
+              <span className="text-mute">
+                {pr.latest_review.findings} findings
+              </span>
+            )}
+            {pr.latest_review?.url && (
+              <a
+                href={pr.latest_review.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-link hover:text-link-deep"
+              >
+                review ↗
+              </a>
+            )}
+          </div>
+        )}
       </div>
       {!pr.suppressed && onUnlink && (
         <button

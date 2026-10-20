@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -18,9 +19,11 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/store"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/db"
 	"github.com/feifeifeimoon/GitSquad/internal/server/store/memory"
+	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/go-github/v68/github"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"golang.org/x/oauth2"
 )
 
@@ -32,11 +35,17 @@ type GitHubAppService struct {
 	pending *memory.PendingInstallationStore
 	// pullRequests receives pull_request webhooks; nil disables the sync.
 	pullRequests *PullRequestService
+	// reviews receives the same events after the PR is recorded; nil disables
+	// automatic review dispatch.
+	reviews *ReviewService
 }
 
 // SetPullRequests wires the issue ↔ PR relationship in. The webhook is one of
 // its entries, so the GitHub service is how GitHub's events reach it.
 func (s *GitHubAppService) SetPullRequests(p *PullRequestService) { s.pullRequests = p }
+
+// SetReviews wires automatic review dispatch in; nil disables it.
+func (s *GitHubAppService) SetReviews(r *ReviewService) { s.reviews = r }
 
 func NewGitHubAppService(s *store.Store, cfg config.Config, pending *memory.PendingInstallationStore) *GitHubAppService {
 	return &GitHubAppService{store: s, cfg: cfg, pending: pending}
@@ -211,7 +220,38 @@ func (s *GitHubAppService) FetchPullRequest(ctx context.Context, installationDBI
 	if err != nil {
 		return FetchedPullRequest{}, err
 	}
+	return fetchedPullRequest(pr), nil
+}
 
+// ListOpenPullRequests reads the first page of open PRs, newest first. The
+// enable-time backfill uses it to populate the console's list without reviewing
+// anything: existing PRs become rows, not queued reviews.
+func (s *GitHubAppService) ListOpenPullRequests(ctx context.Context, installationDBID uuid.UUID, owner, repo string) ([]FetchedPullRequest, error) {
+	inst, err := s.store.GetInstallationByDBID(ctx, installationDBID)
+	if err != nil {
+		return nil, fmt.Errorf("get installation: %w", err)
+	}
+	client, err := s.newInstallationClient(ctx, inst.InstallationID)
+	if err != nil {
+		return nil, err
+	}
+	prs, _, err := client.PullRequests.List(ctx, owner, repo, &github.PullRequestListOptions{
+		State:       "open",
+		Sort:        "updated",
+		Direction:   "desc",
+		ListOptions: github.ListOptions{PerPage: 100},
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]FetchedPullRequest, 0, len(prs))
+	for _, pr := range prs {
+		out = append(out, fetchedPullRequest(pr))
+	}
+	return out, nil
+}
+
+func fetchedPullRequest(pr *github.PullRequest) FetchedPullRequest {
 	state := "open"
 	if pr.GetMerged() {
 		state = "merged"
@@ -224,17 +264,24 @@ func (s *GitHubAppService) FetchPullRequest(ctx context.Context, installationDBI
 		mergedAt = &t
 	}
 	return FetchedPullRequest{
-		Number:     int32(pr.GetNumber()),
-		Title:      pr.GetTitle(),
-		URL:        pr.GetHTMLURL(),
-		State:      state,
-		Draft:      pr.GetDraft(),
-		HeadBranch: pr.GetHead().GetRef(),
-		BaseBranch: pr.GetBase().GetRef(),
-		Author:     pr.GetUser().GetLogin(),
-		MergedAt:   mergedAt,
-		UpdatedAt:  pr.GetUpdatedAt().Time,
-	}, nil
+		Number:            int32(pr.GetNumber()),
+		Title:             pr.GetTitle(),
+		URL:               pr.GetHTMLURL(),
+		State:             state,
+		Draft:             pr.GetDraft(),
+		HeadBranch:        pr.GetHead().GetRef(),
+		BaseBranch:        pr.GetBase().GetRef(),
+		Author:            pr.GetUser().GetLogin(),
+		MergedAt:          mergedAt,
+		UpdatedAt:         pr.GetUpdatedAt().Time,
+		Body:              pr.GetBody(),
+		HeadSHA:           pr.GetHead().GetSHA(),
+		Additions:         pr.GetAdditions(),
+		Deletions:         pr.GetDeletions(),
+		ChangedFiles:      pr.GetChangedFiles(),
+		AuthorAssociation: pr.GetAuthorAssociation(),
+		HeadRepo:          pr.GetHead().GetRepo().GetFullName(),
+	}
 }
 
 // CreatePullRequest opens a PR on the installation's repo and returns its number.
@@ -298,13 +345,19 @@ func (s *GitHubAppService) VerifyWebhook(body []byte, signature string) bool {
 // ProcessWebhook persists a webhook event and triggers side effects
 // for installation-related events.
 func (s *GitHubAppService) ProcessWebhook(ctx context.Context, deliveryID, eventType, action string, payload []byte) error {
-	// Persist event (idempotent via github_delivery_id UNIQUE).
-	if err := s.store.CreateWebhookEvent(ctx, db.CreateWebhookEventParams{
+	// Persist event (idempotent via github_delivery_id UNIQUE). A redelivery
+	// returns no row; running its side effects again is what duplicated reviews
+	// and comments.
+	if _, err := s.store.CreateWebhookEvent(ctx, db.CreateWebhookEventParams{
 		GithubDeliveryID: &deliveryID,
 		EventType:        eventType,
 		Action:           &action,
 		Payload:          payload,
 	}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			slog.Info("duplicate webhook delivery ignored", "delivery_id", deliveryID)
+			return nil
+		}
 		slog.Warn("persist webhook event", "delivery_id", deliveryID, "error", err)
 		return fmt.Errorf("persist webhook: %w", err)
 	}
@@ -358,25 +411,39 @@ func (s *GitHubAppService) handlePullRequest(ctx context.Context, payload []byte
 		installationID = inst.GetID()
 	}
 
-	err := s.pullRequests.ApplyState(ctx, GitHubPullRequestEvent{
-		InstallationID: installationID,
-		RepoOwner:      repo.GetOwner().GetLogin(),
-		RepoName:       repo.GetName(),
-		Number:         int32(ev.GetNumber()),
-		Title:          pr.GetTitle(),
-		State:          pr.GetState(),
-		Merged:         pr.GetMerged(),
-		Draft:          pr.GetDraft(),
-		HeadBranch:     pr.GetHead().GetRef(),
-		BaseBranch:     pr.GetBase().GetRef(),
-		Author:         pr.GetUser().GetLogin(),
-		HTMLURL:        pr.GetHTMLURL(),
-		UpdatedAt:      pr.GetUpdatedAt().Time,
-	})
-	if err != nil {
+	prEvent := GitHubPullRequestEvent{
+		Action:            ev.GetAction(),
+		InstallationID:    installationID,
+		RepoOwner:         repo.GetOwner().GetLogin(),
+		RepoName:          repo.GetName(),
+		Number:            int32(ev.GetNumber()),
+		Title:             pr.GetTitle(),
+		Body:              pr.GetBody(),
+		State:             pr.GetState(),
+		Merged:            pr.GetMerged(),
+		Draft:             pr.GetDraft(),
+		HeadBranch:        pr.GetHead().GetRef(),
+		BaseBranch:        pr.GetBase().GetRef(),
+		HeadSHA:           pr.GetHead().GetSHA(),
+		Author:            pr.GetUser().GetLogin(),
+		AuthorAssociation: pr.GetAuthorAssociation(),
+		HeadRepo:          pr.GetHead().GetRepo().GetFullName(),
+		Additions:         pr.GetAdditions(),
+		Deletions:         pr.GetDeletions(),
+		ChangedFiles:      pr.GetChangedFiles(),
+		HTMLURL:           pr.GetHTMLURL(),
+		UpdatedAt:         pr.GetUpdatedAt().Time,
+	}
+	if err := s.pullRequests.ApplyState(ctx, prEvent); err != nil {
 		// The event is already persisted in webhook_events, so a failure here
 		// is recoverable by replaying it — never silent.
 		slog.Error("sync pull request", "number", ev.GetNumber(), "action", ev.GetAction(), "error", err)
+		return
+	}
+	if s.reviews != nil {
+		if err := s.reviews.HandlePullRequest(ctx, prEvent); err != nil {
+			slog.Error("dispatch pull request review", "number", ev.GetNumber(), "action", ev.GetAction(), "error", err)
+		}
 	}
 }
 
@@ -565,10 +632,14 @@ type appTokenSource struct {
 }
 
 func (s *appTokenSource) Token() (*oauth2.Token, error) {
+	// GitHub rejects an exp more than 10 minutes out and compares it against
+	// its own clock, so a JWT signed at exactly +10m fails on a machine whose
+	// clock is slightly fast. iat goes back a minute and exp stays under the
+	// ceiling.
 	now := time.Now()
 	claims := jwt.MapClaims{
-		"iat": now.Unix(),
-		"exp": now.Add(10 * time.Minute).Unix(),
+		"iat": now.Add(-time.Minute).Unix(),
+		"exp": now.Add(8 * time.Minute).Unix(),
 		"iss": s.appID,
 	}
 	tok := jwt.NewWithClaims(jwt.SigningMethodRS256, claims)
@@ -577,4 +648,65 @@ func (s *appTokenSource) Token() (*oauth2.Token, error) {
 		return nil, fmt.Errorf("sign jwt: %w", err)
 	}
 	return &oauth2.Token{AccessToken: signed, TokenType: "Bearer"}, nil
+}
+
+// CreatePullRequestReview posts a COMMENT review pinned to the commit the
+// reviewer actually read. commit_id is mandatory: omitting it makes GitHub
+// validate the comment anchors against whatever the PR head is at request time,
+// so a push during the review turns the whole review into a 422.
+func (s *GitHubAppService) CreatePullRequestReview(
+	ctx context.Context,
+	installationID int64,
+	owner, repo string,
+	number int,
+	reviewedSHA, body string,
+	comments []v1.ReviewComment,
+	inline bool,
+) (*github.PullRequestReview, error) {
+	client, err := s.newInstallationClient(ctx, installationID)
+	if err != nil {
+		return nil, err
+	}
+	req := &github.PullRequestReviewRequest{
+		CommitID: github.Ptr(reviewedSHA),
+		Body:     github.Ptr(body),
+		Event:    github.Ptr("COMMENT"),
+	}
+	if inline {
+		for _, comment := range comments {
+			req.Comments = append(req.Comments, &github.DraftReviewComment{
+				Path: github.Ptr(comment.Path),
+				Line: github.Ptr(comment.Line),
+				Side: github.Ptr("RIGHT"),
+				Body: github.Ptr(comment.Body),
+			})
+		}
+	}
+	review, _, err := client.PullRequests.CreateReview(ctx, owner, repo, number, req)
+	return review, err
+}
+
+// ListChangedPaths returns the PR's changed file paths. The caller uses it to
+// drop inline comments for files the review cannot anchor to; line-level
+// mistakes still fall through to the 422 retry.
+func (s *GitHubAppService) ListChangedPaths(ctx context.Context, installationID int64, owner, repo string, number int) (map[string]bool, error) {
+	client, err := s.newInstallationClient(ctx, installationID)
+	if err != nil {
+		return nil, err
+	}
+	files, _, err := client.PullRequests.ListFiles(ctx, owner, repo, number, &github.ListOptions{PerPage: 100})
+	if err != nil {
+		return nil, err
+	}
+	paths := make(map[string]bool, len(files))
+	for _, file := range files {
+		paths[file.GetFilename()] = true
+	}
+	return paths, nil
+}
+
+func isGitHub422(err error) bool {
+	var response *github.ErrorResponse
+	return errors.As(err, &response) && response.Response != nil &&
+		response.Response.StatusCode == http.StatusUnprocessableEntity
 }

@@ -114,7 +114,8 @@ func TestDaemonDetailAndAgentStatusIntegration(t *testing.T) {
 	}
 	if _, err := s.CreateTask(ctx, db.CreateTaskParams{
 		WorkspaceID:      ws.ID,
-		IssueID:          issue.ID,
+		Kind:             "issue",
+		IssueID:          &issue.ID,
 		AgentID:          agent.ID,
 		AssignedDaemonID: &daemon.ID,
 		Provider:         "claude",

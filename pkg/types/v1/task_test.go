@@ -12,7 +12,8 @@ func TestTaskJSONRoundTrip(t *testing.T) {
 	task := Task{
 		ID:          uuid.New(),
 		WorkspaceID: uuid.New(),
-		Issue: TaskIssueContext{
+		Kind:        "issue",
+		Issue: &TaskIssueContext{
 			ID:          uuid.New(),
 			Key:         "GTS-42",
 			Title:       "login null pointer",

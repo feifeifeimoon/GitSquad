@@ -23,7 +23,8 @@ import (
 func TestTaskContextRoundTrip(t *testing.T) {
 	in := v1.Task{
 		WorkspaceID: uuid.New(),
-		Issue: v1.TaskIssueContext{
+		Kind:        "issue",
+		Issue: &v1.TaskIssueContext{
 			Key:         "GTS-1",
 			Title:       "fix",
 			Description: "desc",
@@ -162,7 +163,9 @@ func (f taskFixture) contextJSON() []byte {
 func (f taskFixture) createTask(t *testing.T, ctx context.Context, s *store.Store) db.Task {
 	t.Helper()
 	task, err := s.CreateTask(ctx, db.CreateTaskParams{
-		WorkspaceID: f.workspace.ID, IssueID: f.issue.ID, AgentID: f.agent.ID,
+		WorkspaceID: f.workspace.ID,
+		Kind:        "issue",
+		IssueID:     &f.issue.ID, AgentID: f.agent.ID,
 		AssignedDaemonID: &f.daemon.ID, Provider: "claude", Context: f.contextJSON(),
 	})
 	if err != nil {

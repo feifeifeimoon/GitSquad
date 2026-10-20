@@ -57,10 +57,11 @@ func (q *Queries) CreateInstallation(ctx context.Context, arg CreateInstallation
 	return i, err
 }
 
-const createWebhookEvent = `-- name: CreateWebhookEvent :exec
+const createWebhookEvent = `-- name: CreateWebhookEvent :one
 INSERT INTO webhook_events (github_delivery_id, event_type, action, payload)
 VALUES ($1, $2, $3, $4)
 ON CONFLICT (github_delivery_id) DO NOTHING
+RETURNING id, github_delivery_id, event_type, action, payload, processed, created_at
 `
 
 type CreateWebhookEventParams struct {
@@ -70,14 +71,24 @@ type CreateWebhookEventParams struct {
 	Payload          []byte  `json:"payload"`
 }
 
-func (q *Queries) CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) error {
-	_, err := q.db.Exec(ctx, createWebhookEvent,
+func (q *Queries) CreateWebhookEvent(ctx context.Context, arg CreateWebhookEventParams) (WebhookEvent, error) {
+	row := q.db.QueryRow(ctx, createWebhookEvent,
 		arg.GithubDeliveryID,
 		arg.EventType,
 		arg.Action,
 		arg.Payload,
 	)
-	return err
+	var i WebhookEvent
+	err := row.Scan(
+		&i.ID,
+		&i.GithubDeliveryID,
+		&i.EventType,
+		&i.Action,
+		&i.Payload,
+		&i.Processed,
+		&i.CreatedAt,
+	)
+	return i, err
 }
 
 const deleteReposNotInList = `-- name: DeleteReposNotInList :exec

@@ -554,20 +554,45 @@ func (s *IssueService) GetIssue(ctx context.Context, workspaceID, issueID uuid.U
 	if err != nil {
 		slog.Warn("list pull requests for issue", "issue", issueID, "error", err)
 	}
-	detail.Issue.PullRequests = pullRequestsToResponse(prRows)
+	detail.Issue.PullRequests = s.pullRequestsToResponse(ctx, prRows)
 
 	return &detail, nil
 }
 
 // pullRequestsToResponse maps PR rows to the API shape, flagging which one is
-// the issue's active PR so clients do not have to re-derive the rule.
-func pullRequestsToResponse(rows []db.PullRequest) []v1.PullRequest {
+// the issue's active PR so clients do not have to re-derive the rule, and
+// attaching the latest review when one exists.
+func (s *IssueService) pullRequestsToResponse(ctx context.Context, rows []db.PullRequest) []v1.PullRequest {
 	if len(rows) == 0 {
 		return nil
 	}
 	out := make([]v1.PullRequest, 0, len(rows))
+	ids := make([]uuid.UUID, 0, len(rows))
 	for _, r := range rows {
 		out = append(out, PullRequestResponse(r))
+		ids = append(ids, r.ID)
+	}
+	reviews, err := s.store.LatestReviewsByPullRequestIDs(ctx, ids)
+	if err != nil {
+		slog.Warn("latest reviews for issue", "error", err)
+		return out
+	}
+	byID := make(map[uuid.UUID]db.LatestReviewsByPullRequestIDsRow, len(reviews))
+	for _, review := range reviews {
+		byID[review.PullRequestID] = review
+	}
+	for i := range out {
+		review, ok := byID[rows[i].ID]
+		if !ok {
+			continue
+		}
+		out[i].LatestReview = &v1.PullRequestReview{
+			ID: review.ID, Status: review.Status, AgentName: review.AgentName,
+			HeadSHA: review.HeadSha, Summary: review.Summary,
+			Findings: review.Findings, URL: review.Url,
+			Stale:     review.HeadSha != "" && review.HeadSha != rows[i].HeadSha,
+			CreatedAt: review.CreatedAt,
+		}
 	}
 	return out
 }

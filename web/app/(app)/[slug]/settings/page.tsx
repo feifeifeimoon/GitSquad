@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { ErrorState } from "@/components/error-state";
+import { PRReviewCard } from "@/components/settings/pr-review-card";
 import {
   SettingRow,
   SettingSection,
@@ -193,6 +194,8 @@ export default function WorkspaceSettingsPage() {
             />
           </SettingRow>
         </SettingSection>
+
+        <PRReviewCard workspace={workspace} />
 
         <SettingSection
           title="Danger Zone"

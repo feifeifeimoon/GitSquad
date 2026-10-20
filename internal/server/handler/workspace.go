@@ -216,3 +216,40 @@ func (h *WorkspaceHandler) UpdateAvatar(c *gin.Context) {
 
 	c.JSON(http.StatusOK, v1.SuccessResponse(map[string]string{"avatar_url": req.AvatarURL}, 0))
 }
+
+// UpdatePRReview handles PATCH /api/v1/workspaces/:id/pr-review (id = UUID or slug).
+func (h *WorkspaceHandler) UpdatePRReview(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("login required"))
+		return
+	}
+
+	workspace, err := h.workspaces.ResolveWorkspace(c.Request.Context(), user.ID, c.Param("id"))
+	if err != nil {
+		c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
+		return
+	}
+
+	var req v1.PRReviewConfig
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid request body"))
+		return
+	}
+
+	updated, err := h.workspaces.UpdatePRReview(c.Request.Context(), user.ID, workspace.ID, req)
+	if err != nil {
+		switch {
+		case errors.Is(err, service.ErrReviewerNotRunnable), errors.Is(err, service.ErrInvalidReviewConfig):
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse(err.Error()))
+		case errors.Is(err, service.ErrWorkspaceNotFound):
+			c.JSON(http.StatusNotFound, v1.ErrorResponse("workspace not found"))
+		default:
+			slog.Error("update pr review config", "error", err)
+			c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to update review config"))
+		}
+		return
+	}
+
+	c.JSON(http.StatusOK, v1.SuccessResponse(updated, 0))
+}
