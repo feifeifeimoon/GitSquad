@@ -200,3 +200,68 @@ func TestHandlePullRequestSkipsDraftThenReviewsReady(t *testing.T) {
 		t.Fatalf("ready review status = %q, want queued", review.Status)
 	}
 }
+
+func TestListWorkspacePullRequestsIncludesReviewTokens(t *testing.T) {
+	s, pool := openTestStore(t)
+	ctx := context.Background()
+	f := seedTaskFixture(t, ctx, s, pool)
+
+	pr, err := s.RecordRepoPullRequest(ctx, db.InsertRepoPullRequestParams{
+		WorkspaceID: f.workspace.ID, RepoOwner: "tk-owner", RepoName: "tk-repo",
+		Number: 81, Title: "Review token accounting", State: "open", HeadSha: "sha-81",
+		GithubUpdatedAt: pgTime(t),
+	})
+	if err != nil {
+		t.Fatalf("seed PR: %v", err)
+	}
+	review, err := s.CreatePRReview(ctx, db.CreatePRReviewParams{
+		WorkspaceID: f.workspace.ID, PullRequestID: pr.ID, AgentID: &f.agent.ID,
+		HeadSha: "sha-81", TriggerKind: "auto",
+	})
+	if err != nil {
+		t.Fatalf("seed review: %v", err)
+	}
+	task, err := s.CreateTask(ctx, db.CreateTaskParams{
+		WorkspaceID: f.workspace.ID, PullRequestID: &pr.ID, Kind: "review",
+		AgentID: f.agent.ID, AssignedDaemonID: &f.daemon.ID, Provider: "claude",
+		Context: []byte(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("seed task: %v", err)
+	}
+	if err := s.SetPRReviewTask(ctx, db.SetPRReviewTaskParams{ID: review.ID, TaskID: &task.ID}); err != nil {
+		t.Fatalf("attach review task: %v", err)
+	}
+	if _, err := s.MarkReviewCompleted(ctx, db.MarkReviewCompletedParams{
+		Column1: task.ID, Summary: "ok", Findings: 2,
+		Url: "https://example.test/review", HeadSha: "sha-81",
+	}); err != nil {
+		t.Fatalf("complete review: %v", err)
+	}
+	if _, err := pool.Exec(ctx, `INSERT INTO task_usage
+		(task_id, provider, model, input_tokens, output_tokens, cache_read_tokens, cache_write_tokens)
+		VALUES ($1, 'claude', 'test-model', 10, 5, 0, 0)`, task.ID); err != nil {
+		t.Fatalf("seed usage: %v", err)
+	}
+
+	list, err := NewPullRequestService(s).ListWorkspacePullRequests(ctx, f.workspace.ID, "open", 100)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	for _, item := range list {
+		if item.Number != 81 {
+			continue
+		}
+		if item.LatestReview == nil {
+			t.Fatal("latest review missing")
+		}
+		if item.LatestReview.Tokens != 15 {
+			t.Fatalf("tokens = %d, want 15", item.LatestReview.Tokens)
+		}
+		if item.LatestReview.Findings != 2 {
+			t.Fatalf("findings = %d, want 2", item.LatestReview.Findings)
+		}
+		return
+	}
+	t.Fatal("PR 81 not in the list")
+}

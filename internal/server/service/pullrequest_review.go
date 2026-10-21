@@ -221,7 +221,17 @@ func (s *ReviewService) Complete(ctx context.Context, task db.Task, report v1.Ta
 		slog.Warn("review has no head sha; using dispatch-time sha", "task", task.ID)
 	}
 
+	inline := true
+	if cfg, err := s.store.GetWorkspacePRReviewConfig(ctx, task.WorkspaceID); err != nil {
+		slog.Warn("read review config; keeping inline comments", "task", task.ID, "error", err)
+	} else {
+		inline = cfg.PrReviewInlineComments
+	}
+
 	comments := append([]v1.ReviewComment(nil), summary.Review.Comments...)
+	if !inline {
+		comments = nil
+	}
 	if len(comments) > 0 {
 		paths, err := s.github.ListChangedPaths(ctx, inst.InstallationID, pr.RepoOwner, pr.RepoName, int(pr.Number))
 		if err != nil {
@@ -239,7 +249,7 @@ func (s *ReviewService) Complete(ctx context.Context, task db.Task, report v1.Ta
 	}
 
 	body := formatReviewBody(full.Agent.Name, summary.Review.Summary, reviewedSHA)
-	review, err := s.github.CreatePullRequestReview(ctx, inst.InstallationID, pr.RepoOwner, pr.RepoName, int(pr.Number), reviewedSHA, body, comments, true)
+	review, err := s.github.CreatePullRequestReview(ctx, inst.InstallationID, pr.RepoOwner, pr.RepoName, int(pr.Number), reviewedSHA, body, comments, inline)
 	if err != nil && isGitHub422(err) && len(comments) > 0 {
 		dropped := len(comments)
 		body += fmt.Sprintf("\n\n_%d inline comments could not be anchored to the diff._", dropped)

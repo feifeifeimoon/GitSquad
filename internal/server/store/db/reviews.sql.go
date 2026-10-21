@@ -338,6 +338,39 @@ func (q *Queries) ListReviewsByPullRequest(ctx context.Context, pullRequestID uu
 	return items, nil
 }
 
+const listTaskUsageTotals = `-- name: ListTaskUsageTotals :many
+SELECT task_id,
+       SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens)::bigint AS tokens
+FROM task_usage
+WHERE task_id = ANY($1::uuid[])
+GROUP BY task_id
+`
+
+type ListTaskUsageTotalsRow struct {
+	TaskID uuid.UUID `json:"task_id"`
+	Tokens int64     `json:"tokens"`
+}
+
+func (q *Queries) ListTaskUsageTotals(ctx context.Context, dollar_1 []uuid.UUID) ([]ListTaskUsageTotalsRow, error) {
+	rows, err := q.db.Query(ctx, listTaskUsageTotals, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListTaskUsageTotalsRow
+	for rows.Next() {
+		var i ListTaskUsageTotalsRow
+		if err := rows.Scan(&i.TaskID, &i.Tokens); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markReviewCompleted = `-- name: MarkReviewCompleted :one
 UPDATE pr_reviews SET
     status = 'completed',

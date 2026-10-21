@@ -76,3 +76,10 @@ ORDER BY pr.pull_request_id, pr.created_at DESC;
 -- name: GetTaskUsageTotal :one
 SELECT COALESCE(SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens), 0)::bigint AS tokens
 FROM task_usage WHERE task_id = $1::uuid;
+
+-- name: ListTaskUsageTotals :many
+SELECT task_id,
+       SUM(input_tokens + output_tokens + cache_read_tokens + cache_write_tokens)::bigint AS tokens
+FROM task_usage
+WHERE task_id = ANY($1::uuid[])
+GROUP BY task_id;

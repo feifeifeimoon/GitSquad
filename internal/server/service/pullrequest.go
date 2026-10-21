@@ -357,6 +357,26 @@ func (s *PullRequestService) ListWorkspacePullRequests(ctx context.Context, work
 		}
 	}
 
+	// One usage query for the whole page; doing it per row turned a 100-row
+	// list into 100 extra round trips on every 15s poll.
+	taskIDs := make([]uuid.UUID, 0, len(latest))
+	for _, review := range latest {
+		if review.TaskID != nil {
+			taskIDs = append(taskIDs, *review.TaskID)
+		}
+	}
+	tokensByTask := map[uuid.UUID]int64{}
+	if len(taskIDs) > 0 {
+		totals, err := s.store.ListTaskUsageTotals(ctx, taskIDs)
+		if err != nil {
+			slog.Warn("review usage totals", "error", err)
+		} else {
+			for _, total := range totals {
+				tokensByTask[total.TaskID] = total.Tokens
+			}
+		}
+	}
+
 	out := make([]v1.PullRequestSummary, 0, len(rows))
 	for _, row := range rows {
 		updatedAt := row.UpdatedAt
@@ -378,12 +398,7 @@ func (s *PullRequestService) ListWorkspacePullRequests(ctx context.Context, work
 		if review, ok := latest[row.ID]; ok {
 			var tokens int64
 			if review.TaskID != nil {
-				n, err := s.store.GetTaskUsageTotal(ctx, *review.TaskID)
-				if err != nil {
-					slog.Warn("review usage total", "review", review.ID, "error", err)
-				} else {
-					tokens = n
-				}
+				tokens = tokensByTask[*review.TaskID]
 			}
 			item.LatestReview = &v1.PullRequestReview{
 				ID: review.ID, Status: review.Status, AgentName: review.AgentName,

@@ -1,12 +1,27 @@
 package runner
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 )
+
+func TestCheckoutPullRequestFetchesBaseBeforeHead(t *testing.T) {
+	git := &fakeGit{}
+	r := New(git, nil, nil, t.TempDir())
+	pr := &v1.TaskPullRequestContext{Number: 7, BaseBranch: "main"}
+	if _, err := r.checkoutPullRequest(context.Background(), t.TempDir(), pr, Credential{}); err != nil {
+		t.Fatalf("checkout: %v", err)
+	}
+	want := "fetch-branch fetch-pr checkout:FETCH_HEAD head-sha"
+	if got := strings.Join(git.calls, " "); got != want {
+		t.Fatalf("calls = %q, want %q (FETCH_HEAD must still point at the PR head)", got, want)
+	}
+}
 
 func TestTriggerPromptReviewUsesPullRequest(t *testing.T) {
 	task := testTask()

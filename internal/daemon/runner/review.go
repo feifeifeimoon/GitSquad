@@ -31,18 +31,9 @@ func (r *Runner) runReview(ctx context.Context, task v1.Task) error {
 	if err := r.git.CloneOrFetch(ctx, wsDir, GitHubCloneURL(task.Repo.Owner, task.Repo.Name), cred); err != nil {
 		return r.fail(ctx, task, nil, "", fmt.Errorf("checkout: %w", err))
 	}
-	if err := r.git.FetchPullRequest(ctx, wsDir, task.PullRequest.Number, cred); err != nil {
-		return r.fail(ctx, task, nil, "", fmt.Errorf("fetch pull request: %w", err))
-	}
-	if err := r.git.FetchBranch(ctx, wsDir, task.PullRequest.BaseBranch, cred); err != nil {
-		return r.fail(ctx, task, nil, "", fmt.Errorf("fetch base branch: %w", err))
-	}
-	if err := r.git.CheckoutDetached(ctx, wsDir, "FETCH_HEAD"); err != nil {
-		return r.fail(ctx, task, nil, "", fmt.Errorf("checkout pull request: %w", err))
-	}
-	sha, err := r.git.HeadSHA(ctx, wsDir)
+	sha, err := r.checkoutPullRequest(ctx, wsDir, task.PullRequest, cred)
 	if err != nil {
-		return r.fail(ctx, task, nil, "", fmt.Errorf("read pull request sha: %w", err))
+		return r.fail(ctx, task, nil, "", err)
 	}
 
 	cleanup, err := neutralizeRepoInstructions(wsDir)
@@ -96,6 +87,27 @@ func (r *Runner) runReview(ctx context.Context, task v1.Task) error {
 		},
 		Usage: usage,
 	})
+}
+
+// checkoutPullRequest fetches the base first and the PR head last. git fetch
+// writes FETCH_HEAD, so checking out FETCH_HEAD after the base fetch would
+// detach to the base branch tip and review the unchanged code instead of the
+// pull request.
+func (r *Runner) checkoutPullRequest(ctx context.Context, dir string, pr *v1.TaskPullRequestContext, cred Credential) (string, error) {
+	if err := r.git.FetchBranch(ctx, dir, pr.BaseBranch, cred); err != nil {
+		return "", fmt.Errorf("fetch base branch: %w", err)
+	}
+	if err := r.git.FetchPullRequest(ctx, dir, pr.Number, cred); err != nil {
+		return "", fmt.Errorf("fetch pull request: %w", err)
+	}
+	if err := r.git.CheckoutDetached(ctx, dir, "FETCH_HEAD"); err != nil {
+		return "", fmt.Errorf("checkout pull request: %w", err)
+	}
+	sha, err := r.git.HeadSHA(ctx, dir)
+	if err != nil {
+		return "", fmt.Errorf("read pull request sha: %w", err)
+	}
+	return sha, nil
 }
 
 // neutralizeRepoInstructions moves every repository-owned agent instruction

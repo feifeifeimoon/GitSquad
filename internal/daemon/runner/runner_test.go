@@ -25,21 +25,27 @@ type fakeGit struct {
 	// resetToDefault / resetToBranch record which starting point the task used.
 	resetToDefault bool
 	resetToBranch  string
+	// calls records the order of the review checkout's git operations.
+	calls []string
 }
 
 func (f *fakeGit) CloneOrFetch(_ context.Context, _ string, _ string, _ Credential) error {
 	return f.cloneErr
 }
 func (f *fakeGit) FetchPullRequest(_ context.Context, _ string, _ int, _ Credential) error {
+	f.calls = append(f.calls, "fetch-pr")
 	return nil
 }
 func (f *fakeGit) FetchBranch(_ context.Context, _, _ string, _ Credential) error {
+	f.calls = append(f.calls, "fetch-branch")
 	return nil
 }
-func (f *fakeGit) CheckoutDetached(_ context.Context, _, _ string) error {
+func (f *fakeGit) CheckoutDetached(_ context.Context, _, ref string) error {
+	f.calls = append(f.calls, "checkout:"+ref)
 	return nil
 }
 func (f *fakeGit) HeadSHA(_ context.Context, _ string) (string, error) {
+	f.calls = append(f.calls, "head-sha")
 	return "review-sha", nil
 }
 func (f *fakeGit) ResetToDefault(_ context.Context, _ string, _ string) error {
