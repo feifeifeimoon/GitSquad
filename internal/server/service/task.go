@@ -43,6 +43,7 @@ type TaskService struct {
 	publisher    EventPublisher
 	waker        DaemonWaker
 	pullRequests *PullRequestService
+	reviews      *ReviewService
 }
 
 func NewTaskService(s *store.Store, github GitHubGateway) *TaskService {
@@ -51,6 +52,9 @@ func NewTaskService(s *store.Store, github GitHubGateway) *TaskService {
 
 // SetPullRequests wires the issue ↔ PR relationship in; nil disables it.
 func (s *TaskService) SetPullRequests(p *PullRequestService) { s.pullRequests = p }
+
+// SetReviews wires review completion in; nil leaves review tasks unwritable.
+func (s *TaskService) SetReviews(r *ReviewService) { s.reviews = r }
 
 // pullRequestURL is GitHub's own URL shape. Building it beats threading a second
 // return value through the GitHub client for something the number already
@@ -115,9 +119,11 @@ func (s *TaskService) Dispatch(ctx context.Context, workspaceID, issueID uuid.UU
 		return fmt.Errorf("list skills: %w", err)
 	}
 
+	issueCtx := buildTaskIssue(issue, comments)
 	contextTask := v1.Task{
+		Kind:        "issue",
 		WorkspaceID: workspaceID,
-		Issue:       buildTaskIssue(issue, comments),
+		Issue:       &issueCtx,
 		// The repository's own default branch, not an assumed "main": the daemon
 		// resets the checkout to it and diffs against it.
 		Repo: v1.TaskRepoContext{Owner: ws.RepoOwner, Name: ws.RepoName, DefaultBranch: ws.RepoDefaultBranch},
@@ -136,7 +142,8 @@ func (s *TaskService) Dispatch(ctx context.Context, workspaceID, issueID uuid.UU
 
 	_, err = s.store.CreateTask(ctx, db.CreateTaskParams{
 		WorkspaceID:      workspaceID,
-		IssueID:          issueID,
+		IssueID:          &issueID,
+		Kind:             "issue",
 		AgentID:          agent.ID,
 		AssignedDaemonID: agent.RuntimeDaemonID,
 		Provider:         agent.RuntimeProvider,
@@ -215,7 +222,7 @@ func (s *TaskService) buildClaim(ctx context.Context, task db.Task) (*v1.Task, e
 	// here, at claim time, because the daemon is stateless — it cannot look up
 	// the issue's PRs, and by the time it could, the agent would already have
 	// started from the wrong base.
-	if s.pullRequests != nil {
+	if task.Kind != "review" && full.Issue != nil && s.pullRequests != nil {
 		if pr, err := s.pullRequests.ActivePullRequest(ctx, full.Issue.ID); err != nil {
 			slog.Warn("resolve active pull request", "issue", full.Issue.ID, "error", err)
 		} else if pr.ID != uuid.Nil && pr.HeadBranch != "" {
@@ -235,6 +242,20 @@ func (s *TaskService) HasPending(ctx context.Context, daemonID uuid.UUID) bool {
 	return ok
 }
 
+// EnqueueReview inserts a review task and wakes its daemon. It is separate from
+// Dispatch because a review has no mention, no issue comment, and no issue-side
+// status change.
+func (s *TaskService) EnqueueReview(ctx context.Context, p db.CreateTaskParams) (db.Task, error) {
+	t, err := s.store.CreateTask(ctx, p)
+	if err != nil {
+		return db.Task{}, err
+	}
+	if t.AssignedDaemonID != nil {
+		s.wake(*t.AssignedDaemonID)
+	}
+	return t, nil
+}
+
 // Report handles a task lifecycle report from a daemon, advancing the state
 // machine and writing progress messages / terminal results.
 func (s *TaskService) Report(ctx context.Context, daemonID uuid.UUID, taskID uuid.UUID, report v1.TaskReport) error {
@@ -245,7 +266,6 @@ func (s *TaskService) Report(ctx context.Context, daemonID uuid.UUID, taskID uui
 	if task.AssignedDaemonID == nil || *task.AssignedDaemonID != daemonID {
 		return errors.New("task not assigned to this daemon")
 	}
-
 	// Usage is recorded before the lifecycle switch, and independently of it.
 	// Two reasons: a report that loses the terminal CAS race still came from the
 	// daemon that ran the task, so its numbers are worth keeping; and a replayed
@@ -261,6 +281,12 @@ func (s *TaskService) Report(ctx context.Context, daemonID uuid.UUID, taskID uui
 		}
 	}
 
+	// Review tasks have their own state machine. The branch comes after usage so
+	// a review run is counted in the ledger like any other run.
+	if task.Kind == "review" {
+		return s.reportReview(ctx, task, report)
+	}
+
 	switch report.Status {
 	case v1.TaskReportStarted:
 		return s.handleStarted(ctx, task)
@@ -270,6 +296,52 @@ func (s *TaskService) Report(ctx context.Context, daemonID uuid.UUID, taskID uui
 		return s.handleCompleted(ctx, task, report)
 	case v1.TaskReportFailed:
 		return s.handleFailed(ctx, task, report)
+	default:
+		return nil
+	}
+}
+
+// reportReview is the review half of the state machine. It never touches an
+// issue's status or comments: the ledger and the PR review are the record.
+func (s *TaskService) reportReview(ctx context.Context, task db.Task, report v1.TaskReport) error {
+	switch report.Status {
+	case v1.TaskReportStarted:
+		if _, err := s.store.MarkTaskRunning(ctx, task.ID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		if _, err := s.store.MarkReviewRunning(ctx, task.ID); err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		return nil
+	case v1.TaskReportRunning:
+		return s.handleProgress(ctx, task, report.Progress)
+	case v1.TaskReportSucceeded:
+		if _, err := s.store.MarkTaskCompleted(ctx, task.ID); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		if s.reviews == nil {
+			return errors.New("review service is not wired")
+		}
+		return s.reviews.Complete(ctx, task, report)
+	case v1.TaskReportFailed:
+		if _, err := s.store.MarkTaskFailed(ctx, db.MarkTaskFailedParams{
+			ID: task.ID, Error: report.Error, FailureReason: util.Ptr("agent_error"),
+		}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+		if s.reviews == nil {
+			return errors.New("review service is not wired")
+		}
+		return s.reviews.Fail(ctx, task, report)
 	default:
 		return nil
 	}
@@ -315,13 +387,33 @@ func (s *TaskService) FailSilentDaemonTasks(ctx context.Context, grace time.Dura
 	if err != nil {
 		return fmt.Errorf("fail silent daemon tasks: %w", err)
 	}
+	var reviewTaskIDs []uuid.UUID
 	for _, task := range failed {
+		if task.Kind == "review" {
+			reviewTaskIDs = append(reviewTaskIDs, task.ID)
+			continue
+		}
+		if task.IssueID == nil {
+			continue
+		}
 		full, err := taskContext(task)
 		if err != nil {
 			continue
 		}
-		_ = s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
+		_ = s.appendComment(ctx, task.WorkspaceID, *task.IssueID, "system", "system",
 			fmt.Sprintf("%s 任务因 daemon 下线而失败。", full.Agent.Name))
+	}
+	if len(reviewTaskIDs) > 0 {
+		if _, err := s.store.FailReviewsForTasks(ctx, db.FailReviewsForTasksParams{
+			Column1: reviewTaskIDs, Error: "runtime_offline",
+		}); err != nil {
+			slog.Warn("fail review ledger rows", "error", err)
+		}
+	}
+	// Releases rows whose task is already terminal (or missing) but whose
+	// review still holds the PR's in-flight slot.
+	if _, err := s.store.ReconcileReviewStates(ctx); err != nil {
+		slog.Warn("reconcile review states", "error", err)
 	}
 	return nil
 }
@@ -341,18 +433,22 @@ func (s *TaskService) handleStarted(ctx context.Context, task db.Task) error {
 	if err != nil {
 		return err
 	}
-	if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
+	if task.IssueID == nil {
+		return nil // review tasks have no issue; their ledger is updated by the review path
+	}
+	issueID := *task.IssueID
+	if err := s.appendComment(ctx, task.WorkspaceID, issueID, "agent", full.Agent.Name,
 		fmt.Sprintf("%s 开始工作。", full.Agent.Name)); err != nil {
 		return err
 	}
 	if _, err := s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
-		ID:          task.IssueID,
+		ID:          issueID,
 		WorkspaceID: task.WorkspaceID,
 		Status:      v1.IssueStatusInProgress,
 	}); err != nil {
 		return err
 	}
-	s.publish(v1.AppEventIssueUpdated, task.WorkspaceID, task.IssueID)
+	s.publish(v1.AppEventIssueUpdated, task.WorkspaceID, issueID)
 	return nil
 }
 
@@ -391,6 +487,10 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 	if err != nil {
 		return err
 	}
+	if task.IssueID == nil {
+		return nil // review tasks are completed by the review path
+	}
+	issueID := *task.IssueID
 
 	summary := report.Summary
 	output, branch, base := "", "", ""
@@ -403,7 +503,7 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 	// The agent's own output is the deliverable: it is what an analysis, design
 	// or review task exists to produce, and for code tasks it is the summary.
 	if output != "" {
-		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name, output); err != nil {
+		if err := s.appendComment(ctx, task.WorkspaceID, issueID, "agent", full.Agent.Name, output); err != nil {
 			return err
 		}
 	}
@@ -425,7 +525,7 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		// another one would be wrong. All that is left is to say where the work
 		// went; the PR's own state keeps flowing in through the webhook.
 		if existing := s.activePullRequestOnBranch(ctx, full.Issue.ID, branch); existing.ID != uuid.Nil {
-			if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
+			if err := s.appendComment(ctx, task.WorkspaceID, issueID, "agent", full.Agent.Name,
 				fmt.Sprintf("已推送到 PR #%d：%s", existing.Number,
 					pullRequestURL(ws.RepoOwner, ws.RepoName, int(existing.Number)))); err != nil {
 				return err
@@ -440,7 +540,7 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		if err != nil {
 			// The task is already terminal; surface the write-back failure
 			// rather than losing it silently.
-			_ = s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
+			_ = s.appendComment(ctx, task.WorkspaceID, issueID, "system", "system",
 				fmt.Sprintf("代码改动已推送,但建 PR 失败: %v", err))
 			return err
 		}
@@ -463,13 +563,13 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 		if !linked {
 			trailer = "（未能记录到本 issue，请刷新或手工关联）"
 		}
-		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name,
+		if err := s.appendComment(ctx, task.WorkspaceID, issueID, "agent", full.Agent.Name,
 			fmt.Sprintf("已提 PR #%d：%s%s", prNum, prURL, trailer)); err != nil {
 			return err
 		}
 	} else if output == "" {
 		// Neither text nor code: worth surfacing rather than staying silent.
-		if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
+		if err := s.appendComment(ctx, task.WorkspaceID, issueID, "system", "system",
 			fmt.Sprintf("%s 完成了任务,但没有任何输出。", full.Agent.Name)); err != nil {
 			return err
 		}
@@ -484,14 +584,18 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 // and the task's result is stored. Shared by both endings of a code task — a new
 // pull request, or work pushed onto the one the issue already had.
 func (s *TaskService) finishCompleted(ctx context.Context, task db.Task, full v1.Task, result map[string]any) error {
+	if task.IssueID == nil {
+		return nil
+	}
+	issueID := *task.IssueID
 	if _, err := s.store.UpdateIssueStatus(ctx, db.UpdateIssueStatusParams{
-		ID:          task.IssueID,
+		ID:          issueID,
 		WorkspaceID: task.WorkspaceID,
 		Status:      v1.IssueStatusInReview,
 	}); err != nil {
 		return err
 	}
-	s.publish(v1.AppEventIssueUpdated, task.WorkspaceID, task.IssueID)
+	s.publish(v1.AppEventIssueUpdated, task.WorkspaceID, issueID)
 
 	raw, _ := json.Marshal(result)
 	return s.store.SetTaskResult(ctx, db.SetTaskResultParams{ID: task.ID, Result: raw})
@@ -531,6 +635,10 @@ func (s *TaskService) handleFailed(ctx context.Context, task db.Task, report v1.
 	if err != nil {
 		return err
 	}
+	if task.IssueID == nil {
+		return nil // review tasks are failed by the review path
+	}
+	issueID := *task.IssueID
 
 	// A run can fail after the agent produced its deliverable — the provider
 	// dropped on the closing turn, the push was rejected. Post that output the
@@ -538,13 +646,13 @@ func (s *TaskService) handleFailed(ctx context.Context, task db.Task, report v1.
 	// failure line below say why the task is marked failed.
 	if report.Summary != nil {
 		if output := strings.TrimSpace(report.Summary.Output); output != "" {
-			if err := s.appendComment(ctx, task.WorkspaceID, task.IssueID, "agent", full.Agent.Name, output); err != nil {
+			if err := s.appendComment(ctx, task.WorkspaceID, issueID, "agent", full.Agent.Name, output); err != nil {
 				return err
 			}
 		}
 	}
 
-	return s.appendComment(ctx, task.WorkspaceID, task.IssueID, "system", "system",
+	return s.appendComment(ctx, task.WorkspaceID, issueID, "system", "system",
 		fmt.Sprintf("%s 任务失败: %s", full.Agent.Name, report.Error))
 }
 

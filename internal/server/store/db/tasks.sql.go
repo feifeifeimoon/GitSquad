@@ -11,6 +11,103 @@ import (
 	"github.com/google/uuid"
 )
 
+const cancelQueuedReviewTasks = `-- name: CancelQueuedReviewTasks :many
+UPDATE tasks SET status = 'cancelled', completed_at = now(), updated_at = now()
+WHERE pull_request_id = $1::uuid AND kind = 'review' AND status = 'queued'
+RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+`
+
+// Closing or merging a PR makes a queued review pointless. Only queued tasks
+// are cancelled: a dispatched/running task is already on a daemon and will
+// report its outcome (the ledger sync handles it).
+func (q *Queries) CancelQueuedReviewTasks(ctx context.Context, dollar_1 uuid.UUID) ([]Task, error) {
+	rows, err := q.db.Query(ctx, cancelQueuedReviewTasks, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Task
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.IssueID,
+			&i.PullRequestID,
+			&i.Kind,
+			&i.AgentID,
+			&i.Status,
+			&i.AssignedDaemonID,
+			&i.Provider,
+			&i.Model,
+			&i.Priority,
+			&i.Context,
+			&i.Result,
+			&i.Error,
+			&i.FailureReason,
+			&i.DispatchedAt,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const cancelQueuedReviewTasksByDaemon = `-- name: CancelQueuedReviewTasksByDaemon :many
+UPDATE tasks SET status = 'cancelled', completed_at = now(), updated_at = now()
+WHERE assigned_daemon_id = $1::uuid AND kind = 'review' AND status = 'queued'
+RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+`
+
+func (q *Queries) CancelQueuedReviewTasksByDaemon(ctx context.Context, dollar_1 uuid.UUID) ([]Task, error) {
+	rows, err := q.db.Query(ctx, cancelQueuedReviewTasksByDaemon, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Task
+	for rows.Next() {
+		var i Task
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.IssueID,
+			&i.PullRequestID,
+			&i.Kind,
+			&i.AgentID,
+			&i.Status,
+			&i.AssignedDaemonID,
+			&i.Provider,
+			&i.Model,
+			&i.Priority,
+			&i.Context,
+			&i.Result,
+			&i.Error,
+			&i.FailureReason,
+			&i.DispatchedAt,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const claimNextTask = `-- name: ClaimNextTask :one
 UPDATE tasks
 SET status = 'dispatched', dispatched_at = now(), updated_at = now()
@@ -21,7 +118,7 @@ WHERE tasks.id = (
     FOR UPDATE SKIP LOCKED
     LIMIT 1
 )
-RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 func (q *Queries) ClaimNextTask(ctx context.Context, assignedDaemonID *uuid.UUID) (Task, error) {
@@ -31,6 +128,8 @@ func (q *Queries) ClaimNextTask(ctx context.Context, assignedDaemonID *uuid.UUID
 		&i.ID,
 		&i.WorkspaceID,
 		&i.IssueID,
+		&i.PullRequestID,
+		&i.Kind,
 		&i.AgentID,
 		&i.Status,
 		&i.AssignedDaemonID,
@@ -51,17 +150,21 @@ func (q *Queries) ClaimNextTask(ctx context.Context, assignedDaemonID *uuid.UUID
 }
 
 const createTask = `-- name: CreateTask :one
-INSERT INTO tasks (workspace_id, issue_id, agent_id, assigned_daemon_id, provider, model, context)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+INSERT INTO tasks (workspace_id, issue_id, pull_request_id, kind, agent_id,
+    assigned_daemon_id, provider, model, priority, context)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 type CreateTaskParams struct {
 	WorkspaceID      uuid.UUID  `json:"workspace_id"`
-	IssueID          uuid.UUID  `json:"issue_id"`
+	IssueID          *uuid.UUID `json:"issue_id"`
+	PullRequestID    *uuid.UUID `json:"pull_request_id"`
+	Kind             string     `json:"kind"`
 	AgentID          uuid.UUID  `json:"agent_id"`
 	AssignedDaemonID *uuid.UUID `json:"assigned_daemon_id"`
 	Provider         string     `json:"provider"`
 	Model            string     `json:"model"`
+	Priority         int32      `json:"priority"`
 	Context          []byte     `json:"context"`
 }
 
@@ -69,10 +172,13 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 	row := q.db.QueryRow(ctx, createTask,
 		arg.WorkspaceID,
 		arg.IssueID,
+		arg.PullRequestID,
+		arg.Kind,
 		arg.AgentID,
 		arg.AssignedDaemonID,
 		arg.Provider,
 		arg.Model,
+		arg.Priority,
 		arg.Context,
 	)
 	var i Task
@@ -80,6 +186,8 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) (Task, e
 		&i.ID,
 		&i.WorkspaceID,
 		&i.IssueID,
+		&i.PullRequestID,
+		&i.Kind,
 		&i.AgentID,
 		&i.Status,
 		&i.AssignedDaemonID,
@@ -108,7 +216,7 @@ WHERE status IN ('dispatched','running')
       SELECT id FROM daemons
       WHERE COALESCE(last_seen_at, registered_at) < now() - make_interval(secs => $1::double precision)
   )
-RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 // Fails the in-flight tasks of every daemon that has stopped heartbeating for at
@@ -137,6 +245,8 @@ func (q *Queries) FailTasksOfSilentDaemons(ctx context.Context, graceSeconds flo
 			&i.ID,
 			&i.WorkspaceID,
 			&i.IssueID,
+			&i.PullRequestID,
+			&i.Kind,
 			&i.AgentID,
 			&i.Status,
 			&i.AssignedDaemonID,
@@ -164,7 +274,7 @@ func (q *Queries) FailTasksOfSilentDaemons(ctx context.Context, graceSeconds flo
 }
 
 const getTask = `-- name: GetTask :one
-SELECT id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at FROM tasks WHERE id = $1
+SELECT id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at FROM tasks WHERE id = $1
 `
 
 func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (Task, error) {
@@ -174,6 +284,8 @@ func (q *Queries) GetTask(ctx context.Context, id uuid.UUID) (Task, error) {
 		&i.ID,
 		&i.WorkspaceID,
 		&i.IssueID,
+		&i.PullRequestID,
+		&i.Kind,
 		&i.AgentID,
 		&i.Status,
 		&i.AssignedDaemonID,
@@ -285,7 +397,7 @@ func (q *Queries) ListTaskMessages(ctx context.Context, arg ListTaskMessagesPara
 
 const markTaskCompleted = `-- name: MarkTaskCompleted :one
 UPDATE tasks SET status = 'completed', completed_at = now(), updated_at = now()
-WHERE id = $1 AND status IN ('dispatched','running') RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+WHERE id = $1 AND status IN ('dispatched','running') RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 func (q *Queries) MarkTaskCompleted(ctx context.Context, id uuid.UUID) (Task, error) {
@@ -295,6 +407,8 @@ func (q *Queries) MarkTaskCompleted(ctx context.Context, id uuid.UUID) (Task, er
 		&i.ID,
 		&i.WorkspaceID,
 		&i.IssueID,
+		&i.PullRequestID,
+		&i.Kind,
 		&i.AgentID,
 		&i.Status,
 		&i.AssignedDaemonID,
@@ -316,7 +430,7 @@ func (q *Queries) MarkTaskCompleted(ctx context.Context, id uuid.UUID) (Task, er
 
 const markTaskFailed = `-- name: MarkTaskFailed :one
 UPDATE tasks SET status = 'failed', error = $2, failure_reason = $3, completed_at = now(), updated_at = now()
-WHERE id = $1 AND status IN ('dispatched','running') RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+WHERE id = $1 AND status IN ('dispatched','running') RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 type MarkTaskFailedParams struct {
@@ -332,6 +446,8 @@ func (q *Queries) MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) 
 		&i.ID,
 		&i.WorkspaceID,
 		&i.IssueID,
+		&i.PullRequestID,
+		&i.Kind,
 		&i.AgentID,
 		&i.Status,
 		&i.AssignedDaemonID,
@@ -353,7 +469,7 @@ func (q *Queries) MarkTaskFailed(ctx context.Context, arg MarkTaskFailedParams) 
 
 const markTaskRunning = `-- name: MarkTaskRunning :one
 UPDATE tasks SET status = 'running', started_at = now(), updated_at = now()
-WHERE id = $1 AND status = 'dispatched' RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+WHERE id = $1 AND status = 'dispatched' RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 func (q *Queries) MarkTaskRunning(ctx context.Context, id uuid.UUID) (Task, error) {
@@ -363,6 +479,8 @@ func (q *Queries) MarkTaskRunning(ctx context.Context, id uuid.UUID) (Task, erro
 		&i.ID,
 		&i.WorkspaceID,
 		&i.IssueID,
+		&i.PullRequestID,
+		&i.Kind,
 		&i.AgentID,
 		&i.Status,
 		&i.AssignedDaemonID,
@@ -395,7 +513,7 @@ func (q *Queries) NextTaskMessageSeq(ctx context.Context, taskID uuid.UUID) (int
 
 const revertTaskToQueued = `-- name: RevertTaskToQueued :one
 UPDATE tasks SET status = 'queued', dispatched_at = NULL, updated_at = now()
-WHERE id = $1 AND status = 'dispatched' RETURNING id, workspace_id, issue_id, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
+WHERE id = $1 AND status = 'dispatched' RETURNING id, workspace_id, issue_id, pull_request_id, kind, agent_id, status, assigned_daemon_id, provider, model, priority, context, result, error, failure_reason, dispatched_at, started_at, completed_at, created_at, updated_at
 `
 
 func (q *Queries) RevertTaskToQueued(ctx context.Context, id uuid.UUID) (Task, error) {
@@ -405,6 +523,8 @@ func (q *Queries) RevertTaskToQueued(ctx context.Context, id uuid.UUID) (Task, e
 		&i.ID,
 		&i.WorkspaceID,
 		&i.IssueID,
+		&i.PullRequestID,
+		&i.Kind,
 		&i.AgentID,
 		&i.Status,
 		&i.AssignedDaemonID,

@@ -171,6 +171,46 @@ func (q *Queries) GetAgent(ctx context.Context, arg GetAgentParams) (GetAgentRow
 	return i, err
 }
 
+const getAgentWithRuntime = `-- name: GetAgentWithRuntime :one
+SELECT a.id, a.workspace_id, a.name, a.instructions, a.model, a.enabled,
+       ar.daemon_id AS runtime_daemon_id, ar.provider AS runtime_provider
+FROM agents a
+JOIN agent_runtimes ar ON ar.id = a.runtime_id
+WHERE a.id = $1 AND a.workspace_id = $2
+`
+
+type GetAgentWithRuntimeParams struct {
+	ID          uuid.UUID `json:"id"`
+	WorkspaceID uuid.UUID `json:"workspace_id"`
+}
+
+type GetAgentWithRuntimeRow struct {
+	ID              uuid.UUID  `json:"id"`
+	WorkspaceID     uuid.UUID  `json:"workspace_id"`
+	Name            string     `json:"name"`
+	Instructions    string     `json:"instructions"`
+	Model           string     `json:"model"`
+	Enabled         bool       `json:"enabled"`
+	RuntimeDaemonID *uuid.UUID `json:"runtime_daemon_id"`
+	RuntimeProvider string     `json:"runtime_provider"`
+}
+
+func (q *Queries) GetAgentWithRuntime(ctx context.Context, arg GetAgentWithRuntimeParams) (GetAgentWithRuntimeRow, error) {
+	row := q.db.QueryRow(ctx, getAgentWithRuntime, arg.ID, arg.WorkspaceID)
+	var i GetAgentWithRuntimeRow
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Instructions,
+		&i.Model,
+		&i.Enabled,
+		&i.RuntimeDaemonID,
+		&i.RuntimeProvider,
+	)
+	return i, err
+}
+
 const listAgentNamesByWorkspace = `-- name: ListAgentNamesByWorkspace :many
 SELECT name FROM agents WHERE workspace_id = $1 AND enabled = true ORDER BY name
 `

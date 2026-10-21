@@ -387,7 +387,8 @@ func TestIssueAssignmentIntegration(t *testing.T) {
 	}
 	if _, err := s.CreateTask(ctx, db.CreateTaskParams{
 		WorkspaceID:      ws.ID,
-		IssueID:          issue.ID,
+		Kind:             "issue",
+		IssueID:          &issue.ID,
 		AgentID:          planner.ID,
 		AssignedDaemonID: &daemon.ID,
 		Provider:         "claude",

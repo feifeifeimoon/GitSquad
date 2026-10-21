@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -333,6 +334,19 @@ func (s *DaemonService) FindByUserAndName(ctx context.Context, userID uuid.UUID,
 }
 
 func (s *DaemonService) DeleteDaemon(ctx context.Context, id uuid.UUID) error {
+	// A queued review assigned to this daemon will never be claimed after the
+	// delete. Cancel it and release the PR's in-flight slot before the row goes.
+	if tasks, err := s.store.CancelQueuedReviewTasksByDaemon(ctx, id); err != nil {
+		slog.Warn("cancel queued reviews for daemon", "daemon", id, "error", err)
+	} else if len(tasks) > 0 {
+		ids := make([]uuid.UUID, 0, len(tasks))
+		for _, task := range tasks {
+			ids = append(ids, task.ID)
+		}
+		if _, err := s.store.CancelPRReviewsByTasks(ctx, ids); err != nil {
+			slog.Warn("cancel review ledger rows for daemon", "daemon", id, "error", err)
+		}
+	}
 	return s.store.DeleteDaemon(ctx, id)
 }
 

@@ -13,9 +13,13 @@ type Task struct {
 	ID          uuid.UUID `json:"id"`
 	WorkspaceID uuid.UUID `json:"workspace_id"`
 
-	Issue TaskIssueContext `json:"issue"`
-	Repo  TaskRepoContext  `json:"repo"`
-	Agent TaskAgentContext `json:"agent"`
+	// Kind is "issue" or "review". A review task carries a PullRequest and may
+	// also carry the linked Issue; an issue task always carries Issue.
+	Kind        string                  `json:"kind"`
+	Issue       *TaskIssueContext       `json:"issue,omitempty"`
+	PullRequest *TaskPullRequestContext `json:"pull_request,omitempty"`
+	Repo        TaskRepoContext         `json:"repo"`
+	Agent       TaskAgentContext        `json:"agent"`
 
 	// InstallationToken authenticates git clone/push as the GitHub App for the
 	// workspace's installation. Short-lived; must not be logged or stored.
@@ -38,6 +42,37 @@ type TaskComment struct {
 	Type       string    `json:"type"` // comment | status_change | system
 	Content    string    `json:"content"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+// TaskPullRequestContext is the PR snapshot a review task renders into the
+// execution environment.
+type TaskPullRequestContext struct {
+	Number       int    `json:"number"`
+	Title        string `json:"title"`
+	Body         string `json:"body"`
+	Author       string `json:"author"`
+	BaseBranch   string `json:"base_branch"`
+	HeadBranch   string `json:"head_branch"`
+	HeadSHA      string `json:"head_sha"`
+	Additions    int    `json:"additions"`
+	Deletions    int    `json:"deletions"`
+	ChangedFiles int    `json:"changed_files"`
+}
+
+// ReviewComment is one inline comment the reviewer wants anchored to a line.
+// The server always posts it on the RIGHT side; the daemon never supplies a
+// side or an event.
+type ReviewComment struct {
+	Path string `json:"path"`
+	Line int    `json:"line"`
+	Body string `json:"body"`
+}
+
+// ReviewResult is the structured deliverable of a review task.
+type ReviewResult struct {
+	Summary  string          `json:"summary"`
+	Comments []ReviewComment `json:"comments"`
+	HeadSHA  string          `json:"head_sha,omitempty"`
 }
 
 // TaskRepoContext identifies the repository to check out.
@@ -141,4 +176,6 @@ type TaskSummary struct {
 	CommitSHA   string `json:"commit_sha,omitempty"`
 	DiffStat    string `json:"diff_stat,omitempty"`
 	TestResults string `json:"test_results,omitempty"`
+	// Review is set by a review task: the summary plus the inline comments.
+	Review *ReviewResult `json:"review,omitempty"`
 }

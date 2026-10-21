@@ -356,7 +356,7 @@ export class TestApiClient {
    */
   async seedPullRequest(
     workspaceId: string,
-    issueId: string,
+    issueId: string | null,
     opts: {
       number?: number;
       title?: string;
@@ -364,21 +364,23 @@ export class TestApiClient {
       owner?: string;
       repo?: string;
       suppressed?: boolean;
+      headSha?: string;
     } = {},
-  ): Promise<void> {
+  ): Promise<{ id: string }> {
     const owner = opts.owner ?? "e2e-owner";
     const repo = opts.repo ?? "e2e-repo";
     const number = opts.number ?? 42;
     const client = new pg.Client({ connectionString: DATABASE_URL });
     await client.connect();
     try {
-      await client.query(
+      const res = await client.query(
         `INSERT INTO pull_requests
            (workspace_id, issue_id, repo_owner, repo_name, number, title, url,
             state, head_branch, base_branch, author, source, close_intent,
-            suppressed_at, github_updated_at)
+            suppressed_at, github_updated_at, head_sha)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'main', 'gitsquad[bot]', 'platform', true,
-                 CASE WHEN $10 THEN now() ELSE NULL END, now())`,
+                 CASE WHEN $10 THEN now() ELSE NULL END, now(), $11)
+         RETURNING id`,
         [
           workspaceId,
           issueId,
@@ -390,8 +392,47 @@ export class TestApiClient {
           opts.state ?? "open",
           `gitsquad/E2E-1/${number}`,
           opts.suppressed ?? false,
+          opts.headSha ?? "",
         ],
       );
+      return { id: res.rows[0].id as string };
+    } finally {
+      await client.end();
+    }
+  }
+
+  /** Seed one review run for a seeded PR. */
+  async seedReview(opts: {
+    workspaceId: string;
+    pullRequestId: string;
+    agentId: string;
+    status?: string;
+    summary?: string;
+    findings?: number;
+    headSha?: string;
+  }): Promise<{ id: string }> {
+    const client = new pg.Client({ connectionString: DATABASE_URL });
+    await client.connect();
+    try {
+      const status = opts.status ?? "completed";
+      const res = await client.query(
+        `INSERT INTO pr_reviews
+           (workspace_id, pull_request_id, agent_id, head_sha, trigger_kind, status,
+            summary, findings, completed_at)
+         VALUES ($1, $2, $3, $4, 'auto', $5, $6, $7,
+                 CASE WHEN $5 = 'completed' THEN now() ELSE NULL END)
+         RETURNING id`,
+        [
+          opts.workspaceId,
+          opts.pullRequestId,
+          opts.agentId,
+          opts.headSha ?? "",
+          status,
+          opts.summary ?? "",
+          opts.findings ?? 0,
+        ],
+      );
+      return { id: res.rows[0].id as string };
     } finally {
       await client.end();
     }

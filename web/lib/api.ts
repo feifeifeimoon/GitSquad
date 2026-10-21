@@ -159,6 +159,40 @@ export interface PullRequest {
   active: boolean;
   merged_at?: string;
   created_at: string;
+  latest_review?: PullRequestReview;
+}
+
+/** One review run as the console shows it. */
+export interface PullRequestReview {
+  id: string;
+  status: "queued" | "running" | "completed" | "failed" | "cancelled";
+  agent_name: string;
+  head_sha: string;
+  summary: string;
+  findings: number;
+  url: string;
+  /** The PR head moved after this review. */
+  stale: boolean;
+  tokens: number;
+  created_at: string;
+}
+
+/** One row of the workspace's Pull requests page. */
+export interface PullRequestSummary {
+  id: string;
+  number: number;
+  title: string;
+  url: string;
+  state: "open" | "merged" | "closed";
+  draft: boolean;
+  author: string;
+  head_branch: string;
+  base_branch: string;
+  head_sha: string;
+  updated_at: string;
+  issue_key?: string;
+  issue_title?: string;
+  latest_review?: PullRequestReview;
 }
 
 export interface IssueComment {
@@ -252,6 +286,18 @@ export interface Workspace {
   last_commit_message: string;
   last_commit_author: string;
   last_commit_at: string;
+  pr_review?: PRReviewConfig;
+}
+
+/** The workspace-level pull-request review configuration. */
+export interface PRReviewConfig {
+  enabled: boolean;
+  agent_id: string | null;
+  trigger: "opened" | "push" | "manual";
+  ignore_drafts: boolean;
+  author_scope: "collaborators" | "all";
+  include_bots: boolean;
+  inline_comments: boolean;
 }
 
 // ── Agents ────────────────────────────────────────────────────────────
@@ -510,4 +556,15 @@ export const skillApi = {
     api.patch<Skill>(`/api/v1/workspaces/${workspaceId}/skills/${skillId}`, body),
   remove: (workspaceId: string, skillId: string) =>
     api.delete<{ deleted: boolean }>(`/api/v1/workspaces/${workspaceId}/skills/${skillId}`),
+};
+
+export const pullRequestApi = {
+  list: (workspaceId: string, state = "open") =>
+    api.get<PullRequestSummary[]>(
+      `/api/v1/workspaces/${workspaceId}/pull-requests?state=${encodeURIComponent(state)}`,
+    ),
+  review: (workspaceId: string, number: number) =>
+    api.post<{ status: string; review_id: string }>(
+      `/api/v1/workspaces/${workspaceId}/pull-requests/${number}/review`,
+    ),
 };

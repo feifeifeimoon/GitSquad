@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"regexp"
 	"strings"
 	"sync"
@@ -24,6 +25,8 @@ var (
 	ErrInvalidWorkspaceName  = errors.New("workspace name must contain at least one letter or number")
 	ErrWorkspaceSlugReserved = errors.New("workspace slug is reserved")
 	ErrWorkspaceSlugTaken    = errors.New("workspace slug already exists")
+	ErrReviewerNotRunnable   = errors.New("reviewer agent is not runnable")
+	ErrInvalidReviewConfig   = errors.New("invalid review configuration")
 )
 
 var slugRe = regexp.MustCompile(`[^a-z0-9]+`)
@@ -56,13 +59,22 @@ func deriveSlug(name string) string {
 }
 
 type WorkspaceService struct {
-	store  *store.Store
-	github *GitHubAppService
+	store      *store.Store
+	github     *GitHubAppService
+	reviewSync ReviewSyncer
+}
+
+// ReviewSyncer is the enable-time backfill: record the repo's open PRs without
+// reviewing them. Nil disables the backfill.
+type ReviewSyncer interface {
+	SyncOpenPullRequests(ctx context.Context, workspaceID uuid.UUID) error
 }
 
 func NewWorkspaceService(s *store.Store, githubSvc *GitHubAppService) *WorkspaceService {
 	return &WorkspaceService{store: s, github: githubSvc}
 }
+
+func (s *WorkspaceService) SetReviewSync(r ReviewSyncer) { s.reviewSync = r }
 
 // CreateWorkspace creates a new Workspace bound to a specific repo.
 // Validates that installation_id belongs to user_id and repo_id belongs to installation_id.
@@ -143,7 +155,7 @@ type WorkspaceWithRepo struct {
 
 // toWorkspace projects the internal record onto the API shape.
 func toWorkspace(w *WorkspaceWithRepo) *v1.Workspace {
-	return &v1.Workspace{
+	out := &v1.Workspace{
 		ID:                w.ID,
 		Slug:              w.Slug,
 		Name:              w.Name,
@@ -158,6 +170,21 @@ func toWorkspace(w *WorkspaceWithRepo) *v1.Workspace {
 		LastCommitAuthor:  w.LastCommitAuthor,
 		LastCommitAt:      w.LastCommitAt,
 	}
+	// The list query does not select the review columns; only the detail view
+	// carries a real config. A zero config in a list row would claim every
+	// workspace has an empty trigger and author scope.
+	if w.PrReviewTrigger != "" {
+		out.PRReview = &v1.PRReviewConfig{
+			Enabled:        w.PrReviewEnabled,
+			AgentID:        w.PrReviewAgentID,
+			Trigger:        w.PrReviewTrigger,
+			IgnoreDrafts:   w.PrReviewIgnoreDrafts,
+			AuthorScope:    w.PrReviewAuthorScope,
+			IncludeBots:    w.PrReviewIncludeBots,
+			InlineComments: w.PrReviewInlineComments,
+		}
+	}
+	return out
 }
 
 func (s *WorkspaceService) ListWorkspaces(ctx context.Context, userID uuid.UUID) ([]v1.Workspace, error) {
@@ -227,16 +254,23 @@ func (s *WorkspaceService) GetWorkspace(ctx context.Context, id uuid.UUID) (*Wor
 	}
 	return &WorkspaceWithRepo{
 		Workspace: db.Workspace{
-			ID:             row.ID,
-			UserID:         row.UserID,
-			InstallationID: row.InstallationID,
-			GithubRepoID:   row.GithubRepoID,
-			Name:           row.Name,
-			Slug:           row.Slug,
-			Status:         row.Status,
-			CreatedAt:      row.CreatedAt,
-			UpdatedAt:      row.UpdatedAt,
-			AvatarUrl:      row.AvatarUrl,
+			ID:                     row.ID,
+			UserID:                 row.UserID,
+			InstallationID:         row.InstallationID,
+			GithubRepoID:           row.GithubRepoID,
+			Name:                   row.Name,
+			Slug:                   row.Slug,
+			Status:                 row.Status,
+			CreatedAt:              row.CreatedAt,
+			UpdatedAt:              row.UpdatedAt,
+			AvatarUrl:              row.AvatarUrl,
+			PrReviewEnabled:        row.PrReviewEnabled,
+			PrReviewAgentID:        row.PrReviewAgentID,
+			PrReviewTrigger:        row.PrReviewTrigger,
+			PrReviewIgnoreDrafts:   row.PrReviewIgnoreDrafts,
+			PrReviewAuthorScope:    row.PrReviewAuthorScope,
+			PrReviewIncludeBots:    row.PrReviewIncludeBots,
+			PrReviewInlineComments: row.PrReviewInlineComments,
 		},
 		RepoFullName: row.RepoFullName,
 		RepoOwner:    row.RepoOwner,
@@ -303,6 +337,70 @@ func (s *WorkspaceService) UpdateWorkspaceAvatar(ctx context.Context, id uuid.UU
 		ID:        id,
 		AvatarUrl: avatarURL,
 	})
+}
+
+// UpdatePRReview validates and stores the workspace's reviewer configuration.
+// The reviewer agent must belong to the workspace, be enabled, and have a
+// runtime daemon: a config that names an unrunnable agent would queue reviews
+// nobody can execute.
+func (s *WorkspaceService) UpdatePRReview(ctx context.Context, userID, workspaceID uuid.UUID, cfg v1.PRReviewConfig) (*v1.Workspace, error) {
+	if cfg.Enabled && cfg.AgentID == nil {
+		return nil, ErrReviewerNotRunnable
+	}
+	if cfg.AgentID != nil {
+		agent, err := s.store.GetAgentWithRuntime(ctx, db.GetAgentWithRuntimeParams{
+			ID: *cfg.AgentID, WorkspaceID: workspaceID,
+		})
+		if err != nil || !agent.Enabled || agent.RuntimeDaemonID == nil {
+			return nil, ErrReviewerNotRunnable
+		}
+	}
+	if cfg.Trigger == "" {
+		cfg.Trigger = "opened"
+	}
+	if cfg.AuthorScope == "" {
+		cfg.AuthorScope = "collaborators"
+	}
+	switch cfg.Trigger {
+	case "opened", "push", "manual":
+	default:
+		return nil, ErrInvalidReviewConfig
+	}
+	switch cfg.AuthorScope {
+	case "collaborators", "all":
+	default:
+		return nil, ErrInvalidReviewConfig
+	}
+
+	ws, err := s.store.GetWorkspace(ctx, workspaceID)
+	if err != nil || ws.UserID != userID {
+		return nil, ErrWorkspaceNotFound
+	}
+	if _, err := s.store.UpdateWorkspacePRReview(ctx, db.UpdateWorkspacePRReviewParams{
+		ID:                     workspaceID,
+		PrReviewEnabled:        cfg.Enabled,
+		PrReviewAgentID:        cfg.AgentID,
+		PrReviewTrigger:        cfg.Trigger,
+		PrReviewIgnoreDrafts:   cfg.IgnoreDrafts,
+		PrReviewAuthorScope:    cfg.AuthorScope,
+		PrReviewIncludeBots:    cfg.IncludeBots,
+		PrReviewInlineComments: cfg.InlineComments,
+	}); err != nil {
+		return nil, fmt.Errorf("update review config: %w", err)
+	}
+	// Turning the feature on backfills the list so existing open PRs appear
+	// immediately. It is async and best-effort: saving must not wait on GitHub,
+	// and a failed sync leaves the config intact.
+	if !ws.PrReviewEnabled && cfg.Enabled && s.reviewSync != nil {
+		go func() {
+			syncCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if err := s.reviewSync.SyncOpenPullRequests(syncCtx, workspaceID); err != nil {
+				slog.Warn("backfill open pull requests", "workspace", workspaceID, "error", err)
+			}
+		}()
+	}
+	return s.ResolveWorkspaceResponse(ctx, userID, workspaceID.String())
 }
 
 // ListMembers returns the people an issue in this workspace can be assigned to.

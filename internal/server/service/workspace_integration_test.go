@@ -109,6 +109,7 @@ func TestWorkspaceResponseShapeIntegration(t *testing.T) {
 		"id", "slug", "name", "status", "avatar_url", "created_at",
 		"repo_full_name", "repo_owner", "repo_name", "repo_private",
 		"last_commit_message", "last_commit_author", "last_commit_at",
+		"pr_review",
 	}
 	got := make([]string, 0, len(fields))
 	for name := range fields {

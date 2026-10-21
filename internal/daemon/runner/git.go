@@ -16,6 +16,15 @@ type GitOps interface {
 	// CloneOrFetch clones remoteURL into dst, or fetches origin if dst is
 	// already a checkout. cred authorises the network operation.
 	CloneOrFetch(ctx context.Context, dst, remoteURL string, cred Credential) error
+	// FetchPullRequest fetches refs/pull/<number>/head into FETCH_HEAD. It works
+	// for same-repo and fork PRs alike.
+	FetchPullRequest(ctx context.Context, dst string, number int, cred Credential) error
+	// FetchBranch fetches one base branch into origin/<branch>.
+	FetchBranch(ctx context.Context, dst, branch string, cred Credential) error
+	// CheckoutDetached checks out ref without creating a branch.
+	CheckoutDetached(ctx context.Context, dst, ref string) error
+	// HeadSHA returns the checked-out commit.
+	HeadSHA(ctx context.Context, dst string) (string, error)
 	// DefaultBranch resolves the remote's default branch from origin/HEAD.
 	DefaultBranch(ctx context.Context, dst string) (string, error)
 	// HasBranch reports whether origin/<branch> exists in the checkout.
@@ -87,6 +96,26 @@ func (g *GitCLI) CloneOrFetch(ctx context.Context, dst, remoteURL string, cred C
 		return err
 	}
 	return writeGitExcludes(dst)
+}
+
+func (g *GitCLI) FetchPullRequest(ctx context.Context, dst string, number int, cred Credential) error {
+	_, err := g.Exec(ctx, dst, cred.Env(), "fetch", "origin", fmt.Sprintf("pull/%d/head", number))
+	return err
+}
+
+func (g *GitCLI) FetchBranch(ctx context.Context, dst, branch string, cred Credential) error {
+	_, err := g.Exec(ctx, dst, cred.Env(), "fetch", "origin", branch)
+	return err
+}
+
+func (g *GitCLI) CheckoutDetached(ctx context.Context, dst, ref string) error {
+	_, err := g.Exec(ctx, dst, nil, "checkout", "--detach", ref)
+	return err
+}
+
+func (g *GitCLI) HeadSHA(ctx context.Context, dst string) (string, error) {
+	out, err := g.Exec(ctx, dst, nil, "rev-parse", "HEAD")
+	return strings.TrimSpace(out), err
 }
 
 // platformExcludes are paths the daemon writes into the workdir for the agent.

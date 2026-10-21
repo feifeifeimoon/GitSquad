@@ -38,7 +38,8 @@ WHERE installation_id = $1 AND github_repo_id != ALL($2::bigint[]);
 -- name: ListReposByInstallation :many
 SELECT * FROM github_repos WHERE installation_id = $1 ORDER BY full_name;
 
--- name: CreateWebhookEvent :exec
+-- name: CreateWebhookEvent :one
 INSERT INTO webhook_events (github_delivery_id, event_type, action, payload)
 VALUES ($1, $2, $3, $4)
-ON CONFLICT (github_delivery_id) DO NOTHING;
+ON CONFLICT (github_delivery_id) DO NOTHING
+RETURNING *;

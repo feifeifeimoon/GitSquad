@@ -85,6 +85,7 @@ test("a workspace draws its own pages, and the list becomes the overview", () =>
       "overview",
       "issues",
       "agents",
+      "pull-requests",
       "skills",
       "workspace-settings",
       "daemons",

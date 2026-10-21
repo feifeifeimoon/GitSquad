@@ -14,7 +14,7 @@ import (
 
 const createWorkspace = `-- name: CreateWorkspace :one
 INSERT INTO workspaces (user_id, installation_id, github_repo_id, name, issue_prefix, slug)
-VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug
+VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug, pr_review_enabled, pr_review_agent_id, pr_review_trigger, pr_review_ignore_drafts, pr_review_author_scope, pr_review_include_bots, pr_review_inline_comments
 `
 
 type CreateWorkspaceParams struct {
@@ -49,6 +49,13 @@ func (q *Queries) CreateWorkspace(ctx context.Context, arg CreateWorkspaceParams
 		&i.IssueCounter,
 		&i.AvatarUrl,
 		&i.Slug,
+		&i.PrReviewEnabled,
+		&i.PrReviewAgentID,
+		&i.PrReviewTrigger,
+		&i.PrReviewIgnoreDrafts,
+		&i.PrReviewAuthorScope,
+		&i.PrReviewIncludeBots,
+		&i.PrReviewInlineComments,
 	)
 	return i, err
 }
@@ -63,7 +70,7 @@ func (q *Queries) DeleteWorkspace(ctx context.Context, id uuid.UUID) error {
 }
 
 const getWorkspace = `-- name: GetWorkspace :one
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug FROM workspaces WHERE id = $1
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug, pr_review_enabled, pr_review_agent_id, pr_review_trigger, pr_review_ignore_drafts, pr_review_author_scope, pr_review_include_bots, pr_review_inline_comments FROM workspaces WHERE id = $1
 `
 
 func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, error) {
@@ -82,6 +89,13 @@ func (q *Queries) GetWorkspace(ctx context.Context, id uuid.UUID) (Workspace, er
 		&i.IssueCounter,
 		&i.AvatarUrl,
 		&i.Slug,
+		&i.PrReviewEnabled,
+		&i.PrReviewAgentID,
+		&i.PrReviewTrigger,
+		&i.PrReviewIgnoreDrafts,
+		&i.PrReviewAuthorScope,
+		&i.PrReviewIncludeBots,
+		&i.PrReviewInlineComments,
 	)
 	return i, err
 }
@@ -129,7 +143,7 @@ func (q *Queries) GetWorkspaceByRepo(ctx context.Context, arg GetWorkspaceByRepo
 }
 
 const getWorkspaceBySlug = `-- name: GetWorkspaceBySlug :one
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug FROM workspaces WHERE user_id = $1 AND slug = $2 AND status != 'archived'
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug, pr_review_enabled, pr_review_agent_id, pr_review_trigger, pr_review_ignore_drafts, pr_review_author_scope, pr_review_include_bots, pr_review_inline_comments FROM workspaces WHERE user_id = $1 AND slug = $2 AND status != 'archived'
 `
 
 type GetWorkspaceBySlugParams struct {
@@ -153,6 +167,45 @@ func (q *Queries) GetWorkspaceBySlug(ctx context.Context, arg GetWorkspaceBySlug
 		&i.IssueCounter,
 		&i.AvatarUrl,
 		&i.Slug,
+		&i.PrReviewEnabled,
+		&i.PrReviewAgentID,
+		&i.PrReviewTrigger,
+		&i.PrReviewIgnoreDrafts,
+		&i.PrReviewAuthorScope,
+		&i.PrReviewIncludeBots,
+		&i.PrReviewInlineComments,
+	)
+	return i, err
+}
+
+const getWorkspacePRReviewConfig = `-- name: GetWorkspacePRReviewConfig :one
+SELECT pr_review_enabled, pr_review_agent_id, pr_review_trigger,
+       pr_review_ignore_drafts, pr_review_author_scope,
+       pr_review_include_bots, pr_review_inline_comments
+FROM workspaces WHERE id = $1
+`
+
+type GetWorkspacePRReviewConfigRow struct {
+	PrReviewEnabled        bool       `json:"pr_review_enabled"`
+	PrReviewAgentID        *uuid.UUID `json:"pr_review_agent_id"`
+	PrReviewTrigger        string     `json:"pr_review_trigger"`
+	PrReviewIgnoreDrafts   bool       `json:"pr_review_ignore_drafts"`
+	PrReviewAuthorScope    string     `json:"pr_review_author_scope"`
+	PrReviewIncludeBots    bool       `json:"pr_review_include_bots"`
+	PrReviewInlineComments bool       `json:"pr_review_inline_comments"`
+}
+
+func (q *Queries) GetWorkspacePRReviewConfig(ctx context.Context, id uuid.UUID) (GetWorkspacePRReviewConfigRow, error) {
+	row := q.db.QueryRow(ctx, getWorkspacePRReviewConfig, id)
+	var i GetWorkspacePRReviewConfigRow
+	err := row.Scan(
+		&i.PrReviewEnabled,
+		&i.PrReviewAgentID,
+		&i.PrReviewTrigger,
+		&i.PrReviewIgnoreDrafts,
+		&i.PrReviewAuthorScope,
+		&i.PrReviewIncludeBots,
+		&i.PrReviewInlineComments,
 	)
 	return i, err
 }
@@ -160,6 +213,9 @@ func (q *Queries) GetWorkspaceBySlug(ctx context.Context, arg GetWorkspaceBySlug
 const getWorkspaceWithRepo = `-- name: GetWorkspaceWithRepo :one
 SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at, w.slug,
        w.avatar_url,
+       w.pr_review_enabled, w.pr_review_agent_id, w.pr_review_trigger,
+       w.pr_review_ignore_drafts, w.pr_review_author_scope,
+       w.pr_review_include_bots, w.pr_review_inline_comments,
        r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private,
        r.default_branch AS repo_default_branch
 FROM workspaces w
@@ -168,21 +224,28 @@ WHERE w.id = $1
 `
 
 type GetWorkspaceWithRepoRow struct {
-	ID                uuid.UUID `json:"id"`
-	UserID            uuid.UUID `json:"user_id"`
-	InstallationID    uuid.UUID `json:"installation_id"`
-	GithubRepoID      uuid.UUID `json:"github_repo_id"`
-	Name              string    `json:"name"`
-	Status            string    `json:"status"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
-	Slug              string    `json:"slug"`
-	AvatarUrl         string    `json:"avatar_url"`
-	RepoFullName      string    `json:"repo_full_name"`
-	RepoOwner         string    `json:"repo_owner"`
-	RepoName          string    `json:"repo_name"`
-	RepoPrivate       bool      `json:"repo_private"`
-	RepoDefaultBranch string    `json:"repo_default_branch"`
+	ID                     uuid.UUID  `json:"id"`
+	UserID                 uuid.UUID  `json:"user_id"`
+	InstallationID         uuid.UUID  `json:"installation_id"`
+	GithubRepoID           uuid.UUID  `json:"github_repo_id"`
+	Name                   string     `json:"name"`
+	Status                 string     `json:"status"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+	Slug                   string     `json:"slug"`
+	AvatarUrl              string     `json:"avatar_url"`
+	PrReviewEnabled        bool       `json:"pr_review_enabled"`
+	PrReviewAgentID        *uuid.UUID `json:"pr_review_agent_id"`
+	PrReviewTrigger        string     `json:"pr_review_trigger"`
+	PrReviewIgnoreDrafts   bool       `json:"pr_review_ignore_drafts"`
+	PrReviewAuthorScope    string     `json:"pr_review_author_scope"`
+	PrReviewIncludeBots    bool       `json:"pr_review_include_bots"`
+	PrReviewInlineComments bool       `json:"pr_review_inline_comments"`
+	RepoFullName           string     `json:"repo_full_name"`
+	RepoOwner              string     `json:"repo_owner"`
+	RepoName               string     `json:"repo_name"`
+	RepoPrivate            bool       `json:"repo_private"`
+	RepoDefaultBranch      string     `json:"repo_default_branch"`
 }
 
 func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWorkspaceWithRepoRow, error) {
@@ -199,6 +262,13 @@ func (q *Queries) GetWorkspaceWithRepo(ctx context.Context, id uuid.UUID) (GetWo
 		&i.UpdatedAt,
 		&i.Slug,
 		&i.AvatarUrl,
+		&i.PrReviewEnabled,
+		&i.PrReviewAgentID,
+		&i.PrReviewTrigger,
+		&i.PrReviewIgnoreDrafts,
+		&i.PrReviewAuthorScope,
+		&i.PrReviewIncludeBots,
+		&i.PrReviewInlineComments,
 		&i.RepoFullName,
 		&i.RepoOwner,
 		&i.RepoName,
@@ -247,7 +317,7 @@ func (q *Queries) ListWorkspaceMembers(ctx context.Context, id uuid.UUID) ([]Lis
 }
 
 const listWorkspacesByUser = `-- name: ListWorkspacesByUser :many
-SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
+SELECT id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug, pr_review_enabled, pr_review_agent_id, pr_review_trigger, pr_review_ignore_drafts, pr_review_author_scope, pr_review_include_bots, pr_review_inline_comments FROM workspaces WHERE user_id = $1 AND status != 'archived' ORDER BY created_at DESC
 `
 
 func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([]Workspace, error) {
@@ -272,6 +342,13 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID uuid.UUID) ([
 			&i.IssueCounter,
 			&i.AvatarUrl,
 			&i.Slug,
+			&i.PrReviewEnabled,
+			&i.PrReviewAgentID,
+			&i.PrReviewTrigger,
+			&i.PrReviewIgnoreDrafts,
+			&i.PrReviewAuthorScope,
+			&i.PrReviewIncludeBots,
+			&i.PrReviewInlineComments,
 		); err != nil {
 			return nil, err
 		}
@@ -357,6 +434,66 @@ type UpdateWorkspaceAvatarParams struct {
 func (q *Queries) UpdateWorkspaceAvatar(ctx context.Context, arg UpdateWorkspaceAvatarParams) error {
 	_, err := q.db.Exec(ctx, updateWorkspaceAvatar, arg.ID, arg.AvatarUrl)
 	return err
+}
+
+const updateWorkspacePRReview = `-- name: UpdateWorkspacePRReview :one
+UPDATE workspaces SET
+    pr_review_enabled = $2,
+    pr_review_agent_id = $3,
+    pr_review_trigger = $4,
+    pr_review_ignore_drafts = $5,
+    pr_review_author_scope = $6,
+    pr_review_include_bots = $7,
+    pr_review_inline_comments = $8,
+    updated_at = now()
+WHERE id = $1 RETURNING id, user_id, installation_id, github_repo_id, name, status, created_at, updated_at, issue_prefix, issue_counter, avatar_url, slug, pr_review_enabled, pr_review_agent_id, pr_review_trigger, pr_review_ignore_drafts, pr_review_author_scope, pr_review_include_bots, pr_review_inline_comments
+`
+
+type UpdateWorkspacePRReviewParams struct {
+	ID                     uuid.UUID  `json:"id"`
+	PrReviewEnabled        bool       `json:"pr_review_enabled"`
+	PrReviewAgentID        *uuid.UUID `json:"pr_review_agent_id"`
+	PrReviewTrigger        string     `json:"pr_review_trigger"`
+	PrReviewIgnoreDrafts   bool       `json:"pr_review_ignore_drafts"`
+	PrReviewAuthorScope    string     `json:"pr_review_author_scope"`
+	PrReviewIncludeBots    bool       `json:"pr_review_include_bots"`
+	PrReviewInlineComments bool       `json:"pr_review_inline_comments"`
+}
+
+func (q *Queries) UpdateWorkspacePRReview(ctx context.Context, arg UpdateWorkspacePRReviewParams) (Workspace, error) {
+	row := q.db.QueryRow(ctx, updateWorkspacePRReview,
+		arg.ID,
+		arg.PrReviewEnabled,
+		arg.PrReviewAgentID,
+		arg.PrReviewTrigger,
+		arg.PrReviewIgnoreDrafts,
+		arg.PrReviewAuthorScope,
+		arg.PrReviewIncludeBots,
+		arg.PrReviewInlineComments,
+	)
+	var i Workspace
+	err := row.Scan(
+		&i.ID,
+		&i.UserID,
+		&i.InstallationID,
+		&i.GithubRepoID,
+		&i.Name,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.IssuePrefix,
+		&i.IssueCounter,
+		&i.AvatarUrl,
+		&i.Slug,
+		&i.PrReviewEnabled,
+		&i.PrReviewAgentID,
+		&i.PrReviewTrigger,
+		&i.PrReviewIgnoreDrafts,
+		&i.PrReviewAuthorScope,
+		&i.PrReviewIncludeBots,
+		&i.PrReviewInlineComments,
+	)
+	return i, err
 }
 
 const updateWorkspaceStatus = `-- name: UpdateWorkspaceStatus :exec

@@ -1,6 +1,7 @@
 -- name: CreateTask :one
-INSERT INTO tasks (workspace_id, issue_id, agent_id, assigned_daemon_id, provider, model, context)
-VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *;
+INSERT INTO tasks (workspace_id, issue_id, pull_request_id, kind, agent_id,
+    assigned_daemon_id, provider, model, priority, context)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *;
 
 -- name: GetTask :one
 SELECT * FROM tasks WHERE id = $1;
@@ -72,3 +73,16 @@ SELECT * FROM task_messages WHERE task_id = $1 AND seq > $2 ORDER BY seq ASC;
 
 -- name: NextTaskMessageSeq :one
 SELECT COALESCE(MAX(seq), 0)::int AS seq FROM task_messages WHERE task_id = $1;
+
+-- name: CancelQueuedReviewTasks :many
+-- Closing or merging a PR makes a queued review pointless. Only queued tasks
+-- are cancelled: a dispatched/running task is already on a daemon and will
+-- report its outcome (the ledger sync handles it).
+UPDATE tasks SET status = 'cancelled', completed_at = now(), updated_at = now()
+WHERE pull_request_id = $1::uuid AND kind = 'review' AND status = 'queued'
+RETURNING *;
+
+-- name: CancelQueuedReviewTasksByDaemon :many
+UPDATE tasks SET status = 'cancelled', completed_at = now(), updated_at = now()
+WHERE assigned_daemon_id = $1::uuid AND kind = 'review' AND status = 'queued'
+RETURNING *;

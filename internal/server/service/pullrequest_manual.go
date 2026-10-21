@@ -24,16 +24,23 @@ var ErrPullRequestSlotTaken = errors.New("the issue already has an active pull r
 // platform did not create. A plain struct so the rules can be tested without
 // reaching GitHub.
 type FetchedPullRequest struct {
-	Number     int32
-	Title      string
-	URL        string
-	State      string // open | merged | closed
-	Draft      bool
-	HeadBranch string
-	BaseBranch string
-	Author     string
-	MergedAt   *time.Time
-	UpdatedAt  time.Time
+	Number            int32
+	Title             string
+	URL               string
+	State             string // open | merged | closed
+	Draft             bool
+	HeadBranch        string
+	BaseBranch        string
+	Author            string
+	MergedAt          *time.Time
+	UpdatedAt         time.Time
+	Body              string
+	HeadSHA           string
+	Additions         int
+	Deletions         int
+	ChangedFiles      int
+	AuthorAssociation string
+	HeadRepo          string
 }
 
 // PullRequestFetcher reads one pull request from the hosting provider. It is the
@@ -97,9 +104,8 @@ func (s *PullRequestService) LinkManual(ctx context.Context, workspaceID, issueI
 	}
 
 	updatedAt := pr.UpdatedAt
-	row, err := s.store.RecordPullRequest(ctx, db.InsertPullRequestParams{
+	row, err := s.store.RecordRepoPullRequest(ctx, db.InsertRepoPullRequestParams{
 		WorkspaceID:     workspaceID,
-		IssueID:         issueID,
 		RepoOwner:       owner,
 		RepoName:        repo,
 		Number:          pr.Number,
@@ -110,16 +116,25 @@ func (s *PullRequestService) LinkManual(ctx context.Context, workspaceID, issueI
 		HeadBranch:      pr.HeadBranch,
 		BaseBranch:      pr.BaseBranch,
 		Author:          pr.Author,
-		Source:          "manual",
-		CloseIntent:     true,
 		MergedAt:        pr.MergedAt,
 		GithubUpdatedAt: &updatedAt,
+	})
+	if err != nil {
+		return db.PullRequest{}, fmt.Errorf("record pull request: %w", err)
+	}
+	if row.IssueID != nil && *row.IssueID != issueID {
+		return db.PullRequest{}, errors.New("that pull request is already linked to another issue")
+	}
+
+	row, err = s.store.LinkPullRequestToIssue(ctx, db.LinkPullRequestToIssueParams{
+		ID:      row.ID,
+		IssueID: &issueID,
 	})
 	if err != nil {
 		if util.IsUniqueViolation(err) {
 			return db.PullRequest{}, ErrPullRequestSlotTaken
 		}
-		return db.PullRequest{}, fmt.Errorf("record pull request: %w", err)
+		return db.PullRequest{}, fmt.Errorf("link pull request: %w", err)
 	}
 
 	if err := s.afterPullRequestChange(ctx, workspaceID, issueID, row); err != nil {
@@ -144,7 +159,7 @@ func (s *PullRequestService) PullRequestByID(ctx context.Context, workspaceID, i
 	if err != nil {
 		return db.PullRequest{}, err
 	}
-	if row.IssueID != issueID || row.WorkspaceID != workspaceID {
+	if row.IssueID == nil || *row.IssueID != issueID || row.WorkspaceID != workspaceID {
 		return db.PullRequest{}, errors.New("pull request does not belong to this issue")
 	}
 	return row, nil

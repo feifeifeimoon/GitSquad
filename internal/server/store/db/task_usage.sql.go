@@ -180,17 +180,17 @@ type ListUsageByIssueParams struct {
 }
 
 type ListUsageByIssueRow struct {
-	IssueID          uuid.UUID `json:"issue_id"`
-	IssueNumber      int32     `json:"issue_number"`
-	IssueTitle       string    `json:"issue_title"`
-	IssuePrefix      string    `json:"issue_prefix"`
-	WorkspaceName    string    `json:"workspace_name"`
-	WorkspaceSlug    string    `json:"workspace_slug"`
-	InputTokens      int64     `json:"input_tokens"`
-	OutputTokens     int64     `json:"output_tokens"`
-	CacheReadTokens  int64     `json:"cache_read_tokens"`
-	CacheWriteTokens int64     `json:"cache_write_tokens"`
-	RunCount         int32     `json:"run_count"`
+	IssueID          *uuid.UUID `json:"issue_id"`
+	IssueNumber      int32      `json:"issue_number"`
+	IssueTitle       string     `json:"issue_title"`
+	IssuePrefix      string     `json:"issue_prefix"`
+	WorkspaceName    string     `json:"workspace_name"`
+	WorkspaceSlug    string     `json:"workspace_slug"`
+	InputTokens      int64      `json:"input_tokens"`
+	OutputTokens     int64      `json:"output_tokens"`
+	CacheReadTokens  int64      `json:"cache_read_tokens"`
+	CacheWriteTokens int64      `json:"cache_write_tokens"`
+	RunCount         int32      `json:"run_count"`
 }
 
 // issue_key is composed in Go from prefix + number, the same way the task

@@ -40,6 +40,9 @@ func New(git GitOps, backend provider.Backend, reporter Reporter, workRoot strin
 // Run executes task to completion. It reports a terminal succeeded/failed
 // event to the SaaS before returning; the returned error mirrors the failure.
 func (r *Runner) Run(ctx context.Context, task v1.Task) error {
+	if task.Kind == "review" {
+		return r.runReview(ctx, task)
+	}
 	wsDir := filepath.Join(r.workRoot, "workspaces", task.WorkspaceID.String())
 	branch := taskBranch(task)
 
@@ -82,13 +85,16 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		}
 	}
 
+	if task.Issue == nil {
+		return r.fail(ctx, task, nil, "", fmt.Errorf("issue task has no issue context"))
+	}
 	if _, err := execenv.Prepare(wsDir, execenv.PrepareParams{
 		WorkspaceID: task.WorkspaceID.String(),
 		TaskID:      task.ID.String(),
 		AgentName:   task.Agent.Name,
 		Provider:    task.Agent.Provider,
 		Branch:      branch,
-		Issue:       task.Issue,
+		Issue:       *task.Issue,
 		Agent:       task.Agent,
 	}); err != nil {
 		return r.fail(ctx, task, nil, "", fmt.Errorf("prepare env: %w", err))
@@ -265,6 +271,15 @@ func commitMessage(task v1.Task) string {
 // triggerPrompt is the short prompt passed to the provider; full context lives
 // in the execenv files (brief + issue_context + skills).
 func triggerPrompt(task v1.Task) string {
+	if task.Kind == "review" {
+		if task.PullRequest != nil {
+			return fmt.Sprintf("Review pull request #%d.", task.PullRequest.Number)
+		}
+		return "Review pull request."
+	}
+	if task.Issue == nil {
+		return ""
+	}
 	if n := len(task.Issue.Comments); n > 0 {
 		return task.Issue.Comments[n-1].Content
 	}

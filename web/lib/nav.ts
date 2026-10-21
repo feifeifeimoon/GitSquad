@@ -3,6 +3,7 @@ import {
   CircleDot,
   FolderGit2,
   Gauge,
+  GitPullRequest,
   LayoutDashboard,
   Monitor,
   Settings,
@@ -139,6 +140,18 @@ export const WORKSPACE_PAGES: WorkspaceNavPage[] = [
     slugScoped: true,
     href: (slug) => paths.workspace(slug).agents(),
     allHref: () => paths.allAgents(),
+  },
+  {
+    key: "pull-requests",
+    label: "Pull requests",
+    icon: GitPullRequest,
+    group: "workspace",
+    // v1 is workspace-scoped: the list is the repo this workspace is bound to,
+    // and there is no cross-repo review view yet.
+    scopes: ["workspace"],
+    jump: "p",
+    slugScoped: true,
+    href: (slug) => paths.workspace(slug).pullRequests(),
   },
   {
     key: "skills",

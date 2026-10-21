@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -198,4 +199,62 @@ func newStatusFixture(t *testing.T, ctx context.Context, pool *pgxpool.Pool) *st
 	})
 
 	return f
+}
+
+// PR review needs three schema facts that no unit test can see: the review
+// ledger exists, both task and PR subjects can be issue-less, and the source
+// vocabulary accepts webhook-discovered rows.
+func TestPRReviewMigrationsIntegration(t *testing.T) {
+	dsn := os.Getenv("GITSQUAD_TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("GITSQUAD_TEST_DATABASE_URL not set; skipping integration test")
+	}
+	ctx := context.Background()
+	pool, err := Open(ctx, dsn)
+	if err != nil {
+		t.Fatalf("open database: %v", err)
+	}
+	t.Cleanup(pool.Close)
+
+	// Every server boot runs Migrate; the second pass must be a no-op.
+	for pass := 1; pass <= 2; pass++ {
+		if err := Migrate(ctx, pool); err != nil {
+			t.Fatalf("migrate (pass %d): %v", pass, err)
+		}
+	}
+
+	for table, column := range map[string]string{
+		"tasks":         "issue_id",
+		"pull_requests": "issue_id",
+	} {
+		var nullable string
+		err := pool.QueryRow(ctx,
+			`SELECT is_nullable FROM information_schema.columns
+			 WHERE table_name = $1 AND column_name = $2`, table, column).Scan(&nullable)
+		if err != nil {
+			t.Fatalf("%s.%s: %v", table, column, err)
+		}
+		if nullable != "YES" {
+			t.Fatalf("%s.%s is %s, want YES", table, column, nullable)
+		}
+	}
+
+	var exists bool
+	if err := pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'pr_reviews')`).Scan(&exists); err != nil || !exists {
+		t.Fatalf("pr_reviews missing: %v", err)
+	}
+	if err := pool.QueryRow(ctx,
+		`SELECT EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name = 'tasks' AND column_name = 'kind')`).Scan(&exists); err != nil || !exists {
+		t.Fatalf("tasks.kind missing: %v", err)
+	}
+
+	var sourceCheck string
+	if err := pool.QueryRow(ctx,
+		`SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conname = 'pull_requests_source_check'`).Scan(&sourceCheck); err != nil {
+		t.Fatalf("read source check: %v", err)
+	}
+	if !strings.Contains(sourceCheck, "'github'") {
+		t.Fatalf("source check does not accept github: %s", sourceCheck)
+	}
 }

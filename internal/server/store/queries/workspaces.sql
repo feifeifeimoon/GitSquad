@@ -23,6 +23,9 @@ SELECT * FROM workspaces WHERE user_id = $1 AND slug = $2 AND status != 'archive
 -- name: GetWorkspaceWithRepo :one
 SELECT w.id, w.user_id, w.installation_id, w.github_repo_id, w.name, w.status, w.created_at, w.updated_at, w.slug,
        w.avatar_url,
+       w.pr_review_enabled, w.pr_review_agent_id, w.pr_review_trigger,
+       w.pr_review_ignore_drafts, w.pr_review_author_scope,
+       w.pr_review_include_bots, w.pr_review_inline_comments,
        r.full_name AS repo_full_name, r.owner AS repo_owner, r.name AS repo_name, r.private AS repo_private,
        r.default_branch AS repo_default_branch
 FROM workspaces w
@@ -60,3 +63,21 @@ FROM workspaces w
 JOIN users u ON u.id = w.user_id
 WHERE w.id = $1
 ORDER BY u.login;
+
+-- name: GetWorkspacePRReviewConfig :one
+SELECT pr_review_enabled, pr_review_agent_id, pr_review_trigger,
+       pr_review_ignore_drafts, pr_review_author_scope,
+       pr_review_include_bots, pr_review_inline_comments
+FROM workspaces WHERE id = $1;
+
+-- name: UpdateWorkspacePRReview :one
+UPDATE workspaces SET
+    pr_review_enabled = $2,
+    pr_review_agent_id = $3,
+    pr_review_trigger = $4,
+    pr_review_ignore_drafts = $5,
+    pr_review_author_scope = $6,
+    pr_review_include_bots = $7,
+    pr_review_inline_comments = $8,
+    updated_at = now()
+WHERE id = $1 RETURNING *;

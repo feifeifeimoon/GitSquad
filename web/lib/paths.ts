@@ -39,6 +39,7 @@ export const paths = {
     overview: () => `/${encode(slug)}`,
     issues: () => `/${encode(slug)}/issues`,
     issue: (key: string) => `/${encode(slug)}/issues/${encode(key)}`,
+    pullRequests: () => `/${encode(slug)}/pull-requests`,
     settings: () => `/${encode(slug)}/settings`,
     agents: () => `/${encode(slug)}/agents`,
     skills: () => `/${encode(slug)}/skills`,

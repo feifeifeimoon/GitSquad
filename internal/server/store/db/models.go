@@ -129,27 +129,53 @@ type IssueComment struct {
 	CreatedAt  time.Time  `json:"created_at"`
 }
 
+type PrReview struct {
+	ID             uuid.UUID  `json:"id"`
+	WorkspaceID    uuid.UUID  `json:"workspace_id"`
+	PullRequestID  uuid.UUID  `json:"pull_request_id"`
+	TaskID         *uuid.UUID `json:"task_id"`
+	AgentID        *uuid.UUID `json:"agent_id"`
+	HeadSha        string     `json:"head_sha"`
+	TriggerKind    string     `json:"trigger_kind"`
+	Status         string     `json:"status"`
+	Summary        string     `json:"summary"`
+	Findings       int32      `json:"findings"`
+	GithubReviewID *int64     `json:"github_review_id"`
+	Url            string     `json:"url"`
+	Error          string     `json:"error"`
+	CompletedAt    *time.Time `json:"completed_at"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
 type PullRequest struct {
-	ID              uuid.UUID  `json:"id"`
-	WorkspaceID     uuid.UUID  `json:"workspace_id"`
-	IssueID         uuid.UUID  `json:"issue_id"`
-	RepoOwner       string     `json:"repo_owner"`
-	RepoName        string     `json:"repo_name"`
-	Number          int32      `json:"number"`
-	Title           string     `json:"title"`
-	Url             string     `json:"url"`
-	State           string     `json:"state"`
-	Draft           bool       `json:"draft"`
-	HeadBranch      string     `json:"head_branch"`
-	BaseBranch      string     `json:"base_branch"`
-	Author          string     `json:"author"`
-	Source          string     `json:"source"`
-	CloseIntent     bool       `json:"close_intent"`
-	SuppressedAt    *time.Time `json:"suppressed_at"`
-	MergedAt        *time.Time `json:"merged_at"`
-	GithubUpdatedAt *time.Time `json:"github_updated_at"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID                uuid.UUID  `json:"id"`
+	WorkspaceID       uuid.UUID  `json:"workspace_id"`
+	IssueID           *uuid.UUID `json:"issue_id"`
+	RepoOwner         string     `json:"repo_owner"`
+	RepoName          string     `json:"repo_name"`
+	Number            int32      `json:"number"`
+	Title             string     `json:"title"`
+	Url               string     `json:"url"`
+	State             string     `json:"state"`
+	Draft             bool       `json:"draft"`
+	HeadBranch        string     `json:"head_branch"`
+	BaseBranch        string     `json:"base_branch"`
+	Author            string     `json:"author"`
+	HeadSha           string     `json:"head_sha"`
+	Body              string     `json:"body"`
+	Additions         int32      `json:"additions"`
+	Deletions         int32      `json:"deletions"`
+	ChangedFiles      int32      `json:"changed_files"`
+	AuthorAssociation string     `json:"author_association"`
+	HeadRepo          string     `json:"head_repo"`
+	Source            string     `json:"source"`
+	CloseIntent       bool       `json:"close_intent"`
+	SuppressedAt      *time.Time `json:"suppressed_at"`
+	MergedAt          *time.Time `json:"merged_at"`
+	GithubUpdatedAt   *time.Time `json:"github_updated_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 type Runtime struct {
@@ -179,7 +205,9 @@ type Skill struct {
 type Task struct {
 	ID               uuid.UUID  `json:"id"`
 	WorkspaceID      uuid.UUID  `json:"workspace_id"`
-	IssueID          uuid.UUID  `json:"issue_id"`
+	IssueID          *uuid.UUID `json:"issue_id"`
+	PullRequestID    *uuid.UUID `json:"pull_request_id"`
+	Kind             string     `json:"kind"`
 	AgentID          uuid.UUID  `json:"agent_id"`
 	Status           string     `json:"status"`
 	AssignedDaemonID *uuid.UUID `json:"assigned_daemon_id"`
@@ -253,16 +281,23 @@ type WebhookEvent struct {
 }
 
 type Workspace struct {
-	ID             uuid.UUID `json:"id"`
-	UserID         uuid.UUID `json:"user_id"`
-	InstallationID uuid.UUID `json:"installation_id"`
-	GithubRepoID   uuid.UUID `json:"github_repo_id"`
-	Name           string    `json:"name"`
-	Status         string    `json:"status"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
-	IssuePrefix    string    `json:"issue_prefix"`
-	IssueCounter   int32     `json:"issue_counter"`
-	AvatarUrl      string    `json:"avatar_url"`
-	Slug           string    `json:"slug"`
+	ID                     uuid.UUID  `json:"id"`
+	UserID                 uuid.UUID  `json:"user_id"`
+	InstallationID         uuid.UUID  `json:"installation_id"`
+	GithubRepoID           uuid.UUID  `json:"github_repo_id"`
+	Name                   string     `json:"name"`
+	Status                 string     `json:"status"`
+	CreatedAt              time.Time  `json:"created_at"`
+	UpdatedAt              time.Time  `json:"updated_at"`
+	IssuePrefix            string     `json:"issue_prefix"`
+	IssueCounter           int32      `json:"issue_counter"`
+	AvatarUrl              string     `json:"avatar_url"`
+	Slug                   string     `json:"slug"`
+	PrReviewEnabled        bool       `json:"pr_review_enabled"`
+	PrReviewAgentID        *uuid.UUID `json:"pr_review_agent_id"`
+	PrReviewTrigger        string     `json:"pr_review_trigger"`
+	PrReviewIgnoreDrafts   bool       `json:"pr_review_ignore_drafts"`
+	PrReviewAuthorScope    string     `json:"pr_review_author_scope"`
+	PrReviewIncludeBots    bool       `json:"pr_review_include_bots"`
+	PrReviewInlineComments bool       `json:"pr_review_inline_comments"`
 }
