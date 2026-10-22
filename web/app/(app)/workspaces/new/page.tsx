@@ -166,7 +166,7 @@ function NewWorkspaceContent() {
 
       <div className="mx-auto flex w-full max-w-6xl flex-1 gap-12 px-8 pb-8">
         <div className="min-w-0 flex-1">
-        <h1 className="mb-2 text-2xl font-semibold tracking-[-0.04em] text-ink">
+        <h1 className="mb-2 text-display font-semibold tracking-[-0.01em] text-ink">
           Create a Workspace
         </h1>
       <p className="mb-8 text-copy text-body">

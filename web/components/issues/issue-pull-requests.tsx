@@ -43,15 +43,15 @@ function PullRequestRow({
           <span className="font-mono text-caption text-mute">#{pr.number}</span> {pr.title}
         </a>
         <div className="mt-0.5 flex items-center gap-1.5">
-          <span className={`font-mono text-[11px] ${stateClass}`}>
+          <span className={`font-mono text-micro ${stateClass}`}>
             {pr.draft ? "draft" : pr.state}
           </span>
           {pr.suppressed && (
-            <span className="font-mono text-[11px] text-mute">unlinked</span>
+            <span className="font-mono text-micro text-mute">unlinked</span>
           )}
         </div>
         {review && (
-          <div className="mt-0.5 flex items-center gap-1.5 text-[11px]">
+          <div className="mt-0.5 flex items-center gap-1.5 text-micro">
             <span className={review.tone}>{review.label}</span>
             {pr.latest_review?.status === "completed" && (
               <span className="text-mute">
@@ -75,7 +75,7 @@ function PullRequestRow({
         <button
           type="button"
           onClick={() => onUnlink(pr)}
-          className="shrink-0 text-[11px] text-mute hover:text-body"
+          className="shrink-0 text-micro text-mute hover:text-body"
           title="Unlink this pull request"
         >
           unlink
@@ -85,7 +85,7 @@ function PullRequestRow({
         <button
           type="button"
           onClick={() => onRestore(pr)}
-          className="shrink-0 text-[11px] text-mute hover:text-body"
+          className="shrink-0 text-micro text-mute hover:text-body"
           title="Link this pull request again"
         >
           restore
@@ -162,7 +162,7 @@ export function IssuePullRequests({
             <button
               type="button"
               onClick={() => setShowHistory((v) => !v)}
-              className="flex items-center gap-1 text-[11px] text-mute hover:text-body"
+              className="flex items-center gap-1 text-micro text-mute hover:text-body"
             >
               {showHistory ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
               History ({history.length})
@@ -210,7 +210,7 @@ export function IssuePullRequests({
           </Button>
         </form>
         {active.length > 0 && (
-          <p className="text-[11px] text-mute">
+          <p className="text-micro text-mute">
             One active pull request at a time. To start a new line of work, close the
             current one.
           </p>
@@ -224,7 +224,7 @@ export function IssuePullRequests({
 export function IssuePullRequestBadge({ issue }: { issue: Issue }) {
   if (!issue.active_pr_number) return null;
   return (
-    <Badge variant="outline" className="gap-1 font-mono text-[10px]">
+    <Badge variant="outline" className="gap-1 font-mono text-micro">
       <GitPullRequest className="size-3" />#{issue.active_pr_number}
     </Badge>
   );

@@ -70,6 +70,10 @@ export default function WorkspaceBoardPage({
   const [createStatus, setCreateStatus] = useState<IssueStatus | null>(null);
   const [createSession, setCreateSession] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
+  // The dragged card's width, read once at drag start: the overlay has to be as
+  // wide as the card it stands in for, and columns no longer have one fixed
+  // width to hard-code here.
+  const [activeWidth, setActiveWidth] = useState<number | undefined>(undefined);
   const [filters, setFilters] = useState<IssueFilters>(EMPTY_FILTERS);
   const [sort, setSort] = useState<SortState>(DEFAULT_SORT);
   const [isPanning, setIsPanning] = useState(false);
@@ -147,6 +151,7 @@ export default function WorkspaceBoardPage({
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveId(String(event.active.id));
+    setActiveWidth(event.active.rect.current.initial?.width);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
@@ -204,11 +209,11 @@ export default function WorkspaceBoardPage({
           </div>
           <Skeleton className="h-8 w-28" />
         </div>
-        <div className="flex flex-1 gap-4 overflow-x-auto p-8 pt-0">
+        <div className="flex flex-1 gap-3 overflow-x-auto p-8 pt-0">
           {Array.from({ length: 7 }).map((_, i) => (
             <div
               key={i}
-              className="w-72 shrink-0 rounded-xl border border-hairline/50 bg-muted/40 p-2"
+              className="min-w-[12rem] flex-1 rounded-xl border border-hairline bg-canvas-soft-2 p-2 dark:bg-canvas-soft"
             >
               <div className="flex items-center gap-2 px-1.5 py-2">
                 <Skeleton className="size-3.5 rounded-full" />
@@ -245,7 +250,7 @@ export default function WorkspaceBoardPage({
       <div
         ref={boardRef}
         onMouseDown={onBoardMouseDown}
-        className={`flex flex-1 gap-4 overflow-x-auto p-8 pt-0 ${
+        className={`flex flex-1 gap-3 overflow-x-auto p-8 pt-0 ${
           isPanning ? "cursor-grabbing select-none" : ""
         }`}
       >
@@ -268,7 +273,7 @@ export default function WorkspaceBoardPage({
             {activeIssue ? (
               <div
                 className="rotate-2 cursor-grabbing rounded-lg shadow-level-4"
-                style={{ width: 272 }}
+                style={{ width: activeWidth }}
               >
                 <IssueCard issue={activeIssue} />
               </div>

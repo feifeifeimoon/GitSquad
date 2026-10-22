@@ -79,11 +79,11 @@ export default function AllIssuesPage() {
             <Skeleton className="h-8 w-20" />
           </div>
         </div>
-        <div className="flex flex-1 gap-4 overflow-x-auto p-8 pt-0">
+        <div className="flex flex-1 gap-3 overflow-x-auto p-8 pt-0">
           {ISSUE_STATUSES.map((status) => (
             <div
               key={status}
-              className="w-72 shrink-0 rounded-xl border border-hairline/50 bg-muted/40 p-2"
+              className="min-w-[12rem] flex-1 rounded-xl border border-hairline bg-canvas-soft-2 p-2 dark:bg-canvas-soft"
             >
               <div className="flex items-center gap-2 px-1.5 py-2">
                 <Skeleton className="size-3.5 rounded-full" />
@@ -112,7 +112,7 @@ export default function AllIssuesPage() {
         />
       </div>
 
-      <div className="flex flex-1 gap-4 overflow-x-auto p-8 pt-0">
+      <div className="flex flex-1 gap-3 overflow-x-auto p-8 pt-0">
         {ISSUE_STATUSES.map((status) => (
           <BoardColumn
             key={status}

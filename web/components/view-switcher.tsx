@@ -2,8 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { LayoutGrid, List } from "lucide-react";
+import { SegmentedControl, type SegmentedItem } from "@/components/segmented-control";
 
 export type ViewMode = "cards" | "list";
+
+const VIEW_ITEMS: ReadonlyArray<SegmentedItem<ViewMode>> = [
+  { value: "cards", label: "Cards", icon: LayoutGrid },
+  { value: "list", label: "List", icon: List },
+];
 
 function storedView(storageKey: string): ViewMode | null {
   if (typeof window === "undefined") return null;
@@ -41,22 +47,13 @@ export function ViewSwitcher({
   view: ViewMode;
   onChange: (v: ViewMode) => void;
 }) {
-  const item = (v: ViewMode, Icon: typeof LayoutGrid, label: string) => (
-    <button
-      onClick={() => onChange(v)}
-      title={label}
-      aria-label={`${label} view`}
-      className={`flex size-7 items-center justify-center rounded-sm transition-colors ${
-        view === v ? "bg-muted text-ink" : "text-mute hover:text-ink"
-      }`}
-    >
-      <Icon className="size-3.5" />
-    </button>
-  );
   return (
-    <div className="flex items-center rounded-sm border border-hairline bg-canvas p-0.5">
-      {item("cards", LayoutGrid, "Cards")}
-      {item("list", List, "List")}
-    </div>
+    <SegmentedControl
+      label="Layout"
+      iconOnly
+      items={VIEW_ITEMS}
+      value={view}
+      onChange={onChange}
+    />
   );
 }

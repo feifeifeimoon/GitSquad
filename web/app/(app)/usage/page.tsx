@@ -32,6 +32,8 @@ import { invalidateApi, useApi } from "@/lib/query";
 import { ErrorState } from "@/components/error-state";
 import { UsageChart } from "@/components/usage/usage-chart";
 import { UsageBreakdown } from "@/components/usage/usage-breakdown";
+import { SegmentedControl } from "@/components/segmented-control";
+import { FilterChips } from "@/components/filter-chips";
 import { toast } from "sonner";
 
 // The timezone travels with every request rather than being stored on the
@@ -213,21 +215,16 @@ function RangeSelector({
   onChange: (r: UsageRange) => void;
 }) {
   return (
-    <div className="flex items-center rounded-sm border border-hairline bg-canvas p-0.5">
-      {USAGE_RANGES.map((r) => (
-        <button
-          key={r}
-          onClick={() => onChange(r)}
-          title={USAGE_RANGE_TITLES[r]}
-          aria-pressed={value === r}
-          className={`rounded-xs px-2.5 py-1 text-caption font-medium transition-colors ${
-            value === r ? "bg-muted text-ink" : "text-mute hover:text-ink"
-          }`}
-        >
-          {USAGE_RANGE_LABELS[r]}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      label="Time range"
+      items={USAGE_RANGES.map((r) => ({
+        value: r,
+        label: USAGE_RANGE_LABELS[r],
+        title: USAGE_RANGE_TITLES[r],
+      }))}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 
@@ -239,20 +236,12 @@ function GroupSelector({
   onChange: (g: UsageGroup) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
-      {USAGE_GROUPS.map((g) => (
-        <button
-          key={g}
-          onClick={() => onChange(g)}
-          aria-pressed={value === g}
-          className={`rounded-full px-2.5 py-1 text-caption font-medium transition-colors ${
-            value === g ? "bg-ink text-canvas" : "bg-muted text-body hover:text-ink"
-          }`}
-        >
-          {USAGE_GROUP_LABELS[g]}
-        </button>
-      ))}
-    </div>
+    <FilterChips
+      label="Group by"
+      items={USAGE_GROUPS.map((g) => ({ value: g, label: USAGE_GROUP_LABELS[g] }))}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 

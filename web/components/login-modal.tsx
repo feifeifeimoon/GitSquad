@@ -61,7 +61,7 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
       </div>
 
       {/* Heading */}
-      <h2 className="text-2xl font-semibold tracking-[-0.04em] text-ink">
+      <h2 className="text-display font-semibold tracking-[-0.01em] text-ink">
         Welcome back
       </h2>
       <p className="mt-2 text-copy text-body">
@@ -93,8 +93,8 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
   // ── Page mode: full-page centered layout ──
   if (mode === "page") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-canvas-soft px-6">
-        <div className="w-full max-w-sm rounded-lg border border-hairline bg-canvas-soft-2 p-8 shadow-level-4">
+      <main className="flex min-h-screen items-center justify-center bg-page px-6">
+        <div className="w-full max-w-sm rounded-lg border border-hairline bg-canvas p-8 shadow-level-2">
           {content}
         </div>
       </main>
@@ -111,7 +111,7 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
       />
 
       {/* Card */}
-      <div className="relative w-full max-w-sm rounded-lg border border-hairline bg-canvas-soft-2 p-8 shadow-level-5">
+      <div className="relative w-full max-w-sm rounded-lg border border-hairline bg-canvas p-8 shadow-level-5">
         {/* Close button */}
         {onClose && (
           <button

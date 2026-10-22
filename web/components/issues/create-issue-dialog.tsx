@@ -81,7 +81,7 @@ export function CreateIssueDialog({
           placeholder="Issue title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          className="px-5 pb-2 pt-3 text-lg font-semibold text-ink outline-none placeholder:text-mute"
+          className="px-5 pb-2 pt-3 text-title font-semibold text-ink outline-none placeholder:text-mute"
         />
         <MarkdownEditor
           onChange={setDescription}
