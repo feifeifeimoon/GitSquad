@@ -6,14 +6,15 @@ import { pullRequestApi, type PullRequestSummary } from "@/lib/api";
 import { useApi } from "@/lib/query";
 import { ErrorState } from "@/components/error-state";
 import { PullRequestList } from "@/components/pull-requests/pull-request-list";
-import { Button } from "@/components/ui/button";
+import { PageToolbar } from "@/components/page-toolbar";
+import { FilterChips } from "@/components/filter-chips";
 
 type Filter = "open" | "closed" | "all";
 
-const FILTERS: { key: Filter; label: string }[] = [
-  { key: "open", label: "Open" },
-  { key: "closed", label: "Closed" },
-  { key: "all", label: "All" },
+const FILTERS: Array<{ value: Filter; label: string }> = [
+  { value: "open", label: "Open" },
+  { value: "closed", label: "Closed" },
+  { value: "all", label: "All" },
 ];
 
 export default function PullRequestsPage() {
@@ -31,35 +32,29 @@ export default function PullRequestsPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="mx-auto w-full max-w-4xl flex-1 px-8 pb-8 pt-6">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-title font-semibold tracking-[-0.01em] text-ink">
-            Pull requests
-          </h1>
-          <div className="flex items-center gap-1">
-            {FILTERS.map((item) => (
-              <Button
-                key={item.key}
-                variant={filter === item.key ? "secondary" : "ghost"}
-                size="sm"
-                onClick={() => setFilter(item.key)}
-              >
-                {item.label}
-              </Button>
-            ))}
-          </div>
-        </div>
+      <PageToolbar
+        actions={
+          <FilterChips
+            label="Pull request state"
+            value={filter}
+            onChange={setFilter}
+            items={FILTERS}
+          />
+        }
+      />
 
+      {/* No heading of its own: the bar above the page already names it
+          "Pull requests", and two of them stacked 60px apart was the page
+          saying its own name twice. */}
+      <div className="mx-auto w-full max-w-4xl flex-1 px-8 pb-8 pt-2">
         {error ? (
-          <div className="mt-4">
-            <ErrorState what="pull requests" error={error} onRetry={refresh} />
-          </div>
+          <ErrorState what="pull requests" error={error} onRetry={refresh} />
         ) : loading && !data ? (
-          <div className="mt-4 flex justify-center py-16">
+          <div className="flex justify-center py-16">
             <div className="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         ) : (
-          <div className="mt-4 overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
+          <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
             <PullRequestList
               slug={slug}
               items={data ?? []}

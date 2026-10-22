@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 import { ProviderIcon } from "@/components/provider-icon";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 import { PageToolbar } from "@/components/page-toolbar";
+import { FilterChips } from "@/components/filter-chips";
 import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { Field, TextArea } from "@/components/form-field";
 import { InlineConfirm } from "@/components/inline-confirm";
@@ -283,30 +284,24 @@ export default function WorkspaceAgentsPage() {
           </Empty>
         ) : (
           <>
-            <div className="mb-3 flex flex-wrap items-center gap-1.5">
-              {STATUS_FILTERS.map((f) => {
+            <FilterChips
+              label="Status"
+              className="mb-3"
+              value={statusFilter}
+              onChange={setStatusFilter}
+              items={STATUS_FILTERS.map((f) => {
                 const count =
                   f.key === "all" ? agentsList.length : (counts[f.key] ?? 0);
-                const active = statusFilter === f.key;
-                return (
-                  <button
-                    key={f.key}
-                    onClick={() => setStatusFilter(f.key)}
-                    disabled={count === 0 && f.key !== "all"}
-                    className={`rounded-full px-2.5 py-1 text-caption font-medium transition-colors disabled:opacity-40 ${
-                      active
-                        ? "bg-ink text-canvas"
-                        : "bg-muted text-body hover:text-ink"
-                    }`}
-                  >
-                    {f.label}
-                    <span className={active ? "ml-1.5" : "ml-1.5 text-mute"}>
-                      {count}
-                    </span>
-                  </button>
-                );
+                return {
+                  value: f.key,
+                  label: f.label,
+                  count,
+                  // A status nobody is in is still worth drawing — it says the
+                  // roster has nobody there — but not worth pressing.
+                  disabled: f.key !== "all" && count === 0,
+                };
               })}
-            </div>
+            />
 
             <AgentList
               groups={[{ key: slug, agents: visible }]}

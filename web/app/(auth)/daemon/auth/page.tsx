@@ -65,23 +65,23 @@ function DaemonAuthContent() {
   const codeParts = code ? code.split("-") : [];
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-canvas-soft p-4">
+    <main className="flex min-h-screen items-center justify-center bg-page p-4">
       <div className="w-full max-w-md">
-        <div className="rounded-lg border border-hairline bg-canvas-soft-2 p-8 shadow-level-4">
+        <div className="rounded-lg border border-hairline bg-canvas p-8 shadow-level-2">
           {/* Header — connection flow */}
           <div className="mb-8 flex items-center justify-center gap-4">
-            <Avatar className="size-14 ring-2 ring-hairline ring-offset-2 ring-offset-canvas-soft-2">
+            <Avatar className="size-14 ring-2 ring-hairline ring-offset-2 ring-offset-canvas">
               <AvatarImage src={userAvatar} />
-              <AvatarFallback className="text-lg">
+              <AvatarFallback className="text-label">
                 {userLogin?.slice(0, 2).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             <ArrowRight className="size-5 text-hairline-strong" />
-            <div className="flex size-14 items-center justify-center rounded-md bg-muted ring-2 ring-hairline ring-offset-2 ring-offset-canvas-soft-2">
+            <div className="flex size-14 items-center justify-center rounded-md bg-muted ring-2 ring-hairline ring-offset-2 ring-offset-canvas">
               <GitSquadMark className="size-8" />
             </div>
           </div>
-          <h1 className="text-center text-xl font-semibold tracking-[-0.04em] text-ink">Device Activation</h1>
+          <h1 className="text-center text-display font-semibold tracking-[-0.01em] text-ink">Device Activation</h1>
 
           {/* Need login */}
           {status === "need_login" && (
@@ -126,14 +126,14 @@ function DaemonAuthContent() {
                         {part.split("").map((ch, j) => (
                           <span
                             key={j}
-                            className="flex size-10 items-center justify-center rounded-sm border border-hairline bg-canvas-soft text-lg font-semibold uppercase text-ink"
+                            className="flex size-10 items-center justify-center rounded-sm border border-hairline bg-canvas-soft text-title font-semibold uppercase text-ink"
                           >
                             {ch}
                           </span>
                         ))}
                       </div>
                       {i < codeParts.length - 1 && (
-                        <span className="text-lg font-semibold text-hairline-strong">—</span>
+                        <span className="text-title font-semibold text-hairline-strong">—</span>
                       )}
                     </div>
                   ))}
@@ -167,7 +167,7 @@ function DaemonAuthContent() {
                 <Check className="size-6 text-link" />
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-ink">Device Connected</h2>
+                <h2 className="text-title-sm font-semibold text-ink">Device Connected</h2>
                 <p className="mt-1 text-copy text-body">
                   You can close this page and return to your terminal.
                 </p>
@@ -179,10 +179,10 @@ function DaemonAuthContent() {
           {status === "error" && (
             <div className="space-y-4 text-center">
               <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-destructive/10">
-                <span className="text-xl font-semibold text-destructive">!</span>
+                <span className="text-title font-semibold text-destructive">!</span>
               </div>
               <div>
-                <h2 className="text-lg font-semibold text-ink">Verification Failed</h2>
+                <h2 className="text-title-sm font-semibold text-ink">Verification Failed</h2>
                 <p className="mt-1 text-copy text-body">{error}</p>
               </div>
               <Link
@@ -207,7 +207,7 @@ export default function DaemonAuthPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-canvas-soft">
+        <div className="flex min-h-screen items-center justify-center bg-page">
           <Loader2 className="size-6 animate-spin text-mute" />
         </div>
       }

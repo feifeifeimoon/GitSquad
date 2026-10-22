@@ -114,9 +114,15 @@ test("issue board supports create, empty columns, and per-column add", () => {
   assert.doesNotMatch(card, /stripMarkdown/);
 });
 
-test("issue board and cards use skeletons and timestamp tooltips", () => {
+test("issue board and cards use skeletons and a one-line fact row", () => {
   assert.match(board, /Skeleton/);
-  assert.match(card, /TimeAgo/);
+  // What a card carries: the key, the agents, the pull request, the comment
+  // count. It carried the timestamp too until columns stopped being 288px wide
+  // — on a card with all five, the time was the item that got clipped.
+  assert.match(card, /AgentStack/);
+  assert.match(card, /IssuePullRequestBadge/);
+  assert.match(card, /comments_count/);
+  assert.doesNotMatch(card, /TimeAgo/);
 });
 
 test("issue board pans horizontally by dragging empty space", () => {

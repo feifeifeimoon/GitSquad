@@ -248,7 +248,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
       {/* Logout confirmation */}
       <Dialog open={logoutConfirm} onOpenChange={setLogoutConfirm}>
         <DialogContent className="sm:max-w-xs">
-          <DialogTitle className="text-copy font-semibold text-ink">
+          <DialogTitle className="text-title-sm font-semibold text-ink">
             Sign out
           </DialogTitle>
           <p className="text-copy text-body">Are you sure you want to sign out?</p>

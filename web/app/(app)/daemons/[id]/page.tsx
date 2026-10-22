@@ -5,7 +5,6 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
   Check,
-  ChevronRight,
   Copy,
   Monitor,
   Pencil,
@@ -69,12 +68,7 @@ export default function DaemonDetailPage() {
   if (loading || !daemon) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4">
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-4 w-4" />
-          <Skeleton className="h-4 w-32" />
-        </div>
-        <div className="px-8 py-6">
+        <div className="px-8 pb-8 pt-6">
           <div className="flex items-center gap-3">
             <Skeleton className="size-10 rounded-sm" />
             <div className="space-y-2">
@@ -97,17 +91,6 @@ export default function DaemonDetailPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center gap-1.5 border-b border-hairline px-8 py-4 text-copy">
-        <Link
-          href={paths.daemons()}
-          className="text-mute transition-colors hover:text-ink"
-        >
-          Daemons
-        </Link>
-        <ChevronRight className="size-3.5 shrink-0 text-hairline-strong" />
-        <span className="truncate font-medium text-ink">{daemon.name}</span>
-      </div>
-
       <div className="flex-1 px-8 pb-8 pt-6">
         <header className="flex items-start gap-3">
           <div className="flex size-10 shrink-0 items-center justify-center rounded-sm border border-hairline bg-canvas-soft">
@@ -116,8 +99,11 @@ export default function DaemonDetailPage() {
           <div className="min-w-0 flex-1">
             <div className="flex min-w-0 items-center gap-2">
               {/* An h2: the bar above the page owns the h1 ("Daemons"), and
-                  this is what the page is about. */}
-              <h2 className="truncate text-lg font-semibold text-ink">
+                  this is what the page is about. There is no breadcrumb above
+                  it — the bar already names the section and the sidebar row is
+                  how you get back, so "Daemons › mac-mini" was a third telling
+                  of the same two words. */}
+              <h2 className="truncate text-title font-semibold text-ink">
                 {daemon.name}
               </h2>
               <button
@@ -403,7 +389,7 @@ function RenameDialog({
   return (
     <Dialog open onOpenChange={(v) => !v && onClose()}>
       <DialogContent className="sm:max-w-sm">
-        <DialogTitle className="text-base font-semibold text-ink">
+        <DialogTitle className="text-title-sm font-semibold text-ink">
           Rename daemon
         </DialogTitle>
         <div className="mt-4 space-y-4">

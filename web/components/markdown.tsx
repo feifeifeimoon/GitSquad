@@ -16,10 +16,10 @@ const REHYPE_PLUGINS = [rehypeHighlight];
 // code highlighting, without the mention/attachment/math machinery.
 const COMPONENTS: Components = {
   h1: ({ children }) => (
-    <h1 className="mb-2 mt-4 text-lg font-semibold text-ink">{children}</h1>
+    <h1 className="mb-2 mt-4 text-title font-semibold text-ink">{children}</h1>
   ),
   h2: ({ children }) => (
-    <h2 className="mb-1.5 mt-3 text-base font-semibold text-ink">{children}</h2>
+    <h2 className="mb-1.5 mt-3 text-title-sm font-semibold text-ink">{children}</h2>
   ),
   h3: ({ children }) => (
     <h3 className="mb-1 mt-2 text-copy font-semibold text-ink">{children}</h3>

@@ -30,6 +30,10 @@ const viewSwitcher = readFileSync(
   new URL("../components/view-switcher.tsx", import.meta.url),
   "utf8",
 );
+const segmented = readFileSync(
+  new URL("../components/segmented-control.tsx", import.meta.url),
+  "utf8",
+);
 const nav = readFileSync(new URL("./nav.ts", import.meta.url), "utf8");
 const sidebarNav = readFileSync(
   new URL("../components/sidebar-nav.tsx", import.meta.url),
@@ -65,14 +69,18 @@ test("workspace list shows a skeleton while loading", () => {
 
 test("workspace list offers a cards/list view switcher persisted to localStorage", () => {
   // The toggle and its persistence live in one component now, shared with the
-  // daemon list; the page only wires it up.
+  // daemon list; the page only wires it up. The button treatment — pressed
+  // state and an accessible name for an icon-only pair — is the shared
+  // segmented control's.
   assert.match(list, /ViewSwitcher/);
   assert.match(list, /useViewMode/);
   assert.match(viewSwitcher, /LayoutGrid/);
   assert.match(viewSwitcher, /localStorage/);
   assert.match(viewSwitcher, /"Cards"/);
   assert.match(viewSwitcher, /"List"/);
-  assert.match(viewSwitcher, /aria-label/);
+  assert.match(viewSwitcher, /iconOnly/);
+  assert.match(segmented, /aria-label/);
+  assert.match(segmented, /aria-pressed/);
 });
 
 test("workspace list supports search and a table list view", () => {

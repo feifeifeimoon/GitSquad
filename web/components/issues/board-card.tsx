@@ -6,7 +6,6 @@ import { useDraggable } from "@dnd-kit/core";
 import { MessageSquare } from "lucide-react";
 import type { Issue } from "@/lib/api";
 import { paths } from "@/lib/paths";
-import { TimeAgo } from "@/components/time-ago";
 import { AgentStack } from "@/components/issues/agent-chip";
 import { IssuePullRequestBadge } from "@/components/issues/issue-pull-requests";
 import { STATUS_TONE } from "@/components/status-icon";
@@ -29,6 +28,15 @@ import { STATUS_TONE } from "@/components/status-icon";
 // is long and pushed the rest of the row around, while a stack is the same
 // width for one agent or four — and it is how every other screen in the console
 // shows who an agent is.
+//
+// The timestamp is gone. It was the last item in a one-line row that has to fit
+// the key, the agents, the pull request and the comment count, and on a card
+// with all four it was the thing that got clipped — "27m a" — as soon as the
+// board stopped being 288px columns. It is also the least decisive of the five:
+// almost every card says "recently", and the question it answers is already on
+// the overview's Active list and on the issue's own rail. The board is for
+// triage: what it is, who is on it, whether it has a branch, whether anyone has
+// replied.
 export const IssueCard = memo(function IssueCard({
   issue,
   className,
@@ -80,10 +88,6 @@ export const IssueCard = memo(function IssueCard({
               {issue.comments_count}
             </span>
           )}
-          <TimeAgo
-            iso={issue.updated_at}
-            className="text-micro tabular-nums text-mute"
-          />
         </span>
       </div>
     </div>

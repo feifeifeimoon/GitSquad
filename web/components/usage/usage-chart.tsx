@@ -74,7 +74,7 @@ export function UsageChart({
               </div>
               {/* Reserve the label row even when the text is thinned out, so
                   every bar starts from the same baseline. */}
-              <span className="h-4 truncate pt-1 text-center font-mono text-[10px] text-mute">
+              <span className="h-4 truncate pt-1 text-center font-mono text-micro text-mute">
                 {i % labelStep === 0 ? bucketLabel(point.bucket, bucket) : ""}
               </span>
             </div>

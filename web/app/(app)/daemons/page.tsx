@@ -35,6 +35,7 @@ import { PageToolbar, PageToolbarSkeleton } from "@/components/page-toolbar";
 import { ErrorState } from "@/components/error-state";
 import { invalidateApi, setApiData, useApi } from "@/lib/query";
 import { ViewSwitcher, useViewMode } from "@/components/view-switcher";
+import { SegmentedControl } from "@/components/segmented-control";
 import { SortHeader, TH_CLASS, useSort, type SortState } from "@/components/table-sort";
 import { InlineConfirm } from "@/components/inline-confirm";
 import { Button } from "@/components/ui/button";
@@ -482,7 +483,7 @@ function ConnectDaemonModal({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-lg">
-        <DialogTitle className="pr-8 text-base font-semibold text-ink">
+        <DialogTitle className="pr-8 text-title-sm font-semibold text-ink">
           Connect a daemon
         </DialogTitle>
 
@@ -499,27 +500,16 @@ function ConnectDaemonModal({
                   <p className="text-caption text-mute">Run on your own hardware</p>
                 </div>
               </div>
-              <div
-                role="group"
-                aria-label="Operating system"
-                className="flex shrink-0 items-center rounded-sm border border-hairline bg-canvas p-0.5"
-              >
-                {PLATFORMS.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    aria-pressed={platform === p}
-                    onClick={() => setPicked(p)}
-                    className={`rounded-xs px-2.5 py-1 text-caption font-medium transition-colors ${
-                      platform === p
-                        ? "bg-muted text-ink"
-                        : "text-mute hover:text-ink"
-                    }`}
-                  >
-                    {PLATFORM_LABEL[p]}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                label="Operating system"
+                className="shrink-0"
+                items={PLATFORMS.map((p) => ({
+                  value: p,
+                  label: PLATFORM_LABEL[p],
+                }))}
+                value={platform}
+                onChange={setPicked}
+              />
             </div>
             <p className="mb-2 text-caption text-mute">
               {PLATFORM_HINT[platform]}
