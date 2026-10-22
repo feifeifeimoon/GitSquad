@@ -14,10 +14,10 @@ import {
   XCircle,
 } from "lucide-react";
 import { agentApi, type Agent, type AgentTask } from "@/lib/api";
-import { agentStatus } from "@/lib/agent-status";
-import { agentPresence } from "@/lib/agent-presence";
+import { AGENT_REFRESH_MS, agentStatus } from "@/lib/agent-status";
+import { agentActivity, agentPresence } from "@/lib/agent-presence";
 import { paths } from "@/lib/paths";
-import { useApi } from "@/lib/query";
+import { invalidateApi, useApi } from "@/lib/query";
 import { AgentDialog } from "@/components/agents/agent-dialog";
 import { AgentHead } from "@/components/agents/agent-head";
 import { AgentPresenceBadge } from "@/components/agents/agent-presence-badge";
@@ -68,6 +68,18 @@ export default function AgentDetailPage() {
     if (error) router.push(paths.workspace(slug).agents());
   }, [error, router, slug]);
 
+  // Presence and history move on the daemon's schedule, not on a render's: the
+  // heartbeat decides whether the machine is reachable and a running task turns
+  // into a finished one without any workspace event. Same interval as every
+  // other agent read. The prefix also covers this agent's `/tasks` key.
+  useEffect(() => {
+    const interval = setInterval(
+      () => invalidateApi(`/api/v1/workspaces/${slug}/agents/${agentId}`),
+      AGENT_REFRESH_MS,
+    );
+    return () => clearInterval(interval);
+  }, [slug, agentId]);
+
   if (loading || !agent) {
     return (
       <div className="px-8 py-6">
@@ -96,13 +108,12 @@ export default function AgentDetailPage() {
   }
 
   const presence = agentPresence(agent);
+  const activity = agentActivity(agent);
   const runtime = agent.runtime;
-  const now = agent.current_task;
-  // Only finished runs. The one in flight is already the Now card; listing it
-  // twice would make "Recent runs" read as "runs plus the current one".
-  const runs = (tasks ?? []).filter(
-    (t) => t.status === "completed" || t.status === "failed" || t.status === "cancelled",
-  );
+  // The endpoint returns finished runs only (see ListFinishedTasksByAgent): the
+  // one in flight is the Now card, and a queue must not eat the limit. No second
+  // filter here — a duplicated rule is one that can silently disagree.
+  const runs = tasks ?? [];
 
   return (
     <div className="flex h-full flex-col">
@@ -161,18 +172,18 @@ export default function AgentDetailPage() {
           <div className="min-w-0 space-y-8">
             <section>
               <SectionTitle>Now</SectionTitle>
-              {now?.issue_key ? (
+              {activity.kind === "issue" ? (
                 <Link
-                  href={paths.workspace(slug).issue(now.issue_key)}
+                  href={paths.workspace(slug).issue(activity.issueKey)}
                   className="flex items-start gap-2.5 rounded-lg border border-hairline bg-canvas p-3 shadow-level-2 transition-colors hover:border-hairline-strong"
                 >
                   <Loader2 className="mt-0.5 size-4 shrink-0 animate-spin text-link" />
                   <span className="min-w-0">
                     <span className="block font-mono text-micro text-mute">
-                      {now.issue_key}
+                      {activity.issueKey}
                     </span>
                     <span className="block truncate text-copy font-medium text-ink">
-                      {now.issue_title || "Untitled issue"}
+                      {activity.issueTitle || "Untitled issue"}
                     </span>
                     <span className="mt-0.5 block text-caption text-mute">
                       {agent.running_count > 0
@@ -186,9 +197,11 @@ export default function AgentDetailPage() {
                 </Link>
               ) : (
                 <p className="rounded-lg border border-dashed border-hairline px-3 py-4 text-caption text-mute">
-                  {agent.queued_count > 0
-                    ? `${agent.queued_count} queued — waiting for the machine.`
-                    : "Nothing in flight."}
+                  {activity.kind === "review"
+                    ? "Working on a pull request review."
+                    : activity.kind === "queued"
+                      ? `${activity.queued} queued — waiting for the machine.`
+                      : "Nothing in flight."}
                 </p>
               )}
             </section>
@@ -222,9 +235,10 @@ export default function AgentDetailPage() {
                 aside={
                   <button
                     onClick={() => setEditing(true)}
+                    aria-label="Edit instructions"
                     className="text-caption text-mute transition-colors hover:text-ink"
                   >
-                    Edit
+                    Edit instructions
                   </button>
                 }
               >
@@ -394,16 +408,28 @@ function RunRow({ task, slug }: { task: AgentTask; slug: string }) {
       <span className="w-16 shrink-0 truncate font-mono text-micro text-mute">
         {subject || "—"}
       </span>
-      <span className="min-w-0 flex-1 truncate text-caption text-ink">
-        {task.issue_key ? (
-          <Link
-            href={paths.workspace(slug).issue(task.issue_key)}
-            className="transition-colors hover:text-link"
+      <span className="flex min-w-0 flex-1 items-center gap-2">
+        <span className="min-w-0 truncate text-caption text-ink">
+          {task.issue_key ? (
+            <Link
+              href={paths.workspace(slug).issue(task.issue_key)}
+              className="transition-colors hover:text-link"
+            >
+              {task.issue_title || task.issue_key}
+            </Link>
+          ) : (
+            "Pull request review"
+          )}
+        </span>
+        {/* Why it failed, on a failed row. The reason is the one thing a red
+            icon cannot say, and it used to be dropped for issue runs. */}
+        {task.status === "failed" && task.failure_reason && (
+          <span
+            className="max-w-44 shrink-0 truncate font-mono text-micro text-destructive"
+            title={task.failure_reason}
           >
-            {task.issue_title || task.issue_key}
-          </Link>
-        ) : (
-          task.failure_reason || "Review"
+            {task.failure_reason}
+          </span>
         )}
       </span>
       <span className="shrink-0 font-mono text-micro tabular-nums text-mute">

@@ -94,6 +94,21 @@ func TestListAgentTasksIntegration(t *testing.T) {
 	middle := seed(2*time.Hour, "completed", "")
 	oldest := seed(3*time.Hour, "completed", "")
 
+	// Work still in flight is not history: the list is status-filtered in SQL,
+	// so a queue never eats the limit that the finished rows need. This one is
+	// the newest of the four and must not appear at all.
+	queued, err := s.CreateTask(ctx, db.CreateTaskParams{
+		WorkspaceID: ws.ID,
+		Kind:        "issue",
+		IssueID:     &issue.ID,
+		AgentID:     agent.ID,
+		Provider:    "claude",
+		Context:     []byte(`{}`),
+	})
+	if err != nil {
+		t.Fatalf("create queued task: %v", err)
+	}
+
 	tasks, err := agentSvc.ListAgentTasks(ctx, ws.ID, agent.ID, 20)
 	if err != nil {
 		t.Fatalf("ListAgentTasks: %v", err)
@@ -103,6 +118,11 @@ func TestListAgentTasksIntegration(t *testing.T) {
 	}
 	if got := []uuid.UUID{tasks[0].ID, tasks[1].ID, tasks[2].ID}; got[0] != newest || got[1] != middle || got[2] != oldest {
 		t.Errorf("order = %v, want newest first", got)
+	}
+	for _, task := range tasks {
+		if task.ID == queued.ID {
+			t.Errorf("a queued task appeared in the finished runs")
+		}
 	}
 
 	// The key is composed from the workspace prefix, and the failure reason

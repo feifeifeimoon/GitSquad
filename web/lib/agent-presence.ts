@@ -29,6 +29,7 @@ export interface AgentPresenceInput {
   running_count: number;
   queued_count: number;
   enabled?: boolean;
+  current_task?: { issue_key: string; issue_title: string } | null;
   runtime?: {
     daemon_id?: string | null;
     daemon_name?: string | null;
@@ -71,6 +72,35 @@ export const WORKLOAD_LABEL: Record<AgentWorkload, string> = {
   queued: "Queued",
   idle: "Idle",
 };
+
+/**
+ * What the agent is doing, in a form both surfaces can draw.
+ *
+ * The three sources do not line up, and that is the point. `current_task` names
+ * the issue, but its query inner-joins `issues`, so a running **review** task —
+ * a task with a pull request and no issue — leaves it empty while
+ * `running_count` is 1. Reading only `current_task` there says "nothing in
+ * flight" directly under a badge that says "Working".
+ *
+ * A running task with no issue key is a review: the `tasks` table requires an
+ * issue or a pull request, and a review task carries the latter. So the
+ * precedence is issue → running-but-no-issue (review) → queued → idle.
+ */
+export type AgentActivity =
+  | { kind: "issue"; issueKey: string; issueTitle: string }
+  | { kind: "review" }
+  | { kind: "queued"; queued: number }
+  | { kind: "idle" };
+
+export function agentActivity(agent: AgentPresenceInput): AgentActivity {
+  const task = agent.current_task;
+  if (task?.issue_key) {
+    return { kind: "issue", issueKey: task.issue_key, issueTitle: task.issue_title };
+  }
+  if (agent.running_count > 0) return { kind: "review" };
+  if (agent.queued_count > 0) return { kind: "queued", queued: agent.queued_count };
+  return { kind: "idle" };
+}
 
 /** One offline machine, and what is standing still on it. */
 export interface OfflineDaemon {

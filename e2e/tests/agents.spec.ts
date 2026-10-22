@@ -290,6 +290,39 @@ test.describe("Agents", () => {
     await expect(page.getByText(issue.issue_key).first()).toBeVisible();
   });
 
+  test("a deleted agent is gone from the roster it returns to", async ({
+    page,
+  }) => {
+    // The roster is served from the cache for thirty seconds, and deleting an
+    // agent emits no workspace event: without invalidating on the write, the
+    // page somebody lands back on still shows the agent they just deleted.
+    const agentName = `doomed-${suffix}`;
+    await api.createAgent(workspace.id, {
+      name: agentName,
+      daemon_id: daemon.id,
+      provider: "claude",
+    });
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/agents`, { waitUntil: "domcontentloaded" });
+
+    const row = page.getByRole("listitem").filter({ hasText: `@${agentName}` });
+    await expect(row).toBeVisible({ timeout: 20_000 });
+
+    await row
+      .getByRole("link", { name: new RegExp(`@${agentName}`) })
+      .click();
+    // Exact: the Instructions section has its own "Edit instructions" action.
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    await page.getByRole("button", { name: "Delete agent" }).click();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+
+    await expect(page).toHaveURL(new RegExp(`/${workspace.slug}/agents$`), {
+      timeout: 15_000,
+    });
+    await expect(page.getByText(`@${agentName}`)).toBeHidden();
+  });
+
   test("creates an agent from the UI", async ({ page }) => {
     await loginAsE2E(page, api);
     await page.goto(`/${workspace.slug}/agents`, { waitUntil: "domcontentloaded" });

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import type { Agent } from "@/lib/api";
 import { agentStatus } from "@/lib/agent-status";
-import { agentPresence } from "@/lib/agent-presence";
+import { agentActivity, agentPresence } from "@/lib/agent-presence";
 import { paths } from "@/lib/paths";
 import { AgentHead } from "@/components/agents/agent-head";
 import { AgentPresenceBadge } from "@/components/agents/agent-presence-badge";
@@ -134,9 +134,10 @@ export function AgentRoster({
 
 function AgentRow({ agent, slug }: { agent: Agent; slug?: string }) {
   const presence = agentPresence(agent);
-  const task = agent.current_task;
+  const activity = agentActivity(agent);
+  const task = activity.kind === "issue" ? activity : null;
   const href = slug ? paths.workspace(slug).agent(agent.id) : null;
-  const issueHref = slug && task?.issue_key ? paths.workspace(slug).issue(task.issue_key) : null;
+  const issueHref = slug && task ? paths.workspace(slug).issue(task.issueKey) : null;
 
   return (
     <li
@@ -188,29 +189,33 @@ function AgentRow({ agent, slug }: { agent: Agent; slug?: string }) {
       {/* What it is doing: the issue, if there is one. Above the row overlay so
           it goes to the issue, not to the agent. */}
       <div className="min-w-0">
-        {task?.issue_key ? (
+        {task ? (
           issueHref ? (
             <Link href={issueHref} className="relative z-10 block min-w-0">
               <span className="block truncate font-mono text-micro text-mute">
-                {task.issue_key}
+                {task.issueKey}
               </span>
               <span className="block truncate text-caption text-ink">
-                {task.issue_title || "Untitled issue"}
+                {task.issueTitle || "Untitled issue"}
               </span>
             </Link>
           ) : (
             <>
               <span className="block truncate font-mono text-micro text-mute">
-                {task.issue_key}
+                {task.issueKey}
               </span>
               <span className="block truncate text-caption text-ink">
-                {task.issue_title || "Untitled issue"}
+                {task.issueTitle || "Untitled issue"}
               </span>
             </>
           )
+        ) : activity.kind === "review" ? (
+          // A review run has no issue to name — the task carries a pull request
+          // — so the cell says what it is rather than nothing.
+          <span className="text-caption text-body">Reviewing a pull request</span>
         ) : (
           <span className="text-caption text-mute">
-            {agent.queued_count > 0 ? "Waiting to start" : "Nothing in flight"}
+            {activity.kind === "queued" ? "Waiting to start" : "Nothing in flight"}
           </span>
         )}
       </div>

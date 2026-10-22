@@ -11,7 +11,7 @@ import {
 } from "@/lib/agent-shape";
 import type { RobotHeadShape } from "@/vendor/robot-heads/types";
 import { cn } from "@/lib/utils";
-import { useApi } from "@/lib/query";
+import { invalidateApi, useApi } from "@/lib/query";
 import { AgentHead } from "@/components/agents/agent-head";
 import { ProviderIcon } from "@/components/provider-icon";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
@@ -142,6 +142,12 @@ export function AgentDialog({
     try {
       if (editing) await agentApi.update(slug, editing.id, body);
       else await agentApi.create(slug, body);
+      // The roster, the overview rail and the issue pickers all read this
+      // prefix, and `invalidateApi` carries the change on to the cross-workspace
+      // `/api/v1/agents` aggregate. Without it the page that just saved is
+      // served its pre-write copy for the cache's thirty seconds — and a deleted
+      // agent stays on the roster you land back on.
+      invalidateApi(`/api/v1/workspaces/${slug}/agents`);
       onSaved();
       toast.success(editing ? "Agent updated" : "Agent created");
       onClose();
@@ -156,6 +162,7 @@ export function AgentDialog({
     if (!editing) return;
     try {
       await agentApi.remove(slug, editing.id);
+      invalidateApi(`/api/v1/workspaces/${slug}/agents`);
       toast.success("Agent deleted");
       onDeleted?.();
       onClose();

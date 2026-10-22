@@ -338,8 +338,9 @@ func (s *AgentService) DeleteAgent(ctx context.Context, workspaceID, agentID uui
 	return s.store.DeleteAgent(ctx, db.DeleteAgentParams{ID: agentID, WorkspaceID: workspaceID})
 }
 
-// ListAgentTasks returns an agent's recent runs, newest first — the detail
-// page's history.
+// ListAgentTasks returns an agent's finished runs, newest first — the detail
+// page's history. In-flight work is the agent's current_task, not a row here, so
+// the limit counts history rather than a queue that may never drain.
 //
 // The agent is resolved before the tasks are read, so the workspace boundary is
 // enforced by the same lookup the rest of the page uses. Querying tasks by
@@ -355,7 +356,7 @@ func (s *AgentService) ListAgentTasks(ctx context.Context, workspaceID, agentID 
 		limit = maxAgentTaskLimit
 	}
 
-	rows, err := s.store.ListTasksByAgent(ctx, db.ListTasksByAgentParams{
+	rows, err := s.store.ListFinishedTasksByAgent(ctx, db.ListFinishedTasksByAgentParams{
 		AgentID: agentID,
 		Limit:   int32(limit),
 	})
