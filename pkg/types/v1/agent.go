@@ -69,6 +69,26 @@ type AgentCurrentTask struct {
 	IssueTitle string `json:"issue_title"`
 }
 
+// AgentTask is one entry in an agent's recent work — a row of `tasks` joined
+// with the issue it belongs to. The detail page's history; the roster shows
+// only what is happening now.
+//
+// A review task names a pull request rather than an issue, so the two fields
+// that identify the subject are independent: IssueKey is empty when there is no
+// issue, PRNumber is zero when there is no pull request.
+type AgentTask struct {
+	ID            uuid.UUID  `json:"id"`
+	Status        string     `json:"status"`
+	Kind          string     `json:"kind"`
+	IssueKey      string     `json:"issue_key"`
+	IssueTitle    string     `json:"issue_title"`
+	PRNumber      int32      `json:"pr_number"`
+	FailureReason string     `json:"failure_reason"`
+	StartedAt     *time.Time `json:"started_at"`
+	CompletedAt   *time.Time `json:"completed_at"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
 type CreateAgentRequest struct {
 	Name         string   `json:"name" binding:"required"`
 	Description  string   `json:"description"`

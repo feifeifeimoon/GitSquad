@@ -1,13 +1,15 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { agentApi, type Agent } from "@/lib/api";
 import { AGENT_REFRESH_MS } from "@/lib/agent-status";
+import { offlineDaemons } from "@/lib/agent-presence";
 import { invalidateApi, useApi } from "@/lib/query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/error-state";
+import { AgentDaemonBanner } from "@/components/agents/agent-daemon-banner";
 import { AgentHead } from "@/components/agents/agent-head";
-import { AgentList, type AgentGroup } from "@/components/agents/agent-list";
+import { AgentRoster, type AgentGroup } from "@/components/agents/agent-roster";
 import {
   Empty,
   EmptyDescription,
@@ -46,8 +48,9 @@ function groupByWorkspace(agents: Agent[]): AgentGroup[] {
  * than a column — the same name down twenty rows is a header waiting to happen.
  *
  * Read-only, like the board across workspaces: creating, editing and deleting an
- * agent all belong to a workspace, and this page is not in one. Each header
- * carries the link to that workspace's roster, which is where the edits are.
+ * agent all belong to a workspace, and this page is not in one. Each row still
+ * opens its agent, in the workspace that owns it, and each header carries the
+ * link to that workspace's roster.
  */
 export default function AllAgentsPage() {
   const {
@@ -69,6 +72,9 @@ export default function AllAgentsPage() {
     return () => clearInterval(interval);
   }, []);
 
+  const roster = useMemo(() => agents ?? [], [agents]);
+  const offline = useMemo(() => offlineDaemons(roster), [roster]);
+
   if (error) {
     return (
       <div className="p-8">
@@ -79,26 +85,30 @@ export default function AllAgentsPage() {
 
   return (
     <div className="flex-1 px-8 pb-8 pt-6">
-      {loading ? (
-        <div className="space-y-2">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Skeleton key={i} className="h-14 w-full rounded-md" />
-          ))}
-        </div>
-      ) : (agents ?? []).length === 0 ? (
-        <Empty className="rounded-lg bg-canvas-soft py-16">
-          {/* The same head the workspace roster's empty state draws, with the
-              same settings — one empty state, two copies of the sentence. */}
-          <AgentHead size={96} interactive antenna floorShadow paused={false} />
-          <EmptyTitle>No agents yet</EmptyTitle>
-          <EmptyDescription>
-            An agent belongs to a workspace. Create one there and it will show up
-            here.
-          </EmptyDescription>
-        </Empty>
-      ) : (
-        <AgentList groups={groupByWorkspace(agents ?? [])} />
-      )}
+      <div className="space-y-3">
+        <AgentDaemonBanner daemons={offline} />
+
+        {loading ? (
+          <div className="space-y-2">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-md" />
+            ))}
+          </div>
+        ) : roster.length === 0 ? (
+          <Empty className="rounded-lg bg-canvas-soft py-16">
+            {/* The same head the workspace roster's empty state draws, with the
+                same settings — one empty state, two copies of the sentence. */}
+            <AgentHead size={96} interactive antenna floorShadow paused={false} />
+            <EmptyTitle>No agents yet</EmptyTitle>
+            <EmptyDescription>
+              An agent belongs to a workspace. Create one there and it will show
+              up here.
+            </EmptyDescription>
+          </Empty>
+        ) : (
+          <AgentRoster groups={groupByWorkspace(roster)} />
+        )}
+      </div>
     </div>
   );
 }

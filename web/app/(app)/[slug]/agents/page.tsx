@@ -1,119 +1,60 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Plus, Pencil } from "lucide-react";
-import { api, agentApi, skillApi, type Agent, type Skill } from "@/lib/api";
+import { Plus, Search } from "lucide-react";
+import { agentApi, type Agent } from "@/lib/api";
+import { AGENT_REFRESH_MS } from "@/lib/agent-status";
+import { offlineDaemons } from "@/lib/agent-presence";
 import {
-  agentStatus,
-  AGENT_STATUS_LABEL,
-  AGENT_REFRESH_MS,
-  type AgentStatus,
-} from "@/lib/agent-status";
+  activeAgentFilters,
+  agentFilterCounts,
+  filterAgents,
+  NO_AGENT_FILTERS,
+  type AgentFilters,
+} from "@/lib/agent-filters";
 import { paths } from "@/lib/paths";
+import { invalidateApi, useApi } from "@/lib/query";
+import { AgentDaemonBanner } from "@/components/agents/agent-daemon-banner";
+import { AgentDialog } from "@/components/agents/agent-dialog";
+import { AgentFilterMenu } from "@/components/agents/agent-filter-menu";
 import { AgentHead } from "@/components/agents/agent-head";
-import { AgentList } from "@/components/agents/agent-list";
-import {
-  DEFAULT_HEAD_SHAPE,
-  HEAD_SHAPES,
-  HEAD_SHAPE_LABEL,
-  headShapeOf,
-} from "@/lib/agent-shape";
-import type { RobotHeadShape } from "@/vendor/robot-heads/types";
-import { cn } from "@/lib/utils";
-import { ProviderIcon } from "@/components/provider-icon";
-import { WorkspaceAvatar } from "@/components/workspace-avatar";
-import { PageToolbar } from "@/components/page-toolbar";
-import { FilterChips } from "@/components/filter-chips";
-import { invalidateApi, setApiData, useApi } from "@/lib/query";
-import { Field, TextArea } from "@/components/form-field";
-import { InlineConfirm } from "@/components/inline-confirm";
+import { AgentRoster } from "@/components/agents/agent-roster";
+import { PageToolbar, PageToolbarSkeleton } from "@/components/page-toolbar";
 import { Button } from "@/components/ui/button";
+import { Empty, EmptyDescription, EmptyTitle } from "@/components/ui/empty";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Empty, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger } from "@/components/ui/select";
-import { toast } from "sonner";
 
-interface DaemonRuntime {
-  kind: string;
-}
-interface Daemon {
-  id: string;
-  name: string;
-  status: string;
-  runtimes: DaemonRuntime[];
-}
-interface DaemonOption {
-  id: string;
-  name: string;
-  providers: string[];
-}
-
-const STATUS_FILTERS: Array<{ key: AgentStatus | "all"; label: string }> = [
-  { key: "all", label: "All" },
-  { key: "running", label: AGENT_STATUS_LABEL.running },
-  { key: "queued", label: AGENT_STATUS_LABEL.queued },
-  { key: "idle", label: AGENT_STATUS_LABEL.idle },
-  { key: "offline", label: AGENT_STATUS_LABEL.offline },
-];
-
+/**
+ * A workspace's agents: who they are, what they are doing, and whether the
+ * machine under them can run.
+ *
+ * The page used to be a table with one status word per row and a row of chips
+ * above it. Three things were wrong with that, and all three were about the
+ * same missing layer — there was nowhere to *read* an agent:
+ *
+ *   - an offline daemon turned every agent on it into "Offline", including the
+ *     one with tasks still queued behind it;
+ *   - the row said "1 run" where the question is "doing what";
+ *   - the filter flattened "can it run" and "does it have work" into one list
+ *     of five words, and offered no search.
+ *
+ * Reading now happens on the agent's own page; this page is the roster that
+ * gets you there.
+ */
 export default function WorkspaceAgentsPage() {
   const { slug } = useParams<{ slug: string }>();
   const router = useRouter();
 
-  // Three reads, all cached: the agent list is also read by the shell's
-  // workspace switch, the skills by the skills page, the daemons by the daemons
-  // page — each used to be a separate request for the same bytes.
   const {
     data: agents,
     loading,
     error,
-    refresh: refreshAgents,
+    refresh,
   } = useApi<Agent[]>(`/api/v1/workspaces/${slug}/agents`, () =>
     agentApi.list(slug),
   );
-  const { data: skills = [] } = useApi<Skill[]>(
-    `/api/v1/workspaces/${slug}/skills`,
-    () => skillApi.list(slug),
-  );
-  const { data: daemonRows = [] } = useApi<Daemon[]>("/api/v1/daemons", () =>
-    api.get<Daemon[]>("/api/v1/daemons"),
-  );
-  // Safe to trust as-is: the server resolves liveness against the heartbeat
-  // before it sends a row, so this filter and the daemons page can never
-  // disagree about the same machine.
-  const daemons: DaemonOption[] = useMemo(
-    () =>
-      daemonRows
-        .filter((d) => d.status === "online")
-        .map((d) => ({
-          id: d.id,
-          name: d.name,
-          providers: (d.runtimes || []).map((r) => r.kind),
-        })),
-    [daemonRows],
-  );
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Agent | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [confirmId, setConfirmId] = useState<string | null>(null);
-  const [statusFilter, setStatusFilter] = useState<AgentStatus | "all">("all");
-
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [instructions, setInstructions] = useState("");
-  const [model, setModel] = useState("");
-  const [daemonId, setDaemonId] = useState("");
-  const [provider, setProvider] = useState("");
-  const [avatarUrl, setAvatarUrl] = useState("");
-  const [avatarError, setAvatarError] = useState("");
-  const [headShape, setHeadShape] = useState<RobotHeadShape>(DEFAULT_HEAD_SHAPE);
-  const [skillIds, setSkillIds] = useState<string[]>([]);
-  const [enabled, setEnabled] = useState(true);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Status is derived from the daemon heartbeat, so the server has to be asked
   // again on its schedule, not on the render's.
@@ -129,425 +70,118 @@ export default function WorkspaceAgentsPage() {
     if (error) router.push(paths.workspaces());
   }, [error, router]);
 
-  const openCreate = () => {
-    setEditing(null);
-    setName("");
-    setDescription("");
-    setInstructions("");
-    setModel("");
-    setDaemonId("");
-    setProvider("");
-    setAvatarUrl("");
-    setAvatarError("");
-    setHeadShape(DEFAULT_HEAD_SHAPE);
-    setSkillIds([]);
-    setEnabled(true);
-    setOpen(true);
-  };
+  const [filters, setFilters] = useState<AgentFilters>(NO_AGENT_FILTERS);
+  // "new" or the agent being edited; mounted only while open.
+  const [dialog, setDialog] = useState<Agent | "new" | null>(null);
 
-  const openEdit = (a: Agent) => {
-    setEditing(a);
-    setName(a.name);
-    setDescription(a.description);
-    setInstructions(a.instructions);
-    setModel(a.model);
-    setDaemonId(a.runtime?.daemon_id ?? "");
-    setProvider(a.runtime?.provider ?? "");
-    setAvatarUrl(a.avatar_url ?? "");
-    setAvatarError("");
-    setHeadShape(headShapeOf(a.head_shape));
-    setSkillIds((a.skills || []).map((s) => s.id));
-    setEnabled(a.enabled);
-    setOpen(true);
-  };
+  const roster = useMemo(() => agents ?? [], [agents]);
+  const counts = useMemo(() => agentFilterCounts(roster), [roster]);
+  const visible = useMemo(() => filterAgents(roster, filters), [roster, filters]);
+  const offline = useMemo(() => offlineDaemons(roster), [roster]);
+  const narrowed =
+    filters.search.trim() !== "" || activeAgentFilters(filters) > 0;
 
-  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    if (file.size > 1024 * 1024) {
-      setAvatarError("Image must be under 1MB.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      setAvatarUrl(reader.result as string);
-      setAvatarError("");
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const save = async () => {
-    if (!name.trim()) return toast.error("Name is required");
-    if (!daemonId || !provider) return toast.error("Choose a daemon and provider");
-    setSaving(true);
-    const body = {
-      name,
-      description,
-      instructions,
-      model,
-      daemon_id: daemonId,
-      provider,
-      avatar_url: avatarUrl,
-      head_shape: headShape,
-      skill_ids: skillIds,
-      enabled,
-    };
-    try {
-      if (editing) await agentApi.update(slug, editing.id, body);
-      else await agentApi.create(slug, body);
-      setOpen(false);
-      // Re-read through the cache so the row shows the server's version of
-      // what was just written, not the optimistic one.
-      refreshAgents();
-      toast.success(editing ? "Agent updated" : "Agent created");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to save agent");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const remove = async (id: string) => {
-    try {
-      await agentApi.remove(slug, id);
-      setApiData<Agent[]>(`/api/v1/workspaces/${slug}/agents`, (prev = []) =>
-        prev.filter((a) => a.id !== id),
-      );
-      toast.success("Agent deleted");
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to delete agent");
-    }
-    setConfirmId(null);
-  };
-
-  const agentsList = useMemo(() => agents ?? [], [agents]);
-  const counts = useMemo(() => {
-    const acc: Record<string, number> = {};
-    for (const a of agentsList) {
-      const s = agentStatus(a);
-      acc[s] = (acc[s] ?? 0) + 1;
-    }
-    return acc;
-  }, [agentsList]);
-
-  const visible = useMemo(
-    () =>
-      statusFilter === "all"
-        ? agentsList
-        : agentsList.filter((a) => agentStatus(a) === statusFilter),
-    [agentsList, statusFilter],
-  );
-
-  const selectedDaemon = daemons.find((d) => d.id === daemonId);
-  const toggleSkill = (id: string) =>
-    setSkillIds((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+  if (loading) {
+    return (
+      <div className="flex h-full flex-col">
+        <PageToolbarSkeleton
+          leading={
+            <>
+              <Skeleton className="h-8 w-56" />
+              <Skeleton className="h-8 w-20" />
+            </>
+          }
+          actions={<Skeleton className="h-8 w-28" />}
+        />
+        <div className="flex-1 px-8 pb-8 pt-2">
+          <div className="space-y-2">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <Skeleton key={i} className="h-14 w-full rounded-md" />
+            ))}
+          </div>
+        </div>
+      </div>
     );
+  }
 
   return (
     <div className="flex h-full flex-col">
       <PageToolbar
+        leading={
+          <>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-mute" />
+              <Input
+                value={filters.search}
+                onChange={(e) =>
+                  setFilters((prev) => ({ ...prev, search: e.target.value }))
+                }
+                placeholder="Search agents…"
+                aria-label="Search agents"
+                className="h-8 w-56 pl-8"
+              />
+            </div>
+            <AgentFilterMenu
+              filters={filters}
+              onChange={setFilters}
+              counts={counts}
+            />
+            {narrowed && (
+              <span className="text-caption tabular-nums text-mute">
+                {visible.length} of {roster.length}
+              </span>
+            )}
+          </>
+        }
         actions={
-          <Button onClick={openCreate}>
+          <Button onClick={() => setDialog("new")}>
             <Plus className="size-4" />
-            New Agent
+            New agent
           </Button>
         }
       />
 
-      <div className="flex-1 px-8 pb-8 pt-6">
-        {loading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full rounded-md" />
-            ))}
-          </div>
-        ) : agentsList.length === 0 ? (
-          <Empty className="rounded-lg bg-canvas-soft py-16">
-            {/* The hero's own head — the antenna, the floor shadow and its own
-                life (it blinks, it hops, it follows the pointer), which is what
-                hero-head.tsx passes and what "like the homepage" means.
-                `paused={false}` overrides the roster's default, where a head
-                moves only while its agent has work: an empty roster has nothing
-                to signal, so this one may simply live. */}
-            <AgentHead size={96} interactive antenna floorShadow paused={false} />
-            <EmptyTitle>No agents yet</EmptyTitle>
-            <EmptyDescription>
-              Agents are AI workers bound to a runtime. Create one to start
-              mentioning it in issues.
-            </EmptyDescription>
-            <Button onClick={openCreate} className="mt-1">
-              <Plus className="size-4" />
-              Create your first agent
-            </Button>
-          </Empty>
-        ) : (
-          <>
-            <FilterChips
-              label="Status"
-              className="mb-3"
-              value={statusFilter}
-              onChange={setStatusFilter}
-              items={STATUS_FILTERS.map((f) => {
-                const count =
-                  f.key === "all" ? agentsList.length : (counts[f.key] ?? 0);
-                return {
-                  value: f.key,
-                  label: f.label,
-                  count,
-                  // A status nobody is in is still worth drawing — it says the
-                  // roster has nobody there — but not worth pressing.
-                  disabled: f.key !== "all" && count === 0,
-                };
-              })}
-            />
+      <div className="flex-1 px-8 pb-8 pt-2">
+        <div className="space-y-3">
+          <AgentDaemonBanner daemons={offline} />
 
-            <AgentList
-              groups={[{ key: slug, agents: visible }]}
-              // Only a real status has a "no agents are …" sentence. With "all"
-              // chosen the empty case is the page's own empty state above, and
-              // `AGENT_STATUS_LABEL["all"]` is not a key at all — which is why
-              // this is a guard and not the expression it used to be inline,
-              // where the `&&` kept it from being evaluated.
-              empty={
-                statusFilter === "all"
-                  ? undefined
-                  : `No agents are ${AGENT_STATUS_LABEL[statusFilter].toLowerCase()}.`
-              }
-              renderActions={(a) => (
-                <div className="flex items-center justify-end gap-3">
-                  <button
-                    onClick={() => openEdit(a)}
-                    className="text-hairline-strong transition-colors hover:text-ink"
-                    title="Edit agent"
-                    aria-label="Edit agent"
-                  >
-                    <Pencil className="size-4" />
-                  </button>
-                  <InlineConfirm
-                    confirming={confirmId === a.id}
-                    question="Delete?"
-                    title="Delete agent"
-                    onRequest={() => setConfirmId(a.id)}
-                    onConfirm={() => remove(a.id)}
-                    onCancel={() => setConfirmId(null)}
-                  />
-                </div>
-              )}
+          {roster.length === 0 ? (
+            <Empty className="rounded-lg bg-canvas-soft py-16">
+              {/* The hero's own head — the antenna, the floor shadow and its own
+                  life (it blinks, it hops, it follows the pointer), which is what
+                  hero-head.tsx passes and what "like the homepage" means.
+                  `paused={false}` overrides the roster's default, where a head
+                  moves only while its agent has work: an empty roster has nothing
+                  to signal, so this one may simply live. */}
+              <AgentHead size={96} interactive antenna floorShadow paused={false} />
+              <EmptyTitle>No agents yet</EmptyTitle>
+              <EmptyDescription>
+                Agents are AI workers bound to a runtime. Create one to start
+                mentioning it in issues.
+              </EmptyDescription>
+              <Button onClick={() => setDialog("new")} className="mt-1">
+                <Plus className="size-4" />
+                Create your first agent
+              </Button>
+            </Empty>
+          ) : (
+            <AgentRoster
+              groups={[{ key: slug, slug, agents: visible }]}
+              empty="No agents match this filter."
             />
-          </>
-        )}
+          )}
+        </div>
       </div>
 
-      <Dialog open={open} onOpenChange={(v) => !v && setOpen(false)}>
-        <DialogContent className="sm:max-w-xl">
-          <DialogTitle className="sr-only">
-            {editing ? "Edit agent" : "Create agent"}
-          </DialogTitle>
-          <div className="space-y-4">
-            {/* One face, one field: a robot **or** a picture, never both. The
-                five outlines are the same robot (one visor, one three-cell
-                face), so the choice is a silhouette and nothing else; picking
-                one drops the picture, and uploading a picture drops the
-                selection — the roster draws whichever of the two is set.
-                The big head on the left is the preview: alive, showing the
-                agent's own state while editing. The row of small ones is the
-                picker and they are still frames on purpose, because a click
-                here means "choose me", not "poke me". */}
-            <Field label="Avatar">
-              <div className="flex items-start gap-4">
-                <div className="flex size-24 shrink-0 items-center justify-center rounded-lg bg-canvas-soft-2">
-                  {avatarUrl ? (
-                    <WorkspaceAvatar
-                      name={name || "agent"}
-                      avatarUrl={avatarUrl}
-                      className="size-20"
-                    />
-                  ) : (
-                    <AgentHead
-                      shape={headShape}
-                      status={editing ? agentStatus(editing) : "idle"}
-                      size={96}
-                      interactive
-                      paused={false}
-                    />
-                  )}
-                </div>
-                <div className="min-w-0 space-y-2">
-                  <div role="group" aria-label="Robot" className="flex gap-1">
-                    {HEAD_SHAPES.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        aria-pressed={!avatarUrl && headShape === s}
-                        aria-label={HEAD_SHAPE_LABEL[s]}
-                        title={HEAD_SHAPE_LABEL[s]}
-                        onClick={() => {
-                          setHeadShape(s);
-                          // 二选一: picking the robot is what drops the picture.
-                          setAvatarUrl("");
-                        }}
-                        className={cn(
-                          "rounded-md p-2 transition-colors",
-                          !avatarUrl && headShape === s
-                            ? "bg-muted ring-2 ring-link"
-                            : "hover:bg-muted",
-                        )}
-                      >
-                        <AgentHead shape={s} size={52} paused />
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      Upload picture
-                    </Button>
-                    {avatarUrl && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setAvatarUrl("")}
-                      >
-                        Remove
-                      </Button>
-                    )}
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={handleFileChange}
-                    />
-                  </div>
-                  {avatarError ? (
-                    <p className="text-caption text-destructive">{avatarError}</p>
-                  ) : (
-                    <p className="text-caption text-mute">
-                      A robot, or a picture instead of one — PNG, JPG or SVG, up
-                      to 1MB.
-                    </p>
-                  )}
-                </div>
-              </div>
-            </Field>
-            <Field label="Name">
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="coder"
-                autoFocus
-              />
-            </Field>
-            <Field label="Description">
-              <Input
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Backend engineer"
-              />
-            </Field>
-            <Field label="Instructions">
-              <TextArea
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-                placeholder="You are a senior backend engineer…"
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="Daemon">
-                <Select
-                  value={daemonId}
-                  onValueChange={(v) => {
-                    setDaemonId(v);
-                    setProvider("");
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    {selectedDaemon?.name ?? "Select daemon"}
-                  </SelectTrigger>
-                  <SelectContent position="popper" sideOffset={4}>
-                    {daemons.map((d) => (
-                      <SelectItem key={d.id} value={d.id}>
-                        {d.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-              <Field label="Provider">
-                <Select value={provider} onValueChange={setProvider} disabled={!selectedDaemon}>
-                  <SelectTrigger className="w-full">
-                    {provider ? (
-                      <span className="flex items-center gap-1.5">
-                        <ProviderIcon provider={provider} className="size-3.5" />
-                        {provider}
-                      </span>
-                    ) : (
-                      "Select provider"
-                    )}
-                  </SelectTrigger>
-                  <SelectContent position="popper" sideOffset={4}>
-                    {(selectedDaemon?.providers || []).map((p) => (
-                      <SelectItem key={p} value={p}>
-                        <span className="flex items-center gap-1.5">
-                          <ProviderIcon provider={p} className="size-3.5" />
-                          {p}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </Field>
-            </div>
-            <Field label="Model (optional)">
-              <Input
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="Leave empty for provider default"
-              />
-            </Field>
-            {skills.length > 0 && (
-              <Field label="Skills">
-                <div className="max-h-32 space-y-1 overflow-y-auto rounded-sm border border-hairline p-2">
-                  {skills.map((s) => (
-                    <label key={s.id} className="flex items-center gap-2 text-copy text-body">
-                      <input
-                        type="checkbox"
-                        checked={skillIds.includes(s.id)}
-                        onChange={() => toggleSkill(s.id)}
-                        className="size-4"
-                      />
-                      {s.name}
-                    </label>
-                  ))}
-                </div>
-              </Field>
-            )}
-            <label className="flex items-center gap-2 text-copy text-body">
-              <input
-                type="checkbox"
-                checked={enabled}
-                onChange={(e) => setEnabled(e.target.checked)}
-                className="size-4"
-              />
-              Enabled
-            </label>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>
-                Cancel
-              </Button>
-              <Button disabled={saving} onClick={save}>
-                {saving ? "Saving…" : editing ? "Save changes" : "Create agent"}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {dialog && (
+        <AgentDialog
+          slug={slug}
+          agent={dialog === "new" ? null : dialog}
+          onClose={() => setDialog(null)}
+          onSaved={refresh}
+          onDeleted={refresh}
+        />
+      )}
     </div>
   );
 }
-

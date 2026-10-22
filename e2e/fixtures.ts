@@ -462,6 +462,10 @@ export class TestApiClient {
       /** false seeds an agent that exists but cannot run, which is what the
        * assignment picker has to render as unpickable. */
       enabled?: boolean;
+      /** What the agent works from — the detail page's reading surface. */
+      instructions?: string;
+      model?: string;
+      skill_ids?: string[];
     },
   ): Promise<{ id: string; name: string; head_shape: string }> {
     return this.authedFetch(`/api/v1/workspaces/${workspaceId}/agents`, {
