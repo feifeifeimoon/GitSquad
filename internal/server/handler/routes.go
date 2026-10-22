@@ -212,6 +212,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.GET("/workspaces/:id/agents", agentHandler.List)
 			protected.POST("/workspaces/:id/agents", agentHandler.Create)
 			protected.GET("/workspaces/:id/agents/:agentId", agentHandler.Get)
+			protected.GET("/workspaces/:id/agents/:agentId/tasks", agentHandler.Tasks)
 			protected.PATCH("/workspaces/:id/agents/:agentId", agentHandler.Update)
 			protected.DELETE("/workspaces/:id/agents/:agentId", agentHandler.Delete)
 			protected.GET("/workspaces/:id/runtimes", agentHandler.ListRuntimes)

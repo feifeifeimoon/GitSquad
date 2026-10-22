@@ -27,6 +27,14 @@ var (
 	ErrSkillNameTaken   = errors.New("skill name already exists in workspace")
 )
 
+// How much of an agent's history one read returns, and the ceiling on what a
+// caller may ask for. The detail page shows twenty; anything a browser can ask
+// is clamped so the endpoint cannot be used as a bulk export.
+const (
+	defaultAgentTaskLimit = 20
+	maxAgentTaskLimit     = 50
+)
+
 // A name is both the roster's display name and the @mention handle, so it
 // takes any script's letters and digits — a Han name is a name — but no spaces
 // or punctuation, which is what lets a mention end where the name ends.
@@ -328,6 +336,58 @@ func (s *AgentService) UpdateAgent(ctx context.Context, workspaceID, agentID uui
 
 func (s *AgentService) DeleteAgent(ctx context.Context, workspaceID, agentID uuid.UUID) error {
 	return s.store.DeleteAgent(ctx, db.DeleteAgentParams{ID: agentID, WorkspaceID: workspaceID})
+}
+
+// ListAgentTasks returns an agent's finished runs, newest first — the detail
+// page's history. In-flight work is the agent's current_task, not a row here, so
+// the limit counts history rather than a queue that may never drain.
+//
+// The agent is resolved before the tasks are read, so the workspace boundary is
+// enforced by the same lookup the rest of the page uses. Querying tasks by
+// agent id alone would answer for an agent in someone else's workspace.
+func (s *AgentService) ListAgentTasks(ctx context.Context, workspaceID, agentID uuid.UUID, limit int) ([]v1.AgentTask, error) {
+	if _, err := s.store.GetAgent(ctx, db.GetAgentParams{ID: agentID, WorkspaceID: workspaceID}); err != nil {
+		return nil, ErrAgentNotFound
+	}
+	if limit <= 0 {
+		limit = defaultAgentTaskLimit
+	}
+	if limit > maxAgentTaskLimit {
+		limit = maxAgentTaskLimit
+	}
+
+	rows, err := s.store.ListFinishedTasksByAgent(ctx, db.ListFinishedTasksByAgentParams{
+		AgentID: agentID,
+		Limit:   int32(limit),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list tasks for agent: %w", err)
+	}
+
+	out := make([]v1.AgentTask, 0, len(rows))
+	for _, r := range rows {
+		task := v1.AgentTask{
+			ID:          r.ID,
+			Status:      r.Status,
+			Kind:        r.Kind,
+			IssueTitle:  r.IssueTitle,
+			PRNumber:    r.PrNumber,
+			StartedAt:   r.StartedAt,
+			CompletedAt: r.CompletedAt,
+			CreatedAt:   r.CreatedAt,
+		}
+		// A review task has no issue, so a key built from empty prefix and
+		// number zero would read "-0" — the one case where "no subject" has to
+		// stay empty rather than be formatted.
+		if r.IssueNumber > 0 {
+			task.IssueKey = fmt.Sprintf("%s-%d", r.IssuePrefix, r.IssueNumber)
+		}
+		if r.FailureReason != nil {
+			task.FailureReason = *r.FailureReason
+		}
+		out = append(out, task)
+	}
+	return out, nil
 }
 
 func (s *AgentService) ListRuntimes(ctx context.Context, workspaceID uuid.UUID) ([]v1.AgentRuntime, error) {

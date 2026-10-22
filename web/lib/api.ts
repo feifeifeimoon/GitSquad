@@ -331,6 +331,27 @@ export interface AgentCurrentTask {
   issue_title: string;
 }
 
+/**
+ * One entry in an agent's recent work — a row of `tasks`, joined with the issue
+ * it belongs to. This is the detail page's history; the roster shows only what
+ * is happening now.
+ *
+ * `kind` is "issue" for a coding run and "review" for a pull-request review, so
+ * a review row can name its PR (`pr_number`) instead of an issue.
+ */
+export interface AgentTask {
+  id: string;
+  status: "queued" | "dispatched" | "running" | "completed" | "failed" | "cancelled";
+  kind: "issue" | "review";
+  issue_key: string;
+  issue_title: string;
+  pr_number: number;
+  failure_reason: string;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
 export interface Agent {
   id: string;
   workspace_id: string;
@@ -546,6 +567,11 @@ export const agentApi = {
   }) => api.patch<Agent>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`, body),
   remove: (workspaceId: string, agentId: string) =>
     api.delete<{ deleted: boolean }>(`/api/v1/workspaces/${workspaceId}/agents/${agentId}`),
+  /** An agent's recent runs, newest first. The detail page's history. */
+  tasks: (workspaceId: string, agentId: string, limit = 20) =>
+    api.get<AgentTask[]>(
+      `/api/v1/workspaces/${workspaceId}/agents/${agentId}/tasks?limit=${limit}`,
+    ),
 };
 
 export const skillApi = {

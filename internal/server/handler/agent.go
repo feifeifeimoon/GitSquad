@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 
 	"github.com/feifeifeimoon/GitSquad/internal/server/middleware"
 	"github.com/feifeifeimoon/GitSquad/internal/server/service"
@@ -104,6 +105,33 @@ func (h *AgentHandler) Get(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, v1.SuccessResponse(agent, 0))
+}
+
+// Tasks lists an agent's recent runs, newest first — what the detail page shows
+// under "Recent runs". `limit` is clamped by the service; an unparseable value
+// falls back to the default rather than failing the read.
+func (h *AgentHandler) Tasks(c *gin.Context) {
+	wsID, ok := h.requireWorkspace(c)
+	if !ok {
+		return
+	}
+	agentID, err := uuid.Parse(c.Param("agentId"))
+	if err != nil {
+		c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid agent id"))
+		return
+	}
+	limit := 0
+	if raw := c.Query("limit"); raw != "" {
+		if n, convErr := strconv.Atoi(raw); convErr == nil {
+			limit = n
+		}
+	}
+	tasks, err := h.agents.ListAgentTasks(c.Request.Context(), wsID, agentID, limit)
+	if err != nil {
+		h.writeErr(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, v1.SuccessResponse(tasks, len(tasks)))
 }
 
 func (h *AgentHandler) Update(c *gin.Context) {

@@ -42,6 +42,9 @@ export const paths = {
     pullRequests: () => `/${encode(slug)}/pull-requests`,
     settings: () => `/${encode(slug)}/settings`,
     agents: () => `/${encode(slug)}/agents`,
+    // By id, not by name: renaming an agent must not break a link somebody
+    // pasted into an issue three weeks ago.
+    agent: (id: string) => `/${encode(slug)}/agents/${encode(id)}`,
     skills: () => `/${encode(slug)}/skills`,
   }),
 };

@@ -21,24 +21,51 @@ const ROW = "flex items-center justify-end gap-3 px-8 py-4";
 /**
  * The page's own toolbar, under the bar.
  *
- * Renders nothing when the page has no actions, so a page with nothing to put
- * here starts at the top of the content area instead of under an empty row.
+ * `leading` is the half that belongs to reading — a search field, a filter —
+ * and `actions` the half that belongs to acting. A page with only one of them
+ * draws only that one; a page with neither draws no row at all.
  */
-export function PageToolbar({ actions }: { actions?: ReactNode }) {
-  if (!actions) return null;
+export function PageToolbar({
+  leading,
+  actions,
+}: {
+  leading?: ReactNode;
+  actions?: ReactNode;
+}) {
+  if (!leading && !actions) return null;
   return (
     <div className={ROW}>
-      <div className="flex items-center gap-2">{actions}</div>
+      {leading ? (
+        <div className="mr-auto flex min-w-0 flex-wrap items-center gap-2">
+          {leading}
+        </div>
+      ) : null}
+      {actions ? (
+        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      ) : null}
     </div>
   );
 }
 
 /** The same row while the page loads, so nothing shifts when it lands. */
-export function PageToolbarSkeleton({ actions }: { actions?: ReactNode }) {
-  if (!actions) return null;
+export function PageToolbarSkeleton({
+  leading,
+  actions,
+}: {
+  leading?: ReactNode;
+  actions?: ReactNode;
+}) {
+  if (!leading && !actions) return null;
   return (
     <div className={ROW}>
-      <div className="flex items-center gap-2">{actions}</div>
+      {leading ? (
+        <div className="mr-auto flex min-w-0 flex-wrap items-center gap-2">
+          {leading}
+        </div>
+      ) : null}
+      {actions ? (
+        <div className="flex shrink-0 items-center gap-2">{actions}</div>
+      ) : null}
     </div>
   );
 }

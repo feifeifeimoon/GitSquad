@@ -86,3 +86,30 @@ RETURNING *;
 UPDATE tasks SET status = 'cancelled', completed_at = now(), updated_at = now()
 WHERE assigned_daemon_id = $1::uuid AND kind = 'review' AND status = 'queued'
 RETURNING *;
+
+-- name: ListFinishedTasksByAgent :many
+-- An agent's finished runs, newest first. The detail page's history: the issue
+-- the run belongs to (or the pull request, for a review), when it started and
+-- finished, and why it failed.
+--
+-- Terminal statuses only. The page filtered afterwards, so a machine with
+-- twenty queued tasks filled the limit and left the history empty while the
+-- agent's own counters said it had runs. What is in flight is the agent's
+-- `current_task`, not a row here.
+--
+-- The issue key is assembled by the caller (prefix + number), the way every
+-- other agent read composes it, so one place decides what a key looks like.
+SELECT t.id, t.status, t.kind,
+       t.failure_reason, t.started_at, t.completed_at, t.created_at,
+       coalesce(w.issue_prefix, '') AS issue_prefix,
+       coalesce(i.number, 0)::int AS issue_number,
+       coalesce(i.title, '') AS issue_title,
+       coalesce(pr.number, 0)::int AS pr_number
+FROM tasks t
+LEFT JOIN issues i ON i.id = t.issue_id
+LEFT JOIN workspaces w ON w.id = t.workspace_id
+LEFT JOIN pull_requests pr ON pr.id = t.pull_request_id
+WHERE t.agent_id = $1
+  AND t.status IN ('completed', 'failed', 'cancelled')
+ORDER BY t.created_at DESC
+LIMIT $2;
