@@ -22,6 +22,12 @@ type PullRequestSummary struct {
 	HeadSHA    string    `json:"head_sha"`
 	UpdatedAt  time.Time `json:"updated_at"`
 
+	// The diff's size, as GitHub last reported it. The peek shows it beside the
+	// title: "how big is this" is the next question after "what is it".
+	Additions    int32 `json:"additions"`
+	Deletions    int32 `json:"deletions"`
+	ChangedFiles int32 `json:"changed_files"`
+
 	// IssueKey and IssueTitle are empty when the PR is not linked to an issue.
 	IssueKey   string `json:"issue_key,omitempty"`
 	IssueTitle string `json:"issue_title,omitempty"`

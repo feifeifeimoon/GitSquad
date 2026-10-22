@@ -365,6 +365,10 @@ export class TestApiClient {
       repo?: string;
       suppressed?: boolean;
       headSha?: string;
+      /** The peek shows the diff size; 0 leaves the line out. */
+      additions?: number;
+      deletions?: number;
+      changedFiles?: number;
     } = {},
   ): Promise<{ id: string }> {
     const owner = opts.owner ?? "e2e-owner";
@@ -377,9 +381,9 @@ export class TestApiClient {
         `INSERT INTO pull_requests
            (workspace_id, issue_id, repo_owner, repo_name, number, title, url,
             state, head_branch, base_branch, author, source, close_intent,
-            suppressed_at, github_updated_at, head_sha)
+            suppressed_at, github_updated_at, head_sha, additions, deletions, changed_files)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'main', 'gitsquad[bot]', 'platform', true,
-                 CASE WHEN $10 THEN now() ELSE NULL END, now(), $11)
+                 CASE WHEN $10 THEN now() ELSE NULL END, now(), $11, $12, $13, $14)
          RETURNING id`,
         [
           workspaceId,
@@ -393,6 +397,9 @@ export class TestApiClient {
           `gitsquad/E2E-1/${number}`,
           opts.suppressed ?? false,
           opts.headSha ?? "",
+          opts.additions ?? 0,
+          opts.deletions ?? 0,
+          opts.changedFiles ?? 0,
         ],
       );
       return { id: res.rows[0].id as string };
