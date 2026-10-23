@@ -4,6 +4,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import type { PullRequestSummary } from "@/lib/api";
 import { formatTokens, reviewStatus } from "@/lib/pr-review";
+import { prHasDiff } from "@/lib/pr-list";
 import { paths } from "@/lib/paths";
 import { cn } from "@/lib/utils";
 import { TimeAgo } from "@/components/time-ago";
@@ -39,7 +40,7 @@ export function PullRequestPeek({
   const review = pr.latest_review;
   const status = reviewStatus(review);
   const inFlight = review?.status === "queued" || review?.status === "running";
-  const hasDiff = pr.additions > 0 || pr.deletions > 0;
+  const hasDiff = prHasDiff(pr);
 
   return (
     <div
@@ -117,21 +118,26 @@ export function PullRequestPeek({
                 {review.summary}
               </p>
             )}
-            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption">
-              <span className="text-body">
-                {review.findings} finding{review.findings === 1 ? "" : "s"}
-              </span>
-              {review.url && (
-                <a
-                  href={review.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="text-link transition-colors hover:text-link-deep"
-                >
-                  Review on GitHub
-                </a>
-              )}
-            </div>
+            {/* Only a completed review has findings: the column defaults to 0
+                and is written once, when the run reports. Rendering it earlier
+                promised "0 findings" for a queue that had not looked yet. */}
+            {review.status === "completed" && (
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption">
+                <span className="text-body">
+                  {review.findings} finding{review.findings === 1 ? "" : "s"}
+                </span>
+                {review.url && (
+                  <a
+                    href={review.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-link transition-colors hover:text-link-deep"
+                  >
+                    Review on GitHub
+                  </a>
+                )}
+              </div>
+            )}
           </>
         ) : (
           <p className="mt-1 text-caption text-mute">Not reviewed yet.</p>

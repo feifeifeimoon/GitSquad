@@ -46,6 +46,19 @@ export function filterPrs<T extends Pick<PullRequestSummary, "state">>(
 }
 
 /**
+ * Whether the peek has a size to show. A rename or a binary change reports
+ * zero added and zero removed lines and still touches files, so the file count
+ * alone is enough to be worth a line.
+ */
+export function prHasDiff(pr: {
+  additions: number;
+  deletions: number;
+  changed_files: number;
+}): boolean {
+  return pr.additions > 0 || pr.deletions > 0 || pr.changed_files > 0;
+}
+
+/**
  * Which PR the peek shows: the one somebody selected, or the first row of the
  * current tab.
  *

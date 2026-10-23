@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countPrs, filterPrs, prInFilter, selectedPr } from "./pr-list.ts";
+import { countPrs, filterPrs, prHasDiff, prInFilter, selectedPr } from "./pr-list.ts";
 
 const prs = [
   { id: "a", state: "open" },
@@ -37,4 +37,12 @@ test("the peek falls back to the first row when nothing is selected", () => {
 test("a selection that the current tab removed falls back to the first row", () => {
   assert.equal(selectedPr(filterPrs(prs, "closed"), "a"), "c");
   assert.equal(selectedPr([], "a"), null);
+});
+
+test("a rename or a binary change still has a size worth showing", () => {
+  // GitHub reports zero added and removed lines for both; only the file count
+  // says something changed.
+  assert.equal(prHasDiff({ additions: 0, deletions: 0, changed_files: 3 }), true);
+  assert.equal(prHasDiff({ additions: 5, deletions: 0, changed_files: 0 }), true);
+  assert.equal(prHasDiff({ additions: 0, deletions: 0, changed_files: 0 }), false);
 });

@@ -108,6 +108,9 @@ test.describe("Pull request review", () => {
     await expect(
       peekAgain.getByRole("button", { name: "Queued" }),
     ).toBeDisabled({ timeout: 20_000 });
+    // A queued review has not looked at anything yet: the finding count is
+    // written when the run reports, so "0 findings" here would be a promise.
+    await expect(peekAgain.getByText(/findings/)).toHaveCount(0);
   });
 
   test("selecting a row moves the peek, and Closed includes merged", async ({

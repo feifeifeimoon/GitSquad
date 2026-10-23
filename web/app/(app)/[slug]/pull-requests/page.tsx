@@ -11,7 +11,7 @@ import {
   selectedPr,
   type PrFilter,
 } from "@/lib/pr-list";
-import { useApi } from "@/lib/query";
+import { invalidateApi, useApi } from "@/lib/query";
 import { useMediaQuery } from "@/lib/use-media-query";
 import { ErrorState } from "@/components/error-state";
 import { FilterChips } from "@/components/filter-chips";
@@ -72,7 +72,12 @@ export default function PullRequestsPage() {
     try {
       await pullRequestApi.review(slug, pr.number);
       toast.success("Review queued.");
-      refresh();
+      // A queued review is a new task on the reviewer agent and a change to the
+      // linked issue. Refreshing only this list would leave the issue page and
+      // the rosters serving their pre-review copy for the cache's thirty
+      // seconds; the workspace prefix covers this list, the issues, the agents
+      // and the cross-workspace aggregates.
+      invalidateApi(`/api/v1/workspaces/${slug}`);
     } catch (err) {
       toast.error(
         err instanceof Error ? err.message : "Failed to start the review.",
