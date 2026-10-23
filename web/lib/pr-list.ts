@@ -58,6 +58,14 @@ export function prHasDiff(pr: {
   return pr.additions > 0 || pr.deletions > 0 || pr.changed_files > 0;
 }
 
+/** The tab a PR belongs to, so a link to a merged PR can open the tab that
+ * holds it rather than the Open tab it is not in. */
+export function prFilterOf(state: string): PrFilter {
+  if (state === "open") return "open";
+  if (state === "closed" || state === "merged") return "closed";
+  return "all";
+}
+
 /**
  * Which PR the peek shows: the one somebody selected, or the first row of the
  * current tab.

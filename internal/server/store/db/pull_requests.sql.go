@@ -673,6 +673,116 @@ func (q *Queries) ListPullRequestsByWorkspace(ctx context.Context, arg ListPullR
 	return items, nil
 }
 
+const listPullRequestsForUser = `-- name: ListPullRequestsForUser :many
+SELECT pr.id, pr.workspace_id, pr.issue_id, pr.repo_owner, pr.repo_name, pr.number, pr.title, pr.url, pr.state, pr.draft, pr.head_branch, pr.base_branch, pr.author, pr.head_sha, pr.body, pr.additions, pr.deletions, pr.changed_files, pr.author_association, pr.head_repo, pr.source, pr.close_intent, pr.suppressed_at, pr.merged_at, pr.github_updated_at, pr.created_at, pr.updated_at, w.slug AS workspace_slug, w.name AS workspace_name,
+       w.issue_prefix AS issue_prefix,
+       i.number AS issue_number, i.title AS issue_title
+FROM pull_requests pr
+JOIN workspaces w ON w.id = pr.workspace_id
+LEFT JOIN issues i ON i.id = pr.issue_id
+WHERE w.user_id = $1 AND w.status != 'archived' AND pr.suppressed_at IS NULL
+ORDER BY COALESCE(pr.github_updated_at, pr.updated_at) DESC
+LIMIT $2
+`
+
+type ListPullRequestsForUserParams struct {
+	UserID uuid.UUID `json:"user_id"`
+	Limit  int32     `json:"limit"`
+}
+
+type ListPullRequestsForUserRow struct {
+	ID                uuid.UUID  `json:"id"`
+	WorkspaceID       uuid.UUID  `json:"workspace_id"`
+	IssueID           *uuid.UUID `json:"issue_id"`
+	RepoOwner         string     `json:"repo_owner"`
+	RepoName          string     `json:"repo_name"`
+	Number            int32      `json:"number"`
+	Title             string     `json:"title"`
+	Url               string     `json:"url"`
+	State             string     `json:"state"`
+	Draft             bool       `json:"draft"`
+	HeadBranch        string     `json:"head_branch"`
+	BaseBranch        string     `json:"base_branch"`
+	Author            string     `json:"author"`
+	HeadSha           string     `json:"head_sha"`
+	Body              string     `json:"body"`
+	Additions         int32      `json:"additions"`
+	Deletions         int32      `json:"deletions"`
+	ChangedFiles      int32      `json:"changed_files"`
+	AuthorAssociation string     `json:"author_association"`
+	HeadRepo          string     `json:"head_repo"`
+	Source            string     `json:"source"`
+	CloseIntent       bool       `json:"close_intent"`
+	SuppressedAt      *time.Time `json:"suppressed_at"`
+	MergedAt          *time.Time `json:"merged_at"`
+	GithubUpdatedAt   *time.Time `json:"github_updated_at"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	WorkspaceSlug     string     `json:"workspace_slug"`
+	WorkspaceName     string     `json:"workspace_name"`
+	IssuePrefix       string     `json:"issue_prefix"`
+	IssueNumber       *int32     `json:"issue_number"`
+	IssueTitle        *string    `json:"issue_title"`
+}
+
+// Recent pull requests across every workspace this user owns, newest first —
+// the workspace list page's "Recent pull requests". The workspace rides along
+// because a feed that spans workspaces has to say which one each row belongs to
+// (the same rule as the All Workspaces board), and archived workspaces are left
+// out for the same reason they are left out there.
+func (q *Queries) ListPullRequestsForUser(ctx context.Context, arg ListPullRequestsForUserParams) ([]ListPullRequestsForUserRow, error) {
+	rows, err := q.db.Query(ctx, listPullRequestsForUser, arg.UserID, arg.Limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListPullRequestsForUserRow
+	for rows.Next() {
+		var i ListPullRequestsForUserRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.IssueID,
+			&i.RepoOwner,
+			&i.RepoName,
+			&i.Number,
+			&i.Title,
+			&i.Url,
+			&i.State,
+			&i.Draft,
+			&i.HeadBranch,
+			&i.BaseBranch,
+			&i.Author,
+			&i.HeadSha,
+			&i.Body,
+			&i.Additions,
+			&i.Deletions,
+			&i.ChangedFiles,
+			&i.AuthorAssociation,
+			&i.HeadRepo,
+			&i.Source,
+			&i.CloseIntent,
+			&i.SuppressedAt,
+			&i.MergedAt,
+			&i.GithubUpdatedAt,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.WorkspaceSlug,
+			&i.WorkspaceName,
+			&i.IssuePrefix,
+			&i.IssueNumber,
+			&i.IssueTitle,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const suppressPullRequest = `-- name: SuppressPullRequest :exec
 UPDATE pull_requests
 SET suppressed_at = now(), updated_at = now()

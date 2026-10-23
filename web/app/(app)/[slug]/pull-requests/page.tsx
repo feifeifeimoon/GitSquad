@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useParams } from "next/navigation";
 import { GitPullRequest } from "lucide-react";
 import { pullRequestApi, type PullRequestSummary } from "@/lib/api";
@@ -8,6 +8,7 @@ import {
   PR_FILTERS,
   countPrs,
   filterPrs,
+  prFilterOf,
   selectedPr,
   type PrFilter,
 } from "@/lib/pr-list";
@@ -36,10 +37,36 @@ import { toast } from "sonner";
  * Every PR is read once (`state=all`) and narrowed here, so the tabs can carry
  * counts and "Closed" can mean what GitHub means by it: closed *and* merged.
  */
+const emptySubscribe = () => () => {};
+
+/** The PR a link asked for, or null when the URL names none. */
+function readPrNumber(): number | null {
+  const number = Number(new URLSearchParams(window.location.search).get("pr"));
+  return Number.isFinite(number) && number > 0 ? number : null;
+}
+
 export default function PullRequestsPage() {
   const { slug } = useParams<{ slug: string }>();
-  const [filter, setFilter] = useState<PrFilter>("open");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Null until somebody picks a tab: a link can name a PR that is not open
+  // (the workspace list's feed lists merged ones), and landing on the Open tab
+  // would quietly select a different pull request.
+  const [pickedFilter, setPickedFilter] = useState<PrFilter | null>(null);
+  // Selection is a PR number rather than an id, because the workspace list's
+  // feed links here with `?pr=104` and a number is what a URL can carry.
+  //
+  // The number comes from the URL through `useSyncExternalStore`, not a lazy
+  // `useState` initializer: this page is server-rendered too, the initializer
+  // would run with no `window` and return null, and React keeps that server
+  // value after hydration — which is how the link would quietly stop selecting
+  // anything. Reading it as an external store lets the client answer for itself
+  // after hydration, with no effect and no second render in the wrong state.
+  const urlPrNumber = useSyncExternalStore(
+    emptySubscribe,
+    readPrNumber,
+    () => null,
+  );
+  const [pickedNumber, setPickedNumber] = useState<number | null>(null);
+  const selectedNumber = pickedNumber ?? urlPrNumber;
   const [reviewing, setReviewing] = useState<number | null>(null);
   // The peek is an aside where there is room for one, and a dialog where there
   // is not — the same content, two containers.
@@ -58,12 +85,19 @@ export default function PullRequestsPage() {
 
   const prs = useMemo(() => data ?? [], [data]);
   const counts = useMemo(() => countPrs(prs), [prs]);
+  const namedPr = selectedNumber
+    ? prs.find((pr) => pr.number === selectedNumber)
+    : undefined;
+  const filter: PrFilter =
+    pickedFilter ?? (namedPr ? prFilterOf(namedPr.state) : "open");
   const visible = useMemo(() => filterPrs(prs, filter), [prs, filter]);
+  const selectedId =
+    prs.find((pr) => pr.number === selectedNumber)?.id ?? null;
   const currentId = selectedPr(visible, selectedId);
   const current = visible.find((pr) => pr.id === currentId) ?? null;
 
   const select = (id: string) => {
-    setSelectedId(id);
+    setPickedNumber(prs.find((pr) => pr.id === id)?.number ?? null);
     if (!wide) setPeekOpen(true);
   };
 
@@ -101,7 +135,7 @@ export default function PullRequestsPage() {
           <FilterChips
             label="State"
             value={filter}
-            onChange={(next) => setFilter(next as PrFilter)}
+            onChange={(next) => setPickedFilter(next as PrFilter)}
             items={chips}
           />
         }

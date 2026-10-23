@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { countPrs, filterPrs, prHasDiff, prInFilter, selectedPr } from "./pr-list.ts";
+import { countPrs, filterPrs, prFilterOf, prHasDiff, prInFilter, selectedPr } from "./pr-list.ts";
 
 const prs = [
   { id: "a", state: "open" },
@@ -45,4 +45,11 @@ test("a rename or a binary change still has a size worth showing", () => {
   assert.equal(prHasDiff({ additions: 0, deletions: 0, changed_files: 3 }), true);
   assert.equal(prHasDiff({ additions: 5, deletions: 0, changed_files: 0 }), true);
   assert.equal(prHasDiff({ additions: 0, deletions: 0, changed_files: 0 }), false);
+});
+
+test("a linked PR opens the tab that holds it", () => {
+  assert.equal(prFilterOf("open"), "open");
+  assert.equal(prFilterOf("merged"), "closed");
+  assert.equal(prFilterOf("closed"), "closed");
+  assert.equal(prFilterOf("anything else"), "all");
 });
