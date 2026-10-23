@@ -15,6 +15,7 @@ import {
 // a view of them, not another source of truth.
 
 export interface OfflineMachine {
+  id: string;
   name: string;
   /** Tasks the agents on that machine have waiting. */
   queued: number;
@@ -27,11 +28,12 @@ export interface WorkspaceCard {
   /** Enabled agents, busiest first — the heads the card draws. */
   heads: Agent[];
   /**
-   * The machine that is down, if one is. A card says so in amber instead of
-   * listing its agents' states: "offline + 2 queued" is the only thing worth
-   * acting on.
+   * The machines that are down, busiest first. A card says so in amber instead
+   * of listing its agents' states: "offline + 2 queued" is the only thing worth
+   * acting on. One entry per machine — two down machines are two facts, and
+   * summing their queues under one name would be a false one.
    */
-  offline: OfflineMachine | null;
+  offline: OfflineMachine[];
   /** The most recent timestamp among its issues, or the workspace's own. */
   lastActiveAt: string;
 }
@@ -79,17 +81,26 @@ export function workspaceCards(
     let lastActiveAt = workspace.last_commit_at || workspace.created_at;
     for (const issue of wsIssues) lastActiveAt = newest(lastActiveAt, issue.updated_at);
 
-    // Enabled agents on a machine that is not reachable. Grouped by machine so
-    // the card can name it, and summed so it can say how much is waiting.
-    let offline: OfflineMachine | null = null;
+    // Enabled agents on machines that are not reachable, one entry per machine:
+    // "older-mac offline · 2 queued" has to name the machine those two are
+    // waiting on, so two down machines cannot share a line.
+    const down = new Map<string, OfflineMachine>();
     for (const agent of wsAgents) {
       if (!agent.enabled) continue;
       const runtime = agent.runtime;
       if (runtime?.daemon_id && runtime.daemon_status === "online") continue;
-      const name = runtime?.daemon_name || "Its machine";
-      offline ??= { name, queued: 0 };
-      offline.queued += agent.queued_count;
+      const id = runtime?.daemon_id || "unknown";
+      const entry = down.get(id) ?? {
+        id,
+        name: runtime?.daemon_name || "Its machine",
+        queued: 0,
+      };
+      entry.queued += agent.queued_count;
+      down.set(id, entry);
     }
+    const offline = [...down.values()].sort(
+      (a, b) => b.queued - a.queued || a.name.localeCompare(b.name),
+    );
 
     return {
       workspace,

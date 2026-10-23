@@ -56,13 +56,21 @@ export default function WorkspacesPage() {
   } = useApi<Workspace[]>("/api/v1/workspaces", () =>
     api.get<Workspace[]>("/api/v1/workspaces"),
   );
-  const { data: issues } = useApi<Issue[]>("/api/v1/issues", () =>
-    issueApi.listAll(),
-  );
-  const { data: agents } = useApi<Agent[]>("/api/v1/agents", () =>
-    agentApi.listAll(),
-  );
-  const { data: recentPrs } = useApi<PullRequestSummary[]>(
+  const {
+    data: issues,
+    error: issuesError,
+    refresh: refreshIssues,
+  } = useApi<Issue[]>("/api/v1/issues", () => issueApi.listAll());
+  const {
+    data: agents,
+    error: agentsError,
+    refresh: refreshAgents,
+  } = useApi<Agent[]>("/api/v1/agents", () => agentApi.listAll());
+  const {
+    data: recentPrs,
+    error: recentPrsError,
+    refresh: refreshRecentPrs,
+  } = useApi<PullRequestSummary[]>(
     "/api/v1/pull-requests?limit=5",
     () => pullRequestApi.recent(5),
   );
@@ -87,8 +95,16 @@ export default function WorkspacesPage() {
 
   // Every block reads a different request, and a card drawn before its issues
   // arrived would say "Nothing open" for a workspace full of work. One gate for
-  // the page is the honest version.
-  const ready = !loading && issues !== undefined && agents !== undefined;
+  // the page is the honest version — and a failed read has to leave it, or the
+  // skeleton is the only thing the page ever shows.
+  const loadError = error ?? issuesError ?? agentsError;
+  const retry = () => {
+    refresh();
+    refreshIssues();
+    refreshAgents();
+  };
+  const ready =
+    !loadError && !loading && issues !== undefined && agents !== undefined;
 
   if (!ready) {
     return (
@@ -132,8 +148,8 @@ export default function WorkspacesPage() {
       />
 
       <div className="flex-1 px-8 pb-10 pt-2">
-        {error ? (
-          <ErrorState what="your workspaces" error={error} onRetry={refresh} />
+        {loadError ? (
+          <ErrorState what="your workspaces" error={loadError} onRetry={retry} />
         ) : workspaces.length === 0 ? (
           <Empty className="pb-16">
             <EmptyMedia>
@@ -175,7 +191,17 @@ export default function WorkspacesPage() {
                 title="Recent pull requests"
                 note={`across ${workspaces.length} workspace${workspaces.length === 1 ? "" : "s"}`}
               />
-              {recentPrs === undefined ? (
+              {recentPrsError ? (
+                <p className="rounded-lg border border-dashed border-hairline px-3 py-6 text-center text-caption text-mute">
+                  Couldn&apos;t load recent pull requests.{" "}
+                  <button
+                    onClick={refreshRecentPrs}
+                    className="text-body underline-offset-2 hover:text-ink hover:underline"
+                  >
+                    Try again
+                  </button>
+                </p>
+              ) : recentPrs === undefined ? (
                 <div className="space-y-1.5">
                   {Array.from({ length: 3 }).map((_, i) => (
                     <Skeleton key={i} className="h-12 w-full rounded-md" />

@@ -62,7 +62,7 @@ test("a workspace with nothing in it still gets a card", () => {
   assert.equal(cards.length, 1);
   assert.equal(cards[0].mix.open, 0);
   assert.deepEqual(cards[0].heads, []);
-  assert.equal(cards[0].offline, null);
+  assert.deepEqual(cards[0].offline, []);
 });
 
 test("heads are the enabled agents, busiest first, three at most", () => {
@@ -100,12 +100,12 @@ test("a downed machine is one line naming it and what is waiting", () => {
     ],
   );
 
-  assert.deepEqual(cards[0].offline, { name: "older-mac", queued: 2 });
+  assert.deepEqual(cards[0].offline, [{ id: "d2", name: "older-mac", queued: 2 }]);
 });
 
 test("a reachable machine is not an offline line", () => {
   const cards = workspaceCards([workspace("a")], [], [agent("a", "planner")]);
-  assert.equal(cards[0].offline, null);
+  assert.deepEqual(cards[0].offline, []);
 });
 
 test("last activity is the newest issue, falling back to the workspace", () => {
@@ -146,4 +146,32 @@ test("an empty or offline-only team has no chips", () => {
     agentChips({ enabled: 1, running: 0, queued: 0, idle: 0, offline: 1, statuses: [] }),
     [],
   );
+});
+
+test("two down machines are two facts, busiest first", () => {
+  const first = {
+    daemon_id: "d1",
+    daemon_name: "older-mac",
+    daemon_status: "offline",
+  };
+  const second = {
+    daemon_id: "d2",
+    daemon_name: "build-box",
+    daemon_status: "offline",
+  };
+  const cards = workspaceCards(
+    [workspace("a")],
+    [],
+    [
+      agent("a", "one", { runtime: first, queued_count: 1 }),
+      agent("a", "two", { runtime: second, queued_count: 3 }),
+    ],
+  );
+
+  // Summing them under one name would say "older-mac offline · 4 queued", which
+  // is a fact about neither machine.
+  assert.deepEqual(cards[0].offline, [
+    { id: "d2", name: "build-box", queued: 3 },
+    { id: "d1", name: "older-mac", queued: 1 },
+  ]);
 });

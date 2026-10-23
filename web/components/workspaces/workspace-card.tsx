@@ -8,6 +8,7 @@ import { repoLabel } from "@/lib/overview";
 import { agentChips, type WorkspaceCard as Card } from "@/lib/workspace-cards";
 import { paths } from "@/lib/paths";
 import { AgentHead } from "@/components/agents/agent-head";
+import { TimeAgo } from "@/components/time-ago";
 import { WorkspaceAvatar } from "@/components/workspace-avatar";
 
 // The issue bar's four segments, in board order. Backlog and todo share "Todo"
@@ -80,7 +81,9 @@ export function WorkspaceCardView({ card }: { card: Card }) {
         <div className="flex items-baseline justify-between gap-2">
           <span className="text-micro text-mute">Issues</span>
           {mix.open === 0 ? (
-            <span className="text-caption text-mute">Nothing open</span>
+            <span className="text-caption text-mute">
+              Quiet · <TimeAgo iso={card.lastActiveAt} />
+            </span>
           ) : (
             <span className="text-caption">
               <span className="font-medium text-ink">{mix.open} open</span>
@@ -147,14 +150,17 @@ export function WorkspaceCardView({ card }: { card: Card }) {
               ))}
             </span>
 
-            {offline ? (
+            {offline.length > 0 ? (
               // A machine that is down is the only thing on this line worth
               // acting on, so it replaces the counts rather than joining them.
               <span className="flex min-w-0 items-center gap-1.5 text-caption text-warning">
                 <ServerOff className="size-3.5 shrink-0" aria-hidden="true" />
                 <span className="truncate">
-                  {offline.name} offline
-                  {offline.queued > 0 ? ` · ${offline.queued} queued` : ""}
+                  {offline[0].name} offline
+                  {offline[0].queued > 0 ? ` · ${offline[0].queued} queued` : ""}
+                  {offline.length > 1
+                    ? ` · +${offline.length - 1} machine${offline.length === 2 ? "" : "s"}`
+                    : ""}
                 </span>
               </span>
             ) : (

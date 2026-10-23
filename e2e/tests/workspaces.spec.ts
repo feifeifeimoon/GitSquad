@@ -111,6 +111,44 @@ test.describe("Workspaces", () => {
     });
   });
 
+  test("a feed row for a merged pull request lands on that pull request", async ({
+    page,
+  }) => {
+    const suffix = Date.now().toString(36);
+    const workspace = await api.seedWorkspace({
+      name: `E2E Merged ${suffix}`,
+      slug: `e2e-mrg-${suffix}`,
+      owner: `e2e-owner-${suffix}`,
+      repo: `e2e-repo-${suffix}`,
+    });
+    const issue = await api.createIssue(workspace.id, `Merged work ${suffix}`);
+    await api.seedPullRequest(workspace.id, issue.id, {
+      number: 66,
+      title: `Merged PR ${suffix}`,
+      state: "merged",
+    });
+
+    await loginAsE2E(page, api);
+    await page.goto("/workspaces", { waitUntil: "domcontentloaded" });
+    await page
+      .getByRole("link")
+      .filter({ hasText: `Merged PR ${suffix}` })
+      .click();
+
+    await expect(page).toHaveURL(
+      new RegExp(`/${workspace.slug}/pull-requests\\?pr=66`),
+    );
+    // The tab follows the PR. Landing on Open would have quietly selected a
+    // different pull request, because the merged one is not in that tab.
+    await expect(
+      page.getByRole("button", { name: /^Closed/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    const peek = page.getByRole("complementary", { name: "Pull request" });
+    await expect(peek.getByText(`Merged PR ${suffix}`)).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
   // The card's corner used to hold a status badge that read "Active" on every
   // card — the list is filtered to the active ones before it arrives — and it
   // holds the way to that workspace's settings now.
