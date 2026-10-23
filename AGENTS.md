@@ -330,6 +330,11 @@ The `e2e` job in `.github/workflows/ci.yml` provisions a Postgres service contai
 | `GITSQUAD_GITHUB_APP_PRIVATE_KEY` | No | — | GitHub App private key PEM (required for repo features) |
 | `GITSQUAD_GITHUB_APP_NAME` | No | `gitsquad` | GitHub App name |
 | `GITSQUAD_GITHUB_WEBHOOK_SECRET` | No | — | GitHub webhook HMAC secret |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | No | — | OTLP gateway base URL. Tracing stays off when this and the traces-specific variant are both empty. |
+| `OTEL_EXPORTER_OTLP_HEADERS` | No | — | Exporter auth, e.g. `Authorization=Basic <base64 instance:token>` |
+| `OTEL_SERVICE_NAME` | No | `gitsquad-server` | Overrides the resource's service name |
+| `OTEL_SDK_DISABLED` | No | `false` | `true` disables tracing regardless of the endpoint |
+| `GITSQUAD_OTEL_SAMPLE_RATIO` | No | `0.1` | Share of read requests traced; writes and webhooks are always traced |
 
 ---
 
