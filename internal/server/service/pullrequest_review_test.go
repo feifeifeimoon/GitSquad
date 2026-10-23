@@ -210,6 +210,7 @@ func TestListWorkspacePullRequestsIncludesReviewTokens(t *testing.T) {
 		WorkspaceID: f.workspace.ID, RepoOwner: "tk-owner", RepoName: "tk-repo",
 		Number: 81, Title: "Review token accounting", State: "open", HeadSha: "sha-81",
 		GithubUpdatedAt: pgTime(t),
+		Additions:       128, Deletions: 34, ChangedFiles: 6,
 	})
 	if err != nil {
 		t.Fatalf("seed PR: %v", err)
@@ -260,6 +261,13 @@ func TestListWorkspacePullRequestsIncludesReviewTokens(t *testing.T) {
 		}
 		if item.LatestReview.Findings != 2 {
 			t.Fatalf("findings = %d, want 2", item.LatestReview.Findings)
+		}
+		// The peek's "how big is this" line rides on the summary.
+		if item.Additions != 128 || item.Deletions != 34 || item.ChangedFiles != 6 {
+			t.Fatalf(
+				"diff = +%d -%d /%d files, want +128 -34 /6",
+				item.Additions, item.Deletions, item.ChangedFiles,
+			)
 		}
 		return
 	}

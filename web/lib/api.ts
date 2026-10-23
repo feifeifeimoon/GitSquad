@@ -190,6 +190,10 @@ export interface PullRequestSummary {
   base_branch: string;
   head_sha: string;
   updated_at: string;
+  /** The diff, as GitHub last reported it. */
+  additions: number;
+  deletions: number;
+  changed_files: number;
   issue_key?: string;
   issue_title?: string;
   latest_review?: PullRequestReview;

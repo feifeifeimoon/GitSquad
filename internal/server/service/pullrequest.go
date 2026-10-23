@@ -388,6 +388,8 @@ func (s *PullRequestService) ListWorkspacePullRequests(ctx context.Context, work
 			State: row.State, Draft: row.Draft, Author: row.Author,
 			HeadBranch: row.HeadBranch, BaseBranch: row.BaseBranch,
 			HeadSHA: row.HeadSha, UpdatedAt: updatedAt,
+			Additions: row.Additions, Deletions: row.Deletions,
+			ChangedFiles: row.ChangedFiles,
 		}
 		if row.IssueNumber != nil {
 			item.IssueKey = fmt.Sprintf("%s-%d", row.IssuePrefix, *row.IssueNumber)
