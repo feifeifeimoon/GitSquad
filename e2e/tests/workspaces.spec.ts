@@ -55,6 +55,62 @@ test.describe("Workspaces", () => {
     await expect(page.getByText("Done")).toBeVisible();
   });
 
+  test("a card reads out its work and its team, and the feed opens a recent PR", async ({
+    page,
+  }) => {
+    const suffix = Date.now().toString(36);
+    const workspace = await api.seedWorkspace({
+      name: `E2E Card ${suffix}`,
+      slug: `e2e-card-${suffix}`,
+      owner: `e2e-owner-${suffix}`,
+      repo: `e2e-repo-${suffix}`,
+    });
+    const daemon = await api.seedDaemon({ name: `E2E Card Daemon ${suffix}` });
+    const agent = await api.createAgent(workspace.id, {
+      name: `planner-${suffix}`,
+      daemon_id: daemon.id,
+      provider: "claude",
+    });
+    const issue = await api.createIssue(workspace.id, `Card work ${suffix}`, {
+      status: "in_progress",
+    });
+    await api.seedTask({
+      workspaceId: workspace.id,
+      issueId: issue.id,
+      agentId: agent.id,
+      daemonId: daemon.id,
+    });
+    await api.seedPullRequest(workspace.id, issue.id, {
+      number: 55,
+      title: `Card PR ${suffix}`,
+    });
+
+    await loginAsE2E(page, api);
+    await page.goto("/workspaces", { waitUntil: "domcontentloaded" });
+
+    const card = page.locator(`[data-workspace-card="${workspace.slug}"]`);
+    await expect(card).toBeVisible({ timeout: 20_000 });
+    // The two questions the card exists for: how the work is going, and
+    // whether the team is running.
+    await expect(card.getByText("1 open")).toBeVisible();
+    await expect(card.getByText("In progress 1")).toBeVisible();
+    await expect(card.getByText("1 working")).toBeVisible();
+
+    // The feed under the cards opens the pull request, in its workspace, with
+    // that PR selected in the pane.
+    await page
+      .getByRole("link")
+      .filter({ hasText: `Card PR ${suffix}` })
+      .click();
+    await expect(page).toHaveURL(
+      new RegExp(`/${workspace.slug}/pull-requests\\?pr=55`),
+    );
+    const peek = page.getByRole("complementary", { name: "Pull request" });
+    await expect(peek.getByText(`Card PR ${suffix}`)).toBeVisible({
+      timeout: 20_000,
+    });
+  });
+
   // The card's corner used to hold a status badge that read "Active" on every
   // card — the list is filtered to the active ones before it arrives — and it
   // holds the way to that workspace's settings now.

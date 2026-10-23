@@ -32,6 +32,12 @@ type PullRequestSummary struct {
 	IssueKey   string `json:"issue_key,omitempty"`
 	IssueTitle string `json:"issue_title,omitempty"`
 
+	// WorkspaceSlug and WorkspaceName say whose pull request this is, and are
+	// filled only by the cross-workspace read — the same rule as v1.Issue's and
+	// v1.Agent's: a page inside one workspace has nothing to disambiguate.
+	WorkspaceSlug string `json:"workspace_slug,omitempty"`
+	WorkspaceName string `json:"workspace_name,omitempty"`
+
 	LatestReview *PullRequestReview `json:"latest_review,omitempty"`
 }
 

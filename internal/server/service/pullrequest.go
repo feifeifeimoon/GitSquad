@@ -331,6 +331,135 @@ func (s *PullRequestService) appendSystemComment(ctx context.Context, workspaceI
 // ListWorkspacePullRequests is the console's Pull requests page: every recorded
 // PR in the workspace, with the latest review and its token cost. The list is a
 // read model over pull_requests; GitHub remains the source of truth for the PR.
+// How many recent pull requests the workspace list asks for, and the cap on
+// what a caller may ask for.
+const (
+	recentPullRequestDefault = 5
+	recentPullRequestMax     = 20
+)
+
+// ListRecentPullRequests is the workspace list's "Recent pull requests": every
+// PR in every workspace this user owns, newest first.
+//
+// It is a separate read from the per-workspace list because a feed that spans
+// workspaces has to say which one each row came from, and because it is the one
+// place a pull request is read without a workspace in the path.
+func (s *PullRequestService) ListRecentPullRequests(ctx context.Context, userID uuid.UUID, limit int32) ([]v1.PullRequestSummary, error) {
+	if limit <= 0 || limit > recentPullRequestMax {
+		limit = recentPullRequestDefault
+	}
+	rows, err := s.store.ListPullRequestsForUser(ctx, db.ListPullRequestsForUserParams{
+		UserID: userID,
+		Limit:  limit,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list recent pull requests: %w", err)
+	}
+
+	ids := make([]uuid.UUID, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	latest, tokens, err := s.reviewIndex(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+
+	out := make([]v1.PullRequestSummary, 0, len(rows))
+	for _, row := range rows {
+		updatedAt := row.UpdatedAt
+		if row.GithubUpdatedAt != nil {
+			updatedAt = *row.GithubUpdatedAt
+		}
+		item := v1.PullRequestSummary{
+			ID: row.ID, Number: row.Number, Title: row.Title, URL: row.Url,
+			State: row.State, Draft: row.Draft, Author: row.Author,
+			HeadBranch: row.HeadBranch, BaseBranch: row.BaseBranch,
+			HeadSHA: row.HeadSha, UpdatedAt: updatedAt,
+			Additions: row.Additions, Deletions: row.Deletions,
+			ChangedFiles:  row.ChangedFiles,
+			WorkspaceSlug: row.WorkspaceSlug,
+			WorkspaceName: row.WorkspaceName,
+		}
+		if row.IssueNumber != nil {
+			item.IssueKey = fmt.Sprintf("%s-%d", row.IssuePrefix, *row.IssueNumber)
+			if row.IssueTitle != nil {
+				item.IssueTitle = *row.IssueTitle
+			}
+		}
+		attachLatestReview(&item, row.ID, row.HeadSha, latest, tokens)
+		out = append(out, item)
+	}
+	return out, nil
+}
+
+// reviewIndex loads the latest review for every given pull request, plus that
+// review's token total — one query each for the whole page rather than per row.
+// Both list reads need exactly this, and doing it per row turned a 100-row list
+// into 100 extra round trips on every poll.
+func (s *PullRequestService) reviewIndex(
+	ctx context.Context,
+	ids []uuid.UUID,
+) (map[uuid.UUID]db.LatestReviewsByPullRequestIDsRow, map[uuid.UUID]int64, error) {
+	latest := map[uuid.UUID]db.LatestReviewsByPullRequestIDsRow{}
+	tokens := map[uuid.UUID]int64{}
+	if len(ids) == 0 {
+		return latest, tokens, nil
+	}
+
+	reviews, err := s.store.LatestReviewsByPullRequestIDs(ctx, ids)
+	if err != nil {
+		return nil, nil, fmt.Errorf("latest reviews: %w", err)
+	}
+	for _, review := range reviews {
+		latest[review.PullRequestID] = review
+	}
+
+	taskIDs := make([]uuid.UUID, 0, len(latest))
+	for _, review := range latest {
+		if review.TaskID != nil {
+			taskIDs = append(taskIDs, *review.TaskID)
+		}
+	}
+	if len(taskIDs) > 0 {
+		totals, err := s.store.ListTaskUsageTotals(ctx, taskIDs)
+		if err != nil {
+			slog.Warn("review usage totals", "error", err)
+		} else {
+			for _, total := range totals {
+				tokens[total.TaskID] = total.Tokens
+			}
+		}
+	}
+	return latest, tokens, nil
+}
+
+// attachLatestReview hangs the review (if any) on the summary, including
+// whether it still describes the pull request's current head.
+func attachLatestReview(
+	item *v1.PullRequestSummary,
+	prID uuid.UUID,
+	headSHA string,
+	latest map[uuid.UUID]db.LatestReviewsByPullRequestIDsRow,
+	tokens map[uuid.UUID]int64,
+) {
+	review, ok := latest[prID]
+	if !ok {
+		return
+	}
+	var tok int64
+	if review.TaskID != nil {
+		tok = tokens[*review.TaskID]
+	}
+	item.LatestReview = &v1.PullRequestReview{
+		ID: review.ID, Status: review.Status, AgentName: review.AgentName,
+		HeadSHA: review.HeadSha, Summary: review.Summary,
+		Findings: review.Findings, URL: review.Url,
+		Stale:  review.HeadSha != "" && review.HeadSha != headSHA,
+		Tokens: tok, CreatedAt: review.CreatedAt,
+	}
+}
+
 func (s *PullRequestService) ListWorkspacePullRequests(ctx context.Context, workspaceID uuid.UUID, state string, limit int32) ([]v1.PullRequestSummary, error) {
 	if limit <= 0 || limit > 100 {
 		limit = 100
@@ -346,35 +475,9 @@ func (s *PullRequestService) ListWorkspacePullRequests(ctx context.Context, work
 	for _, row := range rows {
 		ids = append(ids, row.ID)
 	}
-	latest := map[uuid.UUID]db.LatestReviewsByPullRequestIDsRow{}
-	if len(ids) > 0 {
-		reviews, err := s.store.LatestReviewsByPullRequestIDs(ctx, ids)
-		if err != nil {
-			return nil, fmt.Errorf("latest reviews: %w", err)
-		}
-		for _, review := range reviews {
-			latest[review.PullRequestID] = review
-		}
-	}
-
-	// One usage query for the whole page; doing it per row turned a 100-row
-	// list into 100 extra round trips on every 15s poll.
-	taskIDs := make([]uuid.UUID, 0, len(latest))
-	for _, review := range latest {
-		if review.TaskID != nil {
-			taskIDs = append(taskIDs, *review.TaskID)
-		}
-	}
-	tokensByTask := map[uuid.UUID]int64{}
-	if len(taskIDs) > 0 {
-		totals, err := s.store.ListTaskUsageTotals(ctx, taskIDs)
-		if err != nil {
-			slog.Warn("review usage totals", "error", err)
-		} else {
-			for _, total := range totals {
-				tokensByTask[total.TaskID] = total.Tokens
-			}
-		}
+	latest, tokens, err := s.reviewIndex(ctx, ids)
+	if err != nil {
+		return nil, err
 	}
 
 	out := make([]v1.PullRequestSummary, 0, len(rows))
@@ -397,19 +500,7 @@ func (s *PullRequestService) ListWorkspacePullRequests(ctx context.Context, work
 				item.IssueTitle = *row.IssueTitle
 			}
 		}
-		if review, ok := latest[row.ID]; ok {
-			var tokens int64
-			if review.TaskID != nil {
-				tokens = tokensByTask[*review.TaskID]
-			}
-			item.LatestReview = &v1.PullRequestReview{
-				ID: review.ID, Status: review.Status, AgentName: review.AgentName,
-				HeadSHA: review.HeadSha, Summary: review.Summary,
-				Findings: review.Findings, URL: review.Url,
-				Stale:  review.HeadSha != "" && review.HeadSha != row.HeadSha,
-				Tokens: tokens, CreatedAt: review.CreatedAt,
-			}
-		}
+		attachLatestReview(&item, row.ID, row.HeadSha, latest, tokens)
 		out = append(out, item)
 	}
 	return out, nil

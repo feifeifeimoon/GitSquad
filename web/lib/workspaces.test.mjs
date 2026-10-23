@@ -26,6 +26,14 @@ const sonner = readFileSync(
   new URL("../components/ui/sonner.tsx", import.meta.url),
   "utf8",
 );
+const card = readFileSync(
+  new URL("../components/workspaces/workspace-card.tsx", import.meta.url),
+  "utf8",
+);
+const feed = readFileSync(
+  new URL("../components/workspaces/recent-pull-requests.tsx", import.meta.url),
+  "utf8",
+);
 const viewSwitcher = readFileSync(
   new URL("../components/view-switcher.tsx", import.meta.url),
   "utf8",
@@ -48,32 +56,27 @@ const scopeSwitcher = readFileSync(
   "utf8",
 );
 
-test("workspace list renders a card grid by default", () => {
+test("the workspace list is a grid of cards that carry their own work", () => {
   assert.match(list, /grid-cols-1/);
-  assert.match(list, /TimeAgo/);
-  // The corner badge is gone: every card in this list is already active, so it
-  // said the same word every time. What is there is the way to that
-  // workspace's settings.
-  assert.doesNotMatch(list, /StatusBadge/);
-  // Anchored to the workspace-scoped builder: the earlier unanchored
-  // `/\.settings()/` matched the account page's `paths.settings()` just as
-  // happily, which is the mix-up this registry exists to prevent.
-  assert.match(list, /paths\.workspace\([^)]*\)\.settings\(\)/);
-  assert.doesNotMatch(list, /font-bold/);
-  assert.doesNotMatch(list, /text-\[10px\]/);
+  assert.match(list, /WorkspaceCardView/);
+  // The bar names the page; the page does not name it again.
+  assert.doesNotMatch(list, /SectionHead title="Workspaces"/);
+  // The card's three blocks: identity, the issue mix, the agents.
+  assert.match(card, /repoLabel/);
+  assert.match(card, /agentChips/);
+  assert.match(card, /paths\.workspace\([^)]*\)\.settings\(\)/);
+  // The table view is gone with the switcher: this page has one shape.
+  assert.doesNotMatch(list, /<table/);
+  assert.doesNotMatch(list, /ViewSwitcher/);
 });
 
 test("workspace list shows a skeleton while loading", () => {
   assert.match(list, /Skeleton/);
 });
 
-test("workspace list offers a cards/list view switcher persisted to localStorage", () => {
-  // The toggle and its persistence live in one component now, shared with the
-  // daemon list; the page only wires it up. The button treatment — pressed
-  // state and an accessible name for an icon-only pair — is the shared
-  // segmented control's.
-  assert.match(list, /ViewSwitcher/);
-  assert.match(list, /useViewMode/);
+test("the view switcher keeps its pressed state and its accessible name", () => {
+  // The workspace list no longer offers the toggle, but the daemon list still
+  // does, and both it and the usage ranges go through the one control.
   assert.match(viewSwitcher, /LayoutGrid/);
   assert.match(viewSwitcher, /localStorage/);
   assert.match(viewSwitcher, /"Cards"/);
@@ -83,12 +86,12 @@ test("workspace list offers a cards/list view switcher persisted to localStorage
   assert.match(segmented, /aria-pressed/);
 });
 
-test("workspace list supports search and a table list view", () => {
+test("the page searches workspaces and ends with recent pull requests", () => {
   assert.match(list, /Search workspaces…/);
-  assert.match(list, /<table/);
-  assert.match(list, /WorkspaceTable/);
-  assert.match(list, /Repository/);
-  assert.match(list, /Created/);
+  assert.match(list, /pullRequestApi.recent/);
+  assert.match(list, /RecentPullRequests/);
+  assert.match(feed, /reviewStatus/);
+  assert.match(feed, /\?pr=/);
 });
 
 test("the sidebar header is the product; the scope is named above the page", () => {
@@ -115,10 +118,10 @@ test("the sidebar header is the product; the scope is named above the page", () 
 
 test("a workspace card opens its overview, not the issue board", () => {
   // The workspace's front door is the overview now; the board lives one level
-  // down at /{slug}/issues. The list is the main way into a workspace, so it
+  // down at /{slug}/issues. The card is the main way into a workspace, so it
   // has to point at the same place the switcher's fallback does.
-  assert.match(list, /paths\.workspace\([^)]*\)\.overview\(\)/);
-  assert.doesNotMatch(list, /\.board\(\)/);
+  assert.match(card, /paths\.workspace\([^)]*\)\.overview\(\)/);
+  assert.doesNotMatch(card, /\.board\(\)/);
 });
 
 test("shared time util formats relative time", () => {

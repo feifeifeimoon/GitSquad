@@ -196,6 +196,9 @@ export interface PullRequestSummary {
   changed_files: number;
   issue_key?: string;
   issue_title?: string;
+  /** Filled only by the cross-workspace read (the workspace list's feed). */
+  workspace_slug?: string;
+  workspace_name?: string;
   latest_review?: PullRequestReview;
 }
 
@@ -593,6 +596,9 @@ export const pullRequestApi = {
     api.get<PullRequestSummary[]>(
       `/api/v1/workspaces/${workspaceId}/pull-requests?state=${encodeURIComponent(state)}`,
     ),
+  /** Recent pull requests across every workspace — the workspace list feed. */
+  recent: (limit = 5) =>
+    api.get<PullRequestSummary[]>(`/api/v1/pull-requests?limit=${limit}`),
   review: (workspaceId: string, number: number) =>
     api.post<{ status: string; review_id: string }>(
       `/api/v1/workspaces/${workspaceId}/pull-requests/${number}/review`,

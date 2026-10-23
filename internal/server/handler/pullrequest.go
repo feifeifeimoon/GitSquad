@@ -30,6 +30,28 @@ func NewPullRequestHandler(
 }
 
 // List handles GET /api/v1/workspaces/:id/pull-requests (id = UUID or slug).
+// Recent lists pull requests across every workspace the caller owns — the
+// workspace list page's feed. Limit is clamped by the service.
+func (h *PullRequestHandler) Recent(c *gin.Context) {
+	user := middleware.GetUser(c)
+	if user == nil {
+		c.JSON(http.StatusUnauthorized, v1.ErrorResponse("login required"))
+		return
+	}
+	limit := int32(0)
+	if raw := c.Query("limit"); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			limit = int32(n)
+		}
+	}
+	list, err := h.pullRequests.ListRecentPullRequests(c.Request.Context(), user.ID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, v1.ErrorResponse("failed to list pull requests"))
+		return
+	}
+	c.JSON(http.StatusOK, v1.SuccessResponse(list, len(list)))
+}
+
 func (h *PullRequestHandler) List(c *gin.Context) {
 	user := middleware.GetUser(c)
 	if user == nil {

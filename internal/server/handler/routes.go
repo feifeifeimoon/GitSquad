@@ -184,6 +184,10 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.DELETE("/workspaces/:id/delete", workspaceHandler.Delete)
 			protected.PUT("/workspaces/:id/avatar", workspaceHandler.UpdateAvatar)
 			protected.PATCH("/workspaces/:id/pr-review", workspaceHandler.UpdatePRReview)
+			// The only pull-request read without a workspace in the path: the
+			// workspace list page shows recent PRs across every workspace the
+			// user owns.
+			protected.GET("/pull-requests", pullRequestHandler.Recent)
 			protected.GET("/workspaces/:id/pull-requests", pullRequestHandler.List)
 			protected.POST("/workspaces/:id/pull-requests/:number/review", pullRequestHandler.Review)
 			// Who an issue in this workspace can be assigned to. One row today

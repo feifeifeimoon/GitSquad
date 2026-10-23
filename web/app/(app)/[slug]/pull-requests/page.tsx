@@ -39,7 +39,15 @@ import { toast } from "sonner";
 export default function PullRequestsPage() {
   const { slug } = useParams<{ slug: string }>();
   const [filter, setFilter] = useState<PrFilter>("open");
-  const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Selection is a PR number rather than an id, because the feed on the
+  // workspace list links here with `?pr=104` and a number is what a URL can
+  // carry. Read once, lazily: the page is client-rendered and the query string
+  // is not part of any render on the server.
+  const [selectedNumber, setSelectedNumber] = useState<number | null>(() => {
+    if (typeof window === "undefined") return null;
+    const number = Number(new URLSearchParams(window.location.search).get("pr"));
+    return Number.isFinite(number) && number > 0 ? number : null;
+  });
   const [reviewing, setReviewing] = useState<number | null>(null);
   // The peek is an aside where there is room for one, and a dialog where there
   // is not — the same content, two containers.
@@ -59,11 +67,13 @@ export default function PullRequestsPage() {
   const prs = useMemo(() => data ?? [], [data]);
   const counts = useMemo(() => countPrs(prs), [prs]);
   const visible = useMemo(() => filterPrs(prs, filter), [prs, filter]);
+  const selectedId =
+    prs.find((pr) => pr.number === selectedNumber)?.id ?? null;
   const currentId = selectedPr(visible, selectedId);
   const current = visible.find((pr) => pr.id === currentId) ?? null;
 
   const select = (id: string) => {
-    setSelectedId(id);
+    setSelectedNumber(prs.find((pr) => pr.id === id)?.number ?? null);
     if (!wide) setPeekOpen(true);
   };
 

@@ -207,3 +207,19 @@ SELECT
     COUNT(*) FILTER (WHERE state = 'merged' AND close_intent AND suppressed_at IS NULL)::bigint AS merged_closing_count
 FROM pull_requests
 WHERE issue_id = $1::uuid;
+
+-- name: ListPullRequestsForUser :many
+-- Recent pull requests across every workspace this user owns, newest first —
+-- the workspace list page's "Recent pull requests". The workspace rides along
+-- because a feed that spans workspaces has to say which one each row belongs to
+-- (the same rule as the All Workspaces board), and archived workspaces are left
+-- out for the same reason they are left out there.
+SELECT pr.*, w.slug AS workspace_slug, w.name AS workspace_name,
+       w.issue_prefix AS issue_prefix,
+       i.number AS issue_number, i.title AS issue_title
+FROM pull_requests pr
+JOIN workspaces w ON w.id = pr.workspace_id
+LEFT JOIN issues i ON i.id = pr.issue_id
+WHERE w.user_id = $1 AND w.status != 'archived' AND pr.suppressed_at IS NULL
+ORDER BY COALESCE(pr.github_updated_at, pr.updated_at) DESC
+LIMIT $2;
