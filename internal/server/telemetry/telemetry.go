@@ -10,6 +10,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"math"
 	"net/http"
 	"os"
 	"strconv"
@@ -172,7 +173,9 @@ func sampleRatio() float64 {
 		return defaultSampleRatio
 	}
 	ratio, err := strconv.ParseFloat(raw, 64)
-	if err != nil || ratio < 0 || ratio > 1 {
+	// ParseFloat accepts "NaN", and both bounds comparisons are false for it,
+	// so it needs an explicit rejection before the ratio reaches the sampler.
+	if err != nil || math.IsNaN(ratio) || ratio < 0 || ratio > 1 {
 		slog.Warn("invalid sample ratio, using default",
 			"env", sampleRatioEnv, "value", raw, "fallback", defaultSampleRatio)
 		return defaultSampleRatio

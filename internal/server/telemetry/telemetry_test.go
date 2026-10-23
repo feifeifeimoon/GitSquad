@@ -114,6 +114,7 @@ func TestSampleRatio(t *testing.T) {
 		{name: "zero", value: "0", want: 0},
 		{name: "one", value: "1", want: 1},
 		{name: "not a number", value: "many", want: defaultSampleRatio},
+		{name: "NaN", value: "NaN", want: defaultSampleRatio},
 		{name: "negative", value: "-0.5", want: defaultSampleRatio},
 		{name: "above one", value: "1.5", want: defaultSampleRatio},
 	}
