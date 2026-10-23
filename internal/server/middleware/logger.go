@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/feifeifeimoon/GitSquad/internal/server/logging"
 	"github.com/gin-gonic/gin"
 )
 
@@ -21,6 +22,7 @@ func RequestLogger() gin.HandlerFunc {
 			"status", status,
 			"latency_ms", latency.Milliseconds(),
 		}
+		attrs = append(attrs, logging.TraceAttrs(c.Request.Context())...)
 
 		if status >= 500 {
 			slog.Error("http", attrs...)

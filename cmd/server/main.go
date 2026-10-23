@@ -14,6 +14,7 @@ import (
 	"github.com/feifeifeimoon/GitSquad/internal/server/database"
 	"github.com/feifeifeimoon/GitSquad/internal/server/handler"
 	"github.com/feifeifeimoon/GitSquad/internal/server/logging"
+	"github.com/feifeifeimoon/GitSquad/internal/server/telemetry"
 	"github.com/feifeifeimoon/GitSquad/internal/version"
 )
 
@@ -25,6 +26,24 @@ func main() {
 	}
 	logging.Init(cfg.Environment)
 	slog.Info("GitSquad server", "version", version.Short())
+
+	// Tracing must be installed before the pool is created: otelpgx captures
+	// the global provider when it is built.
+	shutdownTracing, err := telemetry.Setup(context.Background(), telemetry.Config{
+		Environment: cfg.Environment,
+	})
+	if err != nil {
+		slog.Warn("tracing setup failed, continuing without traces", "error", err)
+		shutdownTracing = func(context.Context) error { return nil }
+	}
+	defer func() {
+		flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownTracing(flushCtx); err != nil {
+			slog.Warn("flush traces", "error", err)
+		}
+	}()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

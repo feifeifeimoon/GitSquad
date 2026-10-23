@@ -24,6 +24,7 @@ import (
 	"github.com/google/go-github/v68/github"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"golang.org/x/oauth2"
 )
 
@@ -324,7 +325,9 @@ func (s *GitHubAppService) newAppClient() (*github.Client, error) {
 
 	tokenSource := &appTokenSource{appID: appID, privateKey: parsed}
 	return github.NewClient(&http.Client{
-		Transport: &oauth2.Transport{Source: tokenSource},
+		// One transport covers every call made by this client; GitHub is the
+		// slowest dependency in most request paths, so its spans matter.
+		Transport: otelhttp.NewTransport(&oauth2.Transport{Source: tokenSource}),
 	}), nil
 }
 
@@ -519,7 +522,9 @@ func (s *GitHubAppService) newInstallationClient(ctx context.Context, installati
 		return nil, err
 	}
 	ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
-	return github.NewClient(&http.Client{Transport: &oauth2.Transport{Source: ts}}), nil
+	return github.NewClient(&http.Client{
+		Transport: otelhttp.NewTransport(&oauth2.Transport{Source: ts}),
+	}), nil
 }
 
 func (s *GitHubAppService) handleInstallationCreated(ctx context.Context, payload []byte) {

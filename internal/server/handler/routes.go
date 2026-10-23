@@ -13,12 +13,19 @@ import (
 	v1 "github.com/feifeifeimoon/GitSquad/pkg/types/v1"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
 )
 
 func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	r := gin.New()
 
 	r.Use(gin.Recovery())
+	// Tracing runs before the request logger so every log line can carry the
+	// span's ids. The filter keeps the long-lived sockets out.
+	r.Use(otelgin.Middleware("gitsquad-server", otelgin.WithGinFilter(traceable)))
+	// Inside the tracing middleware, so a panic is recorded on the span before
+	// otelgin ends it.
+	r.Use(middleware.RecordPanic())
 	r.Use(middleware.CORS(cfg.FrontendURL))
 	r.Use(middleware.RequestLogger())
 
@@ -230,4 +237,15 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	r.POST("/api/v1/github/webhook", githubHandler.Webhook)
 
 	return r
+}
+
+// traceable keeps the WebSocket upgrades and the health probe out of tracing.
+// A socket's handler does not return until its peer disconnects, so an otelgin
+// span wrapped around it would stay open for the life of the connection.
+func traceable(c *gin.Context) bool {
+	switch c.Request.URL.Path {
+	case "/healthz", "/ws/daemon", "/ws/app":
+		return false
+	}
+	return true
 }
