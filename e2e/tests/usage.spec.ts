@@ -81,9 +81,19 @@ test.describe("Usage", () => {
     await expect(page.getByText("37k", { exact: true }).first()).toBeVisible();
     // The four buckets are all shown, cache included.
     await expect(page.getByText("Cache read").first()).toBeVisible();
-    await expect(page.getByText("30k", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/30k read/)).toBeVisible();
     // cache read / (input + cache read + cache write) = 30000/35000 = 85%
     await expect(page.getByText("85%", { exact: true }).first()).toBeVisible();
+
+    // The same run is also an outcome: one finished run, which succeeded.
+    await expect(page.getByText("Success rate")).toBeVisible();
+    await expect(page.getByText("100%", { exact: true }).first()).toBeVisible();
+    // And it is named at the bottom of the page, with the issue it worked on.
+    await expect(page.getByRole("heading", { name: "Recent runs" })).toBeVisible();
+    const runs = page.getByRole("table").last();
+    await expect(runs.getByText(`coder-${suffix}`, { exact: true })).toBeVisible();
+    await expect(runs.getByText("Completed", { exact: true })).toBeVisible();
+    await expect(runs.getByText(/Work for coder-/)).toBeVisible();
   });
 
   test("breaks usage down by agent, runtime, workspace and issue", async ({
@@ -98,7 +108,12 @@ test.describe("Usage", () => {
 
     await loginAsE2E(page, api);
     await page.goto("/usage", { waitUntil: "domcontentloaded" });
-    const table = page.getByRole("table");
+    // Scoped to the Breakdown section rather than "the first table": while the
+    // breakdown is still loading the only table on the page is the recent-runs
+    // list below it, and a positional locator would resolve to that one.
+    const table = page
+      .locator("section", { hasText: "Breakdown" })
+      .getByRole("table");
 
     // Agents, largest consumer first.
     await expect(table.getByText(`beta-${suffix}`)).toBeVisible({ timeout: 20_000 });
@@ -163,9 +178,10 @@ test.describe("Usage", () => {
 
     await loginAsE2E(page, api);
     await page.goto("/usage", { waitUntil: "domcontentloaded" });
-    await expect(page.getByText("500", { exact: true }).first()).toBeVisible({
-      timeout: 20_000,
-    });
+    // A week is cut into six-hour bins: eight daily bars across a desktop-wide
+    // panel would each be a slab.
+    await expect(page.getByText(/bucketed by 6h/)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("500", { exact: true }).first()).toBeVisible();
 
     // A 24h window buckets by hour rather than day, and still holds the run.
     await page.getByRole("button", { name: "24h" }).click();
@@ -173,6 +189,26 @@ test.describe("Usage", () => {
       timeout: 15_000,
     });
     await expect(page.getByText("500", { exact: true }).first()).toBeVisible();
+  });
+
+  test("switches the trend between what it cost and what ran", async ({ page }) => {
+    await runTask(`switcher-${suffix}`, [
+      { provider: "claude", model: "m1", input_tokens: 300, output_tokens: 200 },
+    ]);
+
+    await loginAsE2E(page, api);
+    await page.goto("/usage", { waitUntil: "domcontentloaded" });
+
+    await expect(page.getByText("Usage over time")).toBeVisible({
+      timeout: 20_000,
+    });
+    // Tokens is the default reading, stacked by where the spend went.
+    await expect(page.getByText("Cache write", { exact: true })).toBeVisible();
+
+    // The runs reading stacks outcomes on the same axis, from the same series.
+    await page.getByRole("button", { name: "Runs", exact: true }).click();
+    await expect(page.getByText("Completed", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Cache write", { exact: true })).toBeHidden();
   });
 
   test("shows an empty state before anything has run", async ({ page }) => {

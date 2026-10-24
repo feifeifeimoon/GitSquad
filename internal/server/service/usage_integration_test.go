@@ -211,6 +211,20 @@ func TestUsageIntegration(t *testing.T) {
 	if len(hourly.Points) != 1 || len(hourly.Points[0].Bucket) != 16 {
 		t.Errorf("hour points = %+v, want one 16-character label", hourly.Points)
 	}
+	// Six-hour bins land on the local 00/06/12/18 grid and, like the hourly
+	// series, hand back a full timestamp label.
+	sixHourly, err := usageSvc.Series(ctx, user.ID, query, UsageBucketSixHour)
+	if err != nil {
+		t.Fatalf("Series(6h): %v", err)
+	}
+	if len(sixHourly.Points) != 1 || len(sixHourly.Points[0].Bucket) != 16 {
+		t.Fatalf("6h points = %+v, want one 16-character label", sixHourly.Points)
+	}
+	switch hour := sixHourly.Points[0].Bucket[11:13]; hour {
+	case "00", "06", "12", "18":
+	default:
+		t.Errorf("6h bucket hour = %q, want one of 00/06/12/18", hour)
+	}
 
 	// A timezone that shifts the run across a day boundary re-buckets it.
 	auckland, err := ResolveUsageQuery(UsageRange30d, "Pacific/Auckland", nil, now)
@@ -250,6 +264,95 @@ func TestUsageIntegration(t *testing.T) {
 	// An unassigned run must not be counted as reported coverage either.
 	if err := taskSvc.Report(ctx, daemon.ID, task, report); err == nil {
 		t.Error("Report for a task no longer assigned to the daemon = nil, want error")
+	}
+
+	// A failed run counts as a run even though it reports no tokens: the
+	// outcome counters, the trend and the recent-runs list are all driven by
+	// tasks, not by the ledger — otherwise the runs that told us nothing would
+	// vanish from the page that exists to admit they told us nothing.
+	failedTask := seedTaskForUsage(ctx, t, s, ws.ID, issue.ID, agent.ID, daemon.ID)
+	if err := taskSvc.Report(ctx, daemon.ID, failedTask, v1.TaskReport{
+		Status:  v1.TaskReportFailed,
+		Summary: &v1.TaskSummary{Output: "gave up"},
+	}); err != nil {
+		t.Fatalf("failed Report: %v", err)
+	}
+	// The window was anchored before the failure was reported, and the windows
+	// are half-open, so re-anchor to include the run that just finished.
+	query, err = ResolveUsageQuery(UsageRange30d, "UTC", nil, time.Now())
+	if err != nil {
+		t.Fatalf("ResolveUsageQuery after failure: %v", err)
+	}
+	summary, err = usageSvc.Summary(ctx, user.ID, query)
+	if err != nil {
+		t.Fatalf("Summary after failure: %v", err)
+	}
+	if got := summary.Summary; got.RunsTotal != 2 || got.RunsCompleted != 1 || got.RunsFailed != 1 || got.RunsCancelled != 0 {
+		t.Errorf("outcomes = total %d completed %d failed %d cancelled %d, want 2/1/1/0",
+			got.RunsTotal, got.RunsCompleted, got.RunsFailed, got.RunsCancelled)
+	}
+	if got := summary.Summary.RunsWithUsage; got != 1 {
+		t.Errorf("runs_with_usage = %d, want 1 (the failed run reported no tokens)", got)
+	}
+	// A finite window has a predecessor to compare against, and it is this
+	// user's — not somebody else's.
+	if summary.Previous == nil {
+		t.Fatal("previous window missing for 30d")
+	} else if p := summary.Previous; p.RunsTotal != 0 || p.InputTokens != 0 {
+		t.Errorf("previous window = %+v, want an empty one", p)
+	}
+
+	// The series counts runs, not ledger rows, and carries the split the Runs
+	// view stacks.
+	series, err = usageSvc.Series(ctx, user.ID, query, UsageBucketDay)
+	if err != nil {
+		t.Fatalf("Series after failure: %v", err)
+	}
+	if len(series.Points) != 1 {
+		t.Fatalf("day points after failure = %d, want 1: %+v", len(series.Points), series.Points)
+	}
+	if pt := series.Points[0]; pt.RunCount != 2 || pt.CompletedRuns != 1 || pt.FailedRuns != 1 || pt.CancelledRuns != 0 {
+		t.Errorf("series point = runs %d completed %d failed %d cancelled %d, want 2/1/1/0",
+			pt.RunCount, pt.CompletedRuns, pt.FailedRuns, pt.CancelledRuns)
+	}
+
+	// The recent-runs list names the agent, the issue and the outcome, and
+	// keeps the run that reported nothing.
+	runList, err := usageSvc.Runs(ctx, user.ID, query, 0)
+	if err != nil {
+		t.Fatalf("Runs: %v", err)
+	}
+	if len(runList.Runs) != 2 {
+		t.Fatalf("runs = %d, want 2: %+v", len(runList.Runs), runList.Runs)
+	}
+	byStatus := make(map[string]v1.UsageRun, len(runList.Runs))
+	for _, r := range runList.Runs {
+		byStatus[r.Status] = r
+	}
+	failedRun, ok := byStatus["failed"]
+	if !ok {
+		t.Fatalf("no failed run in %+v", runList.Runs)
+	}
+	if failedRun.AgentName != "coder" || failedRun.Kind != "issue" || failedRun.WorkspaceSlug != ws.Slug {
+		t.Errorf("failed run = %+v, want agent coder on workspace %q", failedRun, ws.Slug)
+	}
+	if want := fmt.Sprintf("USE-%d", issue.Number); failedRun.IssueKey != want {
+		t.Errorf("failed run issue key = %q, want %q", failedRun.IssueKey, want)
+	}
+	if failedRun.IssueTitle != "Fix the parser" {
+		t.Errorf("failed run issue title = %q, want %q", failedRun.IssueTitle, "Fix the parser")
+	}
+	completedRun, ok := byStatus["completed"]
+	if !ok {
+		t.Fatalf("no completed run in %+v", runList.Runs)
+	}
+	if completedRun.InputTokens != 12 || completedRun.CacheReadTokens != 300 {
+		t.Errorf("completed run tokens = %+v, want the corrected 12 input and 300 cache read", completedRun.TokenBuckets)
+	}
+	// started_at is only set when the daemon reported a start, so it may be
+	// absent; completed_at is the window's own boundary and never is.
+	if completedRun.CompletedAt == nil {
+		t.Errorf("completed run is missing its completion time: %+v", completedRun)
 	}
 
 	testUsageQueryValidation(t, now)
@@ -315,11 +418,16 @@ func testUsageQueryValidation(t *testing.T, now time.Time) {
 		t.Errorf("all from = %v, want %v", all.From, epochAllStart)
 	}
 
-	// 24h reads best at hour granularity; the longer windows at day.
+	// 24h reads best at hour granularity, a week at six-hour bins, and the
+	// longer windows at day. The rule is two to three dozen columns: fewer and
+	// each bar is a slab, more and the axis labels collide.
 	if got := DefaultBucketForRange(UsageRange24h); got != UsageBucketHour {
 		t.Errorf("24h bucket = %q, want hour", got)
 	}
-	for _, r := range []string{UsageRange7d, UsageRange30d, UsageRangeAll} {
+	if got := DefaultBucketForRange(UsageRange7d); got != UsageBucketSixHour {
+		t.Errorf("7d bucket = %q, want 6h", got)
+	}
+	for _, r := range []string{UsageRange30d, UsageRangeAll} {
 		if got := DefaultBucketForRange(r); got != UsageBucketDay {
 			t.Errorf("%s bucket = %q, want day", r, got)
 		}
@@ -327,6 +435,9 @@ func testUsageQueryValidation(t *testing.T, now time.Time) {
 
 	if _, err := ValidateUsageBucket("minute"); !errors.Is(err, ErrUnknownBucket) {
 		t.Errorf("unknown bucket err = %v, want ErrUnknownBucket", err)
+	}
+	if got, err := ValidateUsageBucket(UsageBucketSixHour); err != nil || got != UsageBucketSixHour {
+		t.Errorf("ValidateUsageBucket(6h) = %q, %v; want 6h, nil", got, err)
 	}
 	if got, err := ValidateUsageBucket(""); err != nil || got != "" {
 		t.Errorf("empty bucket = (%q, %v), want ('', nil) so the caller picks a default", got, err)

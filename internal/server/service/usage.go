@@ -54,10 +54,23 @@ const (
 	UsageGroupModel     = "model"
 )
 
-// Usage series granularities.
+// Usage series granularities. Six hours exists because a week at day
+// granularity is eight bars across a desktop-wide panel: each one becomes a
+// slab and the reader sees the weekly total, not the shape of the week. Four
+// buckets a day gives the same window twenty-eight columns — narrow enough to
+// read as columns, fine enough to show the workday peaks.
 const (
-	UsageBucketHour = "hour"
-	UsageBucketDay  = "day"
+	UsageBucketHour    = "hour"
+	UsageBucketSixHour = "6h"
+	UsageBucketDay     = "day"
+)
+
+// The recent-runs list is a glance, not an archive. A dozen rows fill one
+// screen without pushing the sections below it a page down; the agent and
+// issue breakdowns are where the full history is explored.
+const (
+	UsageRunLimitDefault = 12
+	UsageRunLimitMax     = 50
 )
 
 // UsageService answers token-usage questions over the task_usage ledger.
@@ -119,14 +132,30 @@ func (q UsageQuery) window() v1.UsageWindow {
 	return v1.UsageWindow{Range: q.Range, From: q.From, To: q.To, Timezone: q.TZ}
 }
 
-// DefaultBucketForRange picks the granularity a window reads best at: hours for
-// a day, days for anything longer. A 24h window at day granularity would draw
-// two bars and hide the shape entirely.
-func DefaultBucketForRange(rangeKey string) string {
-	if rangeKey == UsageRange24h {
-		return UsageBucketHour
+// previous returns the equally wide window immediately before this one, which
+// is what "vs last period" compares against. All-time has no predecessor: it
+// starts at the epoch, so there is nothing before it to measure.
+func (q UsageQuery) previous() (from, to time.Time, ok bool) {
+	if q.Range == UsageRangeAll {
+		return time.Time{}, time.Time{}, false
 	}
-	return UsageBucketDay
+	return q.From.Add(-q.To.Sub(q.From)), q.From, true
+}
+
+// DefaultBucketForRange picks the granularity a window reads best at: hours for
+// a day, six-hour bins for a week, days for anything longer. The rule is "two
+// to three dozen columns": fewer than that and each bar is a slab; more and the
+// axis labels collide. A 24h window at day granularity drew two bars, and a
+// week at day granularity drew eight across the whole panel.
+func DefaultBucketForRange(rangeKey string) string {
+	switch rangeKey {
+	case UsageRange24h:
+		return UsageBucketHour
+	case UsageRange7d:
+		return UsageBucketSixHour
+	default:
+		return UsageBucketDay
+	}
 }
 
 // ValidateUsageBucket checks a client-supplied granularity.
@@ -134,7 +163,7 @@ func ValidateUsageBucket(bucket string) (string, error) {
 	switch strings.TrimSpace(bucket) {
 	case "":
 		return "", nil
-	case UsageBucketHour, UsageBucketDay:
+	case UsageBucketHour, UsageBucketSixHour, UsageBucketDay:
 		return bucket, nil
 	default:
 		return "", fmt.Errorf("%w: %q", ErrUnknownBucket, bucket)
@@ -142,27 +171,49 @@ func ValidateUsageBucket(bucket string) (string, error) {
 }
 
 func (s *UsageService) Summary(ctx context.Context, userID uuid.UUID, q UsageQuery) (*v1.UsageSummaryResponse, error) {
+	current, err := s.summarize(ctx, userID, q, q.From, q.To)
+	if err != nil {
+		return nil, err
+	}
+	res := &v1.UsageSummaryResponse{Window: q.window(), Summary: *current}
+
+	// The predecessor is fetched rather than derived: a percent change cannot
+	// be computed from the current window alone, and sending the whole previous
+	// summary lets the client show as many comparisons as it has cards.
+	if from, to, ok := q.previous(); ok {
+		previous, prevErr := s.summarize(ctx, userID, q, from, to)
+		if prevErr != nil {
+			return nil, prevErr
+		}
+		res.Previous = previous
+	}
+	return res, nil
+}
+
+// summarize runs the same aggregate over arbitrary bounds. The workspace filter
+// travels on q; only the window changes between a period and its predecessor.
+func (s *UsageService) summarize(ctx context.Context, userID uuid.UUID, q UsageQuery, from, to time.Time) (*v1.UsageSummary, error) {
 	row, err := s.store.SummarizeUsage(ctx, db.SummarizeUsageParams{
 		UserID:      userID,
-		FromAt:      q.From,
-		ToAt:        q.To,
+		FromAt:      from,
+		ToAt:        to,
 		WorkspaceID: q.WorkspaceID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("summarize usage: %w", err)
 	}
-	return &v1.UsageSummaryResponse{
-		Window: q.window(),
-		Summary: v1.UsageSummary{
-			TokenBuckets: v1.TokenBuckets{
-				InputTokens:      row.InputTokens,
-				OutputTokens:     row.OutputTokens,
-				CacheReadTokens:  row.CacheReadTokens,
-				CacheWriteTokens: row.CacheWriteTokens,
-			},
-			RunsWithUsage: int(row.RunsWithUsage),
-			RunsTotal:     int(row.RunsTotal),
+	return &v1.UsageSummary{
+		TokenBuckets: v1.TokenBuckets{
+			InputTokens:      row.InputTokens,
+			OutputTokens:     row.OutputTokens,
+			CacheReadTokens:  row.CacheReadTokens,
+			CacheWriteTokens: row.CacheWriteTokens,
 		},
+		RunsWithUsage: int(row.RunsWithUsage),
+		RunsTotal:     int(row.RunsTotal),
+		RunsCompleted: int(row.RunsCompleted),
+		RunsFailed:    int(row.RunsFailed),
+		RunsCancelled: int(row.RunsCancelled),
 	}, nil
 }
 
@@ -188,10 +239,66 @@ func (s *UsageService) Series(ctx context.Context, userID uuid.UUID, q UsageQuer
 				CacheReadTokens:  r.CacheReadTokens,
 				CacheWriteTokens: r.CacheWriteTokens,
 			},
-			RunCount: int(r.RunCount),
+			RunCount:      int(r.RunCount),
+			CompletedRuns: int(r.CompletedRuns),
+			FailedRuns:    int(r.FailedRuns),
+			CancelledRuns: int(r.CancelledRuns),
 		})
 	}
 	return &v1.UsageSeriesResponse{Window: q.window(), Bucket: bucket, Points: points}, nil
+}
+
+// Runs lists the window's finished runs, newest first. It is the only read that
+// puts a name to the tokens: the breakdowns answer "which agent", this answers
+// "which run, just now".
+func (s *UsageService) Runs(ctx context.Context, userID uuid.UUID, q UsageQuery, limit int) (*v1.UsageRunsResponse, error) {
+	rows, err := s.store.ListUsageRuns(ctx, db.ListUsageRunsParams{
+		UserID:      userID,
+		FromAt:      q.From,
+		ToAt:        q.To,
+		WorkspaceID: q.WorkspaceID,
+		RowLimit:    int32(clampRunLimit(limit)),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("list usage runs: %w", err)
+	}
+	runs := make([]v1.UsageRun, 0, len(rows))
+	for _, r := range rows {
+		run := v1.UsageRun{
+			ID:            r.ID.String(),
+			Kind:          r.Kind,
+			Status:        r.Status,
+			AgentID:       r.AgentID.String(),
+			AgentName:     r.AgentName,
+			AvatarURL:     r.AgentAvatarUrl,
+			WorkspaceSlug: r.WorkspaceSlug,
+			PRNumber:      int(r.PrNumber),
+			StartedAt:     r.StartedAt,
+			CompletedAt:   r.CompletedAt,
+			TokenBuckets:  buckets(r.InputTokens, r.OutputTokens, r.CacheReadTokens, r.CacheWriteTokens),
+		}
+		// A review task has no issue; its label is the PR number. The key is
+		// composed here so one place decides what a key looks like, the same
+		// way every other agent read builds it.
+		if r.IssueNumber > 0 {
+			run.IssueKey = fmt.Sprintf("%s-%d", r.IssuePrefix, r.IssueNumber)
+			run.IssueTitle = r.IssueTitle
+		}
+		runs = append(runs, run)
+	}
+	return &v1.UsageRunsResponse{Window: q.window(), Runs: runs}, nil
+}
+
+// clampRunLimit keeps a caller's row count inside what the page can show and
+// what the database should scan.
+func clampRunLimit(limit int) int {
+	if limit <= 0 {
+		return UsageRunLimitDefault
+	}
+	if limit > UsageRunLimitMax {
+		return UsageRunLimitMax
+	}
+	return limit
 }
 
 // Breakdown dispatches to the query for one dimension. Each dimension has its

@@ -175,6 +175,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 			protected.GET("/usage/summary", usageHandler.Summary)
 			protected.GET("/usage/series", usageHandler.Series)
 			protected.GET("/usage/breakdown", usageHandler.Breakdown)
+			protected.GET("/usage/runs", usageHandler.Runs)
 
 			// Workspace management
 			protected.POST("/workspaces", workspaceHandler.Create)
