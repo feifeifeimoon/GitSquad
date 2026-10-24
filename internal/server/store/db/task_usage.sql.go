@@ -24,7 +24,7 @@ JOIN tasks t ON t.id = u.task_id
 JOIN workspaces w ON w.id = t.workspace_id
 JOIN agents a ON a.id = t.agent_id
 WHERE w.user_id = $1
-  AND u.created_at >= $2 AND u.created_at < $3
+  AND t.completed_at >= $2::timestamptz AND t.completed_at < $3::timestamptz
   AND t.workspace_id = coalesce($4::uuid, t.workspace_id)
 GROUP BY a.id, a.name, a.avatar_url
 ORDER BY sum(u.input_tokens + u.output_tokens + u.cache_read_tokens + u.cache_write_tokens) DESC
@@ -94,7 +94,7 @@ JOIN tasks t ON t.id = u.task_id
 JOIN workspaces w ON w.id = t.workspace_id
 LEFT JOIN daemons d ON d.id = t.assigned_daemon_id
 WHERE w.user_id = $1
-  AND u.created_at >= $2 AND u.created_at < $3
+  AND t.completed_at >= $2::timestamptz AND t.completed_at < $3::timestamptz
   AND t.workspace_id = coalesce($4::uuid, t.workspace_id)
 GROUP BY t.assigned_daemon_id, d.name
 ORDER BY sum(u.input_tokens + u.output_tokens + u.cache_read_tokens + u.cache_write_tokens) DESC
@@ -166,7 +166,7 @@ JOIN tasks t ON t.id = u.task_id
 JOIN workspaces w ON w.id = t.workspace_id
 JOIN issues i ON i.id = t.issue_id
 WHERE w.user_id = $1
-  AND u.created_at >= $2 AND u.created_at < $3
+  AND t.completed_at >= $2::timestamptz AND t.completed_at < $3::timestamptz
   AND t.workspace_id = coalesce($4::uuid, t.workspace_id)
 GROUP BY t.issue_id, i.number, i.title, w.issue_prefix, w.name, w.slug
 ORDER BY sum(u.input_tokens + u.output_tokens + u.cache_read_tokens + u.cache_write_tokens) DESC
@@ -243,7 +243,7 @@ FROM task_usage u
 JOIN tasks t ON t.id = u.task_id
 JOIN workspaces w ON w.id = t.workspace_id
 WHERE w.user_id = $1
-  AND u.created_at >= $2 AND u.created_at < $3
+  AND t.completed_at >= $2::timestamptz AND t.completed_at < $3::timestamptz
   AND t.workspace_id = coalesce($4::uuid, t.workspace_id)
 GROUP BY u.provider, u.model
 ORDER BY sum(u.input_tokens + u.output_tokens + u.cache_read_tokens + u.cache_write_tokens) DESC
@@ -312,7 +312,7 @@ FROM task_usage u
 JOIN tasks t ON t.id = u.task_id
 JOIN workspaces w ON w.id = t.workspace_id
 WHERE w.user_id = $1
-  AND u.created_at >= $2 AND u.created_at < $3
+  AND t.completed_at >= $2::timestamptz AND t.completed_at < $3::timestamptz
 GROUP BY w.id, w.name, w.slug
 ORDER BY sum(u.input_tokens + u.output_tokens + u.cache_read_tokens + u.cache_write_tokens) DESC
 `
@@ -363,24 +363,142 @@ func (q *Queries) ListUsageByWorkspace(ctx context.Context, arg ListUsageByWorks
 	return items, nil
 }
 
+const listUsageRuns = `-- name: ListUsageRuns :many
+SELECT t.id, t.kind, t.status, t.started_at, t.completed_at,
+       a.id AS agent_id, a.name AS agent_name, a.avatar_url AS agent_avatar_url,
+       w.slug AS workspace_slug,
+       coalesce(w.issue_prefix, '') AS issue_prefix,
+       coalesce(i.number, 0)::int AS issue_number,
+       coalesce(i.title, '') AS issue_title,
+       coalesce(pr.number, 0)::int AS pr_number,
+       coalesce(sum(u.input_tokens), 0)::bigint       AS input_tokens,
+       coalesce(sum(u.output_tokens), 0)::bigint      AS output_tokens,
+       coalesce(sum(u.cache_read_tokens), 0)::bigint  AS cache_read_tokens,
+       coalesce(sum(u.cache_write_tokens), 0)::bigint AS cache_write_tokens
+FROM tasks t
+JOIN workspaces w ON w.id = t.workspace_id
+JOIN agents a ON a.id = t.agent_id
+LEFT JOIN issues i ON i.id = t.issue_id
+LEFT JOIN pull_requests pr ON pr.id = t.pull_request_id
+LEFT JOIN task_usage u ON u.task_id = t.id
+WHERE w.user_id = $1
+  AND t.status IN ('completed', 'failed', 'cancelled')
+  AND t.completed_at >= $2::timestamptz AND t.completed_at < $3::timestamptz
+  AND t.workspace_id = coalesce($4::uuid, t.workspace_id)
+GROUP BY t.id, a.id, w.id, i.id, pr.id
+ORDER BY t.completed_at DESC
+LIMIT $5
+`
+
+type ListUsageRunsParams struct {
+	UserID      uuid.UUID  `json:"user_id"`
+	FromAt      time.Time  `json:"from_at"`
+	ToAt        time.Time  `json:"to_at"`
+	WorkspaceID *uuid.UUID `json:"workspace_id"`
+	RowLimit    int32      `json:"row_limit"`
+}
+
+type ListUsageRunsRow struct {
+	ID               uuid.UUID  `json:"id"`
+	Kind             string     `json:"kind"`
+	Status           string     `json:"status"`
+	StartedAt        *time.Time `json:"started_at"`
+	CompletedAt      *time.Time `json:"completed_at"`
+	AgentID          uuid.UUID  `json:"agent_id"`
+	AgentName        string     `json:"agent_name"`
+	AgentAvatarUrl   string     `json:"agent_avatar_url"`
+	WorkspaceSlug    string     `json:"workspace_slug"`
+	IssuePrefix      string     `json:"issue_prefix"`
+	IssueNumber      int32      `json:"issue_number"`
+	IssueTitle       string     `json:"issue_title"`
+	PrNumber         int32      `json:"pr_number"`
+	InputTokens      int64      `json:"input_tokens"`
+	OutputTokens     int64      `json:"output_tokens"`
+	CacheReadTokens  int64      `json:"cache_read_tokens"`
+	CacheWriteTokens int64      `json:"cache_write_tokens"`
+}
+
+// The recent-runs list: what finished in the window, newest first, with the
+// tokens each run reported (absent when it reported none — the row still
+// belongs on the page).
+//
+// Grouped by the primary keys of the joined tables: a run with usage under two
+// models is one row whose tokens are the sum, and every joined column is
+// functionally dependent on one of those keys.
+func (q *Queries) ListUsageRuns(ctx context.Context, arg ListUsageRunsParams) ([]ListUsageRunsRow, error) {
+	rows, err := q.db.Query(ctx, listUsageRuns,
+		arg.UserID,
+		arg.FromAt,
+		arg.ToAt,
+		arg.WorkspaceID,
+		arg.RowLimit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsageRunsRow
+	for rows.Next() {
+		var i ListUsageRunsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Kind,
+			&i.Status,
+			&i.StartedAt,
+			&i.CompletedAt,
+			&i.AgentID,
+			&i.AgentName,
+			&i.AgentAvatarUrl,
+			&i.WorkspaceSlug,
+			&i.IssuePrefix,
+			&i.IssueNumber,
+			&i.IssueTitle,
+			&i.PrNumber,
+			&i.InputTokens,
+			&i.OutputTokens,
+			&i.CacheReadTokens,
+			&i.CacheWriteTokens,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listUsageSeries = `-- name: ListUsageSeries :many
 SELECT bucket,
-       sum(input_tokens)::bigint       AS input_tokens,
-       sum(output_tokens)::bigint      AS output_tokens,
-       sum(cache_read_tokens)::bigint  AS cache_read_tokens,
-       sum(cache_write_tokens)::bigint AS cache_write_tokens,
-       count(DISTINCT task_id)::int    AS run_count
+       coalesce(sum(input_tokens), 0)::bigint       AS input_tokens,
+       coalesce(sum(output_tokens), 0)::bigint      AS output_tokens,
+       coalesce(sum(cache_read_tokens), 0)::bigint  AS cache_read_tokens,
+       coalesce(sum(cache_write_tokens), 0)::bigint AS cache_write_tokens,
+       count(DISTINCT task_id)::int                 AS run_count,
+       count(DISTINCT task_id) FILTER (WHERE status = 'completed')::int AS completed_runs,
+       count(DISTINCT task_id) FILTER (WHERE status = 'failed')::int    AS failed_runs,
+       count(DISTINCT task_id) FILTER (WHERE status = 'cancelled')::int AS cancelled_runs
 FROM (
-    SELECT (CASE WHEN $1::text = 'hour'
-                 THEN to_char(date_trunc('hour', u.created_at AT TIME ZONE $2::text), 'YYYY-MM-DD"T"HH24:00')
-                 ELSE to_char(date_trunc('day', u.created_at AT TIME ZONE $2::text), 'YYYY-MM-DD')
+    SELECT (CASE
+                WHEN $1::text = 'hour'
+                  THEN to_char(date_trunc('hour', t.completed_at AT TIME ZONE $2::text), 'YYYY-MM-DD"T"HH24:00')
+                -- Six-hour bins cut on the local clock, so a day is always
+                -- 00 / 06 / 12 / 18 where the reader is. date_bin's origin is a
+                -- local midnight, which keeps the bounds on those four hours.
+                WHEN $1::text = '6h'
+                  THEN to_char(date_bin(interval '6 hours',
+                                        t.completed_at AT TIME ZONE $2::text,
+                                        timestamp '2000-01-01'), 'YYYY-MM-DD"T"HH24:00')
+                ELSE to_char(date_trunc('day', t.completed_at AT TIME ZONE $2::text), 'YYYY-MM-DD')
             END)::text AS bucket,
-           u.task_id, u.input_tokens, u.output_tokens, u.cache_read_tokens, u.cache_write_tokens
-    FROM task_usage u
-    JOIN tasks t ON t.id = u.task_id
+           t.id AS task_id, t.status,
+           u.input_tokens, u.output_tokens, u.cache_read_tokens, u.cache_write_tokens
+    FROM tasks t
     JOIN workspaces w ON w.id = t.workspace_id
+    LEFT JOIN task_usage u ON u.task_id = t.id
     WHERE w.user_id = $3
-      AND u.created_at >= $4 AND u.created_at < $5
+      AND t.completed_at >= $4::timestamptz AND t.completed_at < $5::timestamptz
       AND t.workspace_id = coalesce($6::uuid, t.workspace_id)
 ) b
 GROUP BY bucket
@@ -403,12 +521,21 @@ type ListUsageSeriesRow struct {
 	CacheReadTokens  int64  `json:"cache_read_tokens"`
 	CacheWriteTokens int64  `json:"cache_write_tokens"`
 	RunCount         int32  `json:"run_count"`
+	CompletedRuns    int32  `json:"completed_runs"`
+	FailedRuns       int32  `json:"failed_runs"`
+	CancelledRuns    int32  `json:"cancelled_runs"`
 }
 
-// The trend chart. Buckets are cut in the viewer's timezone via the tz argument
-// rather than fixed in UTC, so "yesterday" means yesterday where the reader is;
-// rolling windows then land on local day boundaries instead of drifting.
+// The trend chart: one row per bucket, carrying both spend and outcomes so the
+// chart's Tokens and Runs views are two readings of the same series and cannot
+// drift apart.
+//
+// Buckets are cut in the viewer's timezone via the tz argument rather than
+// fixed in UTC, so "yesterday" means yesterday where the reader is; rolling
+// windows then land on local day boundaries instead of drifting.
 // The bucket is formatted as text so no timezone can be reintroduced on scan.
+// The outcome filters count distinct tasks: a run that reported usage under two
+// models is one run, not two.
 func (q *Queries) ListUsageSeries(ctx context.Context, arg ListUsageSeriesParams) ([]ListUsageSeriesRow, error) {
 	rows, err := q.db.Query(ctx, listUsageSeries,
 		arg.Bucket,
@@ -432,6 +559,9 @@ func (q *Queries) ListUsageSeries(ctx context.Context, arg ListUsageSeriesParams
 			&i.CacheReadTokens,
 			&i.CacheWriteTokens,
 			&i.RunCount,
+			&i.CompletedRuns,
+			&i.FailedRuns,
+			&i.CancelledRuns,
 		); err != nil {
 			return nil, err
 		}
@@ -450,17 +580,17 @@ SELECT
     coalesce(sum(u.cache_read_tokens), 0)::bigint  AS cache_read_tokens,
     coalesce(sum(u.cache_write_tokens), 0)::bigint AS cache_write_tokens,
     count(DISTINCT u.task_id)::int                 AS runs_with_usage,
-    (SELECT count(*)::int FROM tasks t2
-     JOIN workspaces w2 ON w2.id = t2.workspace_id
-     WHERE w2.user_id = $1
-       AND t2.completed_at >= $2::timestamptz AND t2.completed_at < $3::timestamptz
-       AND t2.workspace_id = coalesce($4::uuid, t2.workspace_id)
-    )::int AS runs_total
-FROM task_usage u
-JOIN tasks t ON t.id = u.task_id
+    -- DISTINCT because the usage join fans a run out once per reported model;
+    -- the run counters must count runs, not ledger rows.
+    count(DISTINCT t.id)::int                      AS runs_total,
+    count(DISTINCT t.id) FILTER (WHERE t.status = 'completed')::int AS runs_completed,
+    count(DISTINCT t.id) FILTER (WHERE t.status = 'failed')::int    AS runs_failed,
+    count(DISTINCT t.id) FILTER (WHERE t.status = 'cancelled')::int AS runs_cancelled
+FROM tasks t
 JOIN workspaces w ON w.id = t.workspace_id
+LEFT JOIN task_usage u ON u.task_id = t.id
 WHERE w.user_id = $1
-  AND u.created_at >= $2 AND u.created_at < $3
+  AND t.completed_at >= $2::timestamptz AND t.completed_at < $3::timestamptz
   AND t.workspace_id = coalesce($4::uuid, t.workspace_id)
 `
 
@@ -478,15 +608,22 @@ type SummarizeUsageRow struct {
 	CacheWriteTokens int64 `json:"cache_write_tokens"`
 	RunsWithUsage    int32 `json:"runs_with_usage"`
 	RunsTotal        int32 `json:"runs_total"`
+	RunsCompleted    int32 `json:"runs_completed"`
+	RunsFailed       int32 `json:"runs_failed"`
+	RunsCancelled    int32 `json:"runs_cancelled"`
 }
 
-// Totals for a window, plus the coverage that keeps the UI honest.
+// Totals for a window, plus the coverage and the outcomes that keep the
+// headline figures honest.
 //
-// runs_total counts runs that *finished* in the window (completed_at), because
-// that is when usage is written. The gap between it and runs_with_usage is
-// usage we never received — a daemon that died mid-task, a provider that does
-// not report tokens, or a run from before this table existed. Those are not
-// zero-token runs and must not be rendered as such.
+// runs_total counts runs that *finished* in the window. The gap between it and
+// runs_with_usage is usage we never received — a daemon that died mid-task, a
+// provider that does not report tokens, or a run from before this table
+// existed. Those are not zero-token runs and must not be rendered as such.
+//
+// completed/failed/cancelled partition runs_total, so a success rate computed
+// from two of them always has a denominator that reconciles with the card
+// beside it.
 func (q *Queries) SummarizeUsage(ctx context.Context, arg SummarizeUsageParams) (SummarizeUsageRow, error) {
 	row := q.db.QueryRow(ctx, summarizeUsage,
 		arg.UserID,
@@ -502,6 +639,9 @@ func (q *Queries) SummarizeUsage(ctx context.Context, arg SummarizeUsageParams) 
 		&i.CacheWriteTokens,
 		&i.RunsWithUsage,
 		&i.RunsTotal,
+		&i.RunsCompleted,
+		&i.RunsFailed,
+		&i.RunsCancelled,
 	)
 	return i, err
 }
@@ -530,9 +670,16 @@ type UpsertTaskUsageParams struct {
 	CacheWriteTokens int64     `json:"cache_write_tokens"`
 }
 
-// Reads of the token-usage ledger. Every query is scoped to the workspaces a
-// user owns and to a half-open [from_at, to_at) window on the usage row, which
-// is written when the run finishes.
+// Reads of the token-usage ledger, plus the runs that produced it. Every query
+// is scoped to the workspaces a user owns and to a half-open [from_at, to_at)
+// window on when the run *finished* (tasks.completed_at), which is also when
+// its usage row is written.
+//
+// Tasks is the driving table, not task_usage. A run that finished without
+// reporting tokens still happened and still has an outcome, and both the run
+// counters and the chart's Runs view have to include it — driving from the
+// ledger would silently drop exactly the runs the coverage note exists to
+// admit are missing.
 func (q *Queries) UpsertTaskUsage(ctx context.Context, arg UpsertTaskUsageParams) error {
 	_, err := q.db.Exec(ctx, upsertTaskUsage,
 		arg.TaskID,

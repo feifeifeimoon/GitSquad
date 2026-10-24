@@ -1,37 +1,52 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Gauge, Info } from "lucide-react";
 import {
   usageApi,
   type UsageBreakdownResponse,
+  type UsageRunsResponse,
   type UsageSeriesResponse,
+  type UsageSummary,
   type UsageSummaryResponse,
 } from "@/lib/api";
 import {
   browserTimezone,
   cacheHitRate,
+  formatCount,
   formatPercent,
   formatTokens,
+  percentChange,
+  pointChange,
+  successRate,
   totalTokens,
   usageCoverage,
+  zeroFillSeries,
   USAGE_GROUPS,
   USAGE_GROUP_LABELS,
   USAGE_RANGES,
   USAGE_RANGE_LABELS,
   USAGE_RANGE_TITLES,
   type UsageGroup,
+  type UsagePoint,
   type UsageRange,
 } from "@/lib/usage";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Empty, EmptyDescription, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
-import { PageToolbar } from "@/components/page-toolbar";
+import { PageToolbar, SectionHeading } from "@/components/page-toolbar";
 import { invalidateApi, useApi } from "@/lib/query";
 import { ErrorState } from "@/components/error-state";
 import { UsageChart } from "@/components/usage/usage-chart";
 import { UsageBreakdown } from "@/components/usage/usage-breakdown";
+import {
+  UsageKpis,
+  type KpiDelta,
+  type UsageHero,
+  type UsageStat,
+} from "@/components/usage/usage-kpis";
+import { UsageRuns } from "@/components/usage/usage-runs";
 import { SegmentedControl } from "@/components/segmented-control";
 import { FilterChips } from "@/components/filter-chips";
 import { toast } from "sonner";
@@ -39,6 +54,15 @@ import { toast } from "sonner";
 // The timezone travels with every request rather than being stored on the
 // account, so day buckets are cut where the reader actually is.
 const TZ = browserTimezone();
+
+const COMPARISON: Record<UsageRange, string> = {
+  "24h": "vs previous 24 hours",
+  "7d": "vs previous 7 days",
+  "30d": "vs previous 30 days",
+  all: "all time",
+};
+
+const RECENT_RUNS = 12;
 
 export default function UsagePage() {
   const [range, setRange] = useState<UsageRange>("7d");
@@ -62,22 +86,39 @@ export default function UsagePage() {
       `/api/v1/usage/breakdown?${windowParams}&group_by=${group}`,
       () => usageApi.breakdown({ range, tz: TZ, groupBy: group }),
     );
+  const { data: runsRes, error: runsError } = useApi<UsageRunsResponse>(
+    `/api/v1/usage/runs?${windowParams}&limit=${RECENT_RUNS}`,
+    () => usageApi.runs({ range, tz: TZ, limit: RECENT_RUNS }),
+  );
 
   const summary = summaryRes?.summary ?? null;
-  const usageWindow = summaryRes?.window ?? null;
-  const points = seriesRes?.points ?? [];
+  const previous = summaryRes?.previous ?? null;
+  const usageWindow = seriesRes?.window ?? null;
   const granularity = seriesRes?.bucket ?? "day";
   const loading = seriesRes === undefined || summaryRes === undefined;
   const breakdownLoading = breakdownRes === undefined;
+  const runsLoading = runsRes === undefined;
 
-  const usageError = summaryError ?? seriesError ?? breakdownError;
+  // Gaps are drawn, not skipped: a week with two active days must show five
+  // empty ones or the two bars read as the whole week.
+  const points = useMemo(
+    () =>
+      seriesRes
+        ? zeroFillSeries(seriesRes.points, seriesRes.window, seriesRes.bucket)
+        : [],
+    [seriesRes],
+  );
+
+  const usageError = summaryError ?? seriesError ?? breakdownError ?? runsError;
   useEffect(() => {
     if (usageError) toast.error(usageError.message || "Failed to load usage");
   }, [usageError]);
 
   const coverage = summary ? usageCoverage(summary) : null;
-  const total = summary ? totalTokens(summary) : 0;
-  const rate = summary ? cacheHitRate(summary) : null;
+  const content = useMemo(
+    () => (summary ? kpiContent(summary, previous, points, range) : null),
+    [summary, previous, points, range],
+  );
 
   return (
     <div className="flex h-full flex-col">
@@ -107,61 +148,33 @@ export default function UsagePage() {
               <Link href="/daemons">Connect a daemon</Link>
             </Button>
           </Empty>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-hairline pb-6 sm:grid-cols-3 lg:grid-cols-6">
-              <Kpi label="Total tokens" value={formatTokens(total)} emphasis />
-              <Kpi label="Input" value={formatTokens(summary?.input_tokens ?? 0)} />
-              <Kpi label="Output" value={formatTokens(summary?.output_tokens ?? 0)} />
-              <Kpi
-                label="Cache read"
-                value={formatTokens(summary?.cache_read_tokens ?? 0)}
-              />
-              <Kpi
-                label="Cache write"
-                value={formatTokens(summary?.cache_write_tokens ?? 0)}
-              />
-              {/* Null, not 0%, when nothing was sent — an empty cache and an
-                  unused one are different facts. */}
-              <Kpi
-                label="Cache hit rate"
-                value={rate === null ? "—" : formatPercent(rate)}
-              />
+        ) : summary ? (
+          <div className="space-y-6">
+            <div>
+              {content && <UsageKpis hero={content.hero} stats={content.stats} />}
+              {coverage?.incomplete && (
+                <p className="mt-3 flex items-start gap-2 text-caption text-mute">
+                  <Info className="mt-px size-3.5 shrink-0" />
+                  <span>
+                    {coverage.reported} of {coverage.total} finished runs reported
+                    usage. The other {coverage.missing} did not — a daemon that
+                    stopped mid-run, or a provider that reports no tokens — so the
+                    figures above are a lower bound, not the full total.
+                  </span>
+                </p>
+              )}
             </div>
 
-            {coverage?.incomplete && (
-              <p className="mt-4 flex items-start gap-2 text-caption text-mute">
-                <Info className="mt-px size-3.5 shrink-0" />
-                <span>
-                  {coverage.reported} of {coverage.total} finished runs reported
-                  usage. The other {coverage.missing} did not — a daemon that
-                  stopped mid-run, or a provider that reports no tokens — so the
-                  figures above are a lower bound, not the full total.
-                </span>
-              </p>
-            )}
+            <UsageChart
+              points={points}
+              bucket={granularity}
+              usageWindow={usageWindow}
+            />
 
-            <section className="mt-8">
-              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-                <h2 className="text-label font-semibold text-ink">
-                  Tokens over time
-                </h2>
-                <span className="text-caption text-mute">
-                  {usageWindow
-                    ? `${usageWindow.range} · bucketed by ${granularity} in ${usageWindow.timezone}`
-                    : ""}
-                </span>
-              </div>
-              <div className="rounded-lg border border-hairline bg-canvas p-4">
-                <UsageChart points={points} bucket={granularity} />
-              </div>
-            </section>
-
-            <section className="mt-8">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                <h2 className="text-label font-semibold text-ink">Breakdown</h2>
-                <GroupSelector value={group} onChange={setGroup} />
-              </div>
+            <section>
+              <SectionHeading actions={<GroupSelector value={group} onChange={setGroup} />}>
+                Breakdown
+              </SectionHeading>
               {breakdownLoading ? (
                 <div className="space-y-2">
                   {Array.from({ length: 3 }).map((_, i) => (
@@ -172,39 +185,118 @@ export default function UsagePage() {
                 <UsageBreakdown group={group} rows={breakdownRes?.rows ?? []} />
               )}
             </section>
-          </>
-        )}
+
+            <section>
+              <SectionHeading
+                actions={
+                  <span className="text-caption text-mute">
+                    Latest {RECENT_RUNS} · newest first
+                  </span>
+                }
+              >
+                Recent runs
+              </SectionHeading>
+              {runsLoading ? (
+                <Skeleton className="h-56 w-full rounded-lg" />
+              ) : (
+                <UsageRuns runs={runsRes?.runs ?? []} />
+              )}
+            </section>
+          </div>
+        ) : null}
       </div>
     </div>
   );
 }
 
-function Kpi({
-  label,
-  value,
-  emphasis,
-}: {
-  label: string;
-  value: string;
-  emphasis?: boolean;
-}) {
-  return (
-    <div className="min-w-0">
-      {/* Sentence case, not mono uppercase: mono uppercase is how you say "this
-          is an identifier", and "Total tokens" is not one. */}
-      <p className="text-caption text-mute">{label}</p>
-      <p
-        className={`mt-1 truncate tabular-nums ${
-          emphasis
-            ? "text-display font-semibold tracking-[-0.01em] text-ink"
-            : "text-title-sm font-medium text-ink"
-        }`}
-        title={value}
-      >
-        {value}
-      </p>
-    </div>
-  );
+/**
+ * The four headline cards. Each one is a figure, what it is made of, and the
+ * direction it moved against the window before it — the three things the old
+ * six-number row left the reader to work out.
+ */
+/**
+ * The top band's numbers. The total is the hero — it is the figure the page is
+ * about — and the other three are the reasons it moved, so they sit in the
+ * band underneath rather than beside it.
+ */
+function kpiContent(
+  summary: UsageSummary,
+  previous: UsageSummary | null,
+  points: UsagePoint[],
+  range: UsageRange,
+): { hero: UsageHero; stats: UsageStat[] } {
+  const total = totalTokens(summary);
+  const rate = successRate(summary);
+  const cache = cacheHitRate(summary);
+  const comparison = COMPARISON[range];
+
+  const previousTotal = previous ? totalTokens(previous) : undefined;
+  const previousRate = previous ? successRate(previous) : null;
+  const previousCache = previous ? cacheHitRate(previous) : null;
+
+  const runsHint =
+    `${formatCount(summary.runs_completed)} completed · ` +
+    `${formatCount(summary.runs_failed)} failed` +
+    (summary.runs_cancelled > 0
+      ? ` · ${formatCount(summary.runs_cancelled)} cancelled`
+      : "");
+
+  const rateHint =
+    rate === null
+      ? "No finished runs"
+      : `${formatCount(summary.runs_failed)} failed of ${formatCount(
+          summary.runs_completed + summary.runs_failed,
+        )} finished`;
+
+  return {
+    hero: {
+      label: "Total tokens",
+      value: formatTokens(total),
+      hint: `${formatTokens(summary.input_tokens)} in · ${formatTokens(
+        summary.output_tokens,
+      )} out · ${formatTokens(
+        summary.cache_read_tokens + summary.cache_write_tokens,
+      )} cached`,
+      delta: deltaOf(percentChange(total, previousTotal), "percent"),
+      comparison,
+      spark: points.map((point) => totalTokens(point)),
+    },
+    stats: [
+      {
+        label: "Runs",
+        value: formatCount(summary.runs_total),
+        hint: runsHint,
+        delta: deltaOf(
+          percentChange(summary.runs_total, previous?.runs_total),
+          "percent",
+        ),
+        comparison,
+      },
+      {
+        label: "Success rate",
+        value: rate === null ? "—" : formatPercent(rate),
+        hint: rateHint,
+        delta: deltaOf(pointChange(rate, previousRate), "points"),
+        comparison,
+      },
+      {
+        label: "Cache hit rate",
+        value: cache === null ? "—" : formatPercent(cache),
+        hint: `${formatTokens(summary.cache_read_tokens)} read · ${formatTokens(
+          summary.cache_write_tokens,
+        )} written`,
+        delta: deltaOf(pointChange(cache, previousCache), "points"),
+        comparison,
+      },
+    ],
+  };
+}
+
+function deltaOf(
+  value: number | null,
+  kind: KpiDelta["kind"],
+): KpiDelta | null {
+  return value === null ? null : { value, kind };
 }
 
 function RangeSelector({
@@ -247,17 +339,28 @@ function GroupSelector({
 
 function UsageSkeleton() {
   return (
-    <>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-5 border-b border-hairline pb-6 sm:grid-cols-3 lg:grid-cols-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i}>
-            <Skeleton className="h-3 w-20" />
-            <Skeleton className="mt-2 h-6 w-16" />
+    <div className="space-y-6">
+      <div className="overflow-hidden rounded-xl border border-hairline bg-canvas">
+        <div className="flex flex-col gap-5 p-5 lg:flex-row lg:items-end lg:justify-between lg:p-6">
+          <div className="min-w-0">
+            <Skeleton className="h-3 w-24" />
+            <Skeleton className="mt-3 h-10 w-40" />
+            <Skeleton className="mt-3 h-3 w-56" />
           </div>
-        ))}
+          <Skeleton className="h-16 w-full lg:w-[44%]" />
+        </div>
+        <div className="grid grid-cols-1 divide-y divide-hairline border-t border-hairline sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="px-5 py-3.5">
+              <Skeleton className="h-3 w-16" />
+              <Skeleton className="mt-2 h-5 w-20" />
+              <Skeleton className="mt-2 h-3 w-28" />
+            </div>
+          ))}
+        </div>
       </div>
-      <Skeleton className="mt-8 h-52 w-full rounded-lg" />
-      <Skeleton className="mt-8 h-40 w-full rounded-lg" />
-    </>
+      <Skeleton className="h-80 w-full rounded-lg" />
+      <Skeleton className="h-52 w-full rounded-lg" />
+    </div>
   );
 }

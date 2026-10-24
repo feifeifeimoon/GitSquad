@@ -479,11 +479,33 @@ export interface UsageWindow {
 export interface UsageSummary extends TokenBuckets {
   runs_with_usage: number;
   runs_total: number;
+  runs_completed: number;
+  runs_failed: number;
+  runs_cancelled: number;
 }
 
 export interface UsagePoint extends TokenBuckets {
   bucket: string;
   run_count: number;
+  completed_runs: number;
+  failed_runs: number;
+  cancelled_runs: number;
+}
+
+/** One finished run in the window, for the recent-runs list. */
+export interface UsageRun extends TokenBuckets {  id: string;
+  /** "issue" for a coding run, "review" for a pull-request review. */
+  kind: "issue" | "review";
+  status: "completed" | "failed" | "cancelled";
+  agent_id: string;
+  agent_name: string;
+  avatar_url?: string;
+  workspace_slug?: string;
+  issue_key?: string;
+  issue_title?: string;
+  pr_number?: number;
+  started_at?: string;
+  completed_at?: string;
 }
 
 export interface UsageBreakdownRow extends TokenBuckets {
@@ -494,15 +516,29 @@ export interface UsageBreakdownRow extends TokenBuckets {
   run_count: number;
 }
 
+/**
+ * Granularity of the trend series: hourly for a day, six-hour bins for a week
+ * (a week of daily bars is eight slabs across the panel), daily for the longer
+ * windows.
+ */
+export type UsageBucket = "hour" | "6h" | "day";
+
 export interface UsageSummaryResponse {
   window: UsageWindow;
   summary: UsageSummary;
+  /** The equally wide window before this one; absent for all-time. */
+  previous?: UsageSummary;
 }
 
 export interface UsageSeriesResponse {
   window: UsageWindow;
-  bucket: "hour" | "day";
+  bucket: UsageBucket;
   points: UsagePoint[];
+}
+
+export interface UsageRunsResponse {
+  window: UsageWindow;
+  runs: UsageRun[];
 }
 
 export interface UsageBreakdownResponse {
@@ -529,13 +565,17 @@ function usageQuery(params: UsageParams, extra: Record<string, string> = {}): st
 export const usageApi = {
   summary: (params: UsageParams) =>
     api.get<UsageSummaryResponse>(`/api/v1/usage/summary?${usageQuery(params)}`),
-  series: (params: UsageParams & { bucket?: "hour" | "day" }) =>
+  series: (params: UsageParams & { bucket?: UsageBucket }) =>
     api.get<UsageSeriesResponse>(
       `/api/v1/usage/series?${usageQuery(params, params.bucket ? { bucket: params.bucket } : {})}`,
     ),
   breakdown: (params: UsageParams & { groupBy: string }) =>
     api.get<UsageBreakdownResponse>(
       `/api/v1/usage/breakdown?${usageQuery(params, { group_by: params.groupBy })}`,
+    ),
+  runs: (params: UsageParams & { limit?: number }) =>
+    api.get<UsageRunsResponse>(
+      `/api/v1/usage/runs?${usageQuery(params, params.limit ? { limit: String(params.limit) } : {})}`,
     ),
 };
 

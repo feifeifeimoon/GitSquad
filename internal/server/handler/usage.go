@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -112,6 +113,30 @@ func (h *UsageHandler) Breakdown(c *gin.Context) {
 		return
 	}
 	res, err := h.usage.Breakdown(c.Request.Context(), userID, query, groupBy)
+	if err != nil {
+		h.writeQueryError(c, err)
+		return
+	}
+	c.JSON(http.StatusOK, v1.SuccessResponse(res, 0))
+}
+
+// Runs is the recent-runs list. limit is optional and clamped by the service,
+// so a client can ask for fewer rows but not for an unbounded scan.
+func (h *UsageHandler) Runs(c *gin.Context) {
+	userID, query, ok := h.requireUsageQuery(c)
+	if !ok {
+		return
+	}
+	limit := 0
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		n, err := strconv.Atoi(raw)
+		if err != nil || n < 0 {
+			c.JSON(http.StatusBadRequest, v1.ErrorResponse("invalid limit"))
+			return
+		}
+		limit = n
+	}
+	res, err := h.usage.Runs(c.Request.Context(), userID, query, limit)
 	if err != nil {
 		h.writeQueryError(c, err)
 		return
