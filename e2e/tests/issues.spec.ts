@@ -169,6 +169,30 @@ test.describe("Issues", () => {
     await page.getByText(`Written after the fact ${suffix}`).click();
     await expect(editor).toBeFocused();
   });
+
+  // The scrollbar is drawn at the edge of the thing it moves, so the thread's
+  // viewport has to end where the Properties rail begins. Capping the viewport
+  // to the 42rem reading measure put the track at the end of the prose instead
+  // — in the middle of the gutter, beside the text rather than beside the rail.
+  test("draws the thread's scrollbar against the Properties rail", async ({ page }) => {
+    const issue = await api.createIssue(workspace.id, `Pane ${suffix}`);
+
+    await loginAsE2E(page, api);
+    await page.goto(`/${workspace.slug}/issues/${issue.issue_key}`, {
+      waitUntil: "domcontentloaded",
+    });
+
+    const rail = page.locator("aside").filter({ hasText: "Properties" });
+    await expect(rail).toBeVisible({ timeout: 20_000 });
+
+    const paneBox = await page.getByTestId("issue-thread").boundingBox();
+    const railBox = await rail.boundingBox();
+    expect(paneBox).not.toBeNull();
+    expect(railBox).not.toBeNull();
+    // Flush: the scrollbar occupies the pane's right edge, so the two boxes
+    // meet with nothing between them.
+    expect(Math.abs(paneBox!.x + paneBox!.width - railBox!.x)).toBeLessThanOrEqual(1);
+  });
 });
 
 test.describe("Issue pull requests", () => {
