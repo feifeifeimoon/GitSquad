@@ -121,6 +121,31 @@ func TestPreparePreservesUserContent(t *testing.T) {
 	}
 }
 
+// The checkout is reused and the previous review's result is ignored by git
+// clean, so a reviewer that writes nothing would have the old findings posted as
+// this pull request's.
+func TestPrepareReviewClearsPreviousResult(t *testing.T) {
+	dir := t.TempDir()
+	stale := filepath.Join(dir, ".gitsquad", "review.json")
+	if err := os.MkdirAll(filepath.Dir(stale), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(stale, []byte(`{"summary":"old findings","comments":[]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	task := v1.Task{
+		Agent:       v1.TaskAgentContext{Name: "reviewer", Provider: "claude"},
+		PullRequest: &v1.TaskPullRequestContext{Number: 7, BaseBranch: "main"},
+	}
+	if _, err := PrepareReview(dir, task); err != nil {
+		t.Fatalf("PrepareReview: %v", err)
+	}
+	if _, err := os.Stat(stale); !os.IsNotExist(err) {
+		t.Error("the previous review's result must be cleared before this one runs")
+	}
+}
+
 // The platform owns git: commit, push and the pull request. Telling the agent
 // to push as well made the two owners collide — an agent that followed the
 // brief left nothing for the platform to commit, and its `git commit` failed

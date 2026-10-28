@@ -17,7 +17,7 @@ func TestCheckoutPullRequestFetchesBaseBeforeHead(t *testing.T) {
 	if _, err := r.checkoutPullRequest(context.Background(), t.TempDir(), pr, Credential{}); err != nil {
 		t.Fatalf("checkout: %v", err)
 	}
-	want := "fetch-branch fetch-pr checkout:FETCH_HEAD head-sha"
+	want := "reset-worktree fetch-branch fetch-pr checkout:FETCH_HEAD head-sha"
 	if got := strings.Join(git.calls, " "); got != want {
 		t.Fatalf("calls = %q, want %q (FETCH_HEAD must still point at the PR head)", got, want)
 	}

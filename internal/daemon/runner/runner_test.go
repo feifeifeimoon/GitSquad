@@ -25,8 +25,23 @@ type fakeGit struct {
 	// resetToDefault / resetToBranch record which starting point the task used.
 	resetToDefault bool
 	resetToBranch  string
+	// resetWorktree / restored record the cleanup the platform does itself.
+	resetWorktree bool
+	restored      []string
 	// calls records the order of the review checkout's git operations.
 	calls []string
+}
+
+func (f *fakeGit) ResetWorktree(_ context.Context, _ string) error {
+	f.resetWorktree = true
+	f.calls = append(f.calls, "reset-worktree")
+	return nil
+}
+
+func (f *fakeGit) RestoreTracked(_ context.Context, _ string, paths ...string) error {
+	f.restored = append(f.restored, paths...)
+	f.calls = append(f.calls, "restore")
+	return nil
 }
 
 func (f *fakeGit) CloneOrFetch(_ context.Context, _ string, _ string, _ Credential) error {
@@ -71,6 +86,7 @@ func (f *fakeGit) HasBranch(_ context.Context, _ string, branch string) error {
 	return nil
 }
 func (f *fakeGit) HasChanges(_ context.Context, _ string, _ string) (bool, error) {
+	f.calls = append(f.calls, "has-changes")
 	return f.dirty || f.ahead, nil
 }
 func (f *fakeGit) DiscardBranch(_ context.Context, _ string, branch, _ string) error {
@@ -182,6 +198,43 @@ func TestRunnerRunConvergesOnEveryAgentBehaviour(t *testing.T) {
 
 // Nothing to deliver: the empty branch is dropped so a reused checkout does not
 // accumulate one per read-only task, and the agent's text is the deliverable.
+// The brief is written into the checkout the agent works in. When the
+// repository tracks CLAUDE.md/AGENTS.md, that write has to be undone before the
+// platform decides whether the task produced anything — otherwise the prompt is
+// committed and pushed as the change.
+func TestRunnerRestoresPlatformFilesBeforeMeasuringWork(t *testing.T) {
+	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n"}
+	rep := &fakeReporter{}
+	r := New(git, &fakeBackend{res: provider.Result{Status: "completed", Output: "done"}}, rep, t.TempDir())
+
+	if err := r.Run(context.Background(), testTask()); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+	var restored bool
+	for _, name := range git.restored {
+		if name == "AGENTS.md" {
+			restored = true
+		}
+	}
+	if !restored {
+		t.Fatalf("restored = %v, want the platform's own context files", git.restored)
+	}
+	restoreAt, changesAt := -1, -1
+	for i, call := range git.calls {
+		switch call {
+		case "restore":
+			if restoreAt < 0 {
+				restoreAt = i
+			}
+		case "has-changes":
+			changesAt = i
+		}
+	}
+	if restoreAt < 0 || changesAt < 0 || restoreAt > changesAt {
+		t.Fatalf("calls = %v, want the restore before the change check", git.calls)
+	}
+}
+
 func TestRunnerRunNoChangesDiscardsBranch(t *testing.T) {
 	git := &fakeGit{}
 	rep := &fakeReporter{}

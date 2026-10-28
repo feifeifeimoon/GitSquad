@@ -133,6 +133,14 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
 
+	// The brief was written into the checkout the agent just worked in. For a
+	// repository that tracks CLAUDE.md/AGENTS.md the exclude does not apply, so
+	// the write has to be reverted here — otherwise it is measured as this
+	// task's work and pushed as a pull request containing only the prompt.
+	if err := r.git.RestoreTracked(ctx, wsDir, platformPaths...); err != nil {
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("restore platform files: %w", err))
+	}
+
 	changed, err := r.git.HasChanges(ctx, wsDir, changeBase)
 	if err != nil {
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("check changes: %w", err))
