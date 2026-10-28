@@ -397,6 +397,54 @@ func TestGitCLICommitIsIdempotentAndHasChangesSeesTheWorktree(t *testing.T) {
 	}
 }
 
+// The pull request body reports the change as git counts it, which is why the
+// daemon asks git rather than counting the (truncated) diff it also sends.
+func TestGitCLINumStat(t *testing.T) {
+	if _, err := exec.LookPath("git"); err != nil {
+		t.Skip("git not available")
+	}
+	ctx := context.Background()
+	g, dst, defBranch := newCheckout(t)
+	if err := g.CreateBranch(ctx, dst, "gitsquad/GTS-42/task-1"); err != nil {
+		t.Fatalf("CreateBranch: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "new.txt"), []byte("a\nb\nc\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dst, "AGENTS.md"), []byte("# repo instructions\n\nreviewed\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := g.Commit(ctx, dst, "GTS-42: two files"); err != nil {
+		t.Fatalf("Commit: %v", err)
+	}
+
+	files, additions, deletions, err := g.NumStat(ctx, dst, "origin/"+defBranch)
+	if err != nil {
+		t.Fatalf("NumStat: %v", err)
+	}
+	if files != 2 || additions != 5 || deletions != 0 {
+		t.Errorf("numstat = %d files +%d −%d, want 2 files +5 −0", files, additions, deletions)
+	}
+}
+
+// A binary file is a changed file with no line counts, and git says so with a
+// dash on both sides.
+func TestParseNumStat(t *testing.T) {
+	files, additions, deletions, err := parseNumStat("2\t0\ta.txt\n-\t-\tlogo.png\n")
+	if err != nil {
+		t.Fatalf("parseNumStat: %v", err)
+	}
+	if files != 2 || additions != 2 || deletions != 0 {
+		t.Errorf("numstat = %d files +%d −%d, want 2 files +2 −0", files, additions, deletions)
+	}
+	if _, _, _, err := parseNumStat("not a row"); err == nil {
+		t.Error("want an error for a row git never emits")
+	}
+	if files, _, _, err := parseNumStat(""); err != nil || files != 0 {
+		t.Errorf("empty numstat = %d, %v; want 0, nil", files, err)
+	}
+}
+
 // Discarding an empty branch keeps a reused checkout from accumulating one
 // branch per read-only task.
 func TestGitCLIDiscardBranch(t *testing.T) {

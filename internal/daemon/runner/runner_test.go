@@ -21,6 +21,9 @@ type fakeGit struct {
 	committed, pushed       bool
 	discarded               bool
 	branch, discardedBranch string
+	// numStat* is the change git would count for the task's report.
+	numStatFiles, numStatAdditions, numStatDeletions int
+	numStatErr                                       error
 	// originHead is what the checkout's origin/HEAD resolves to ("" → "main").
 	originHead string
 	// missing lists branches the checkout does not have.
@@ -111,6 +114,13 @@ func (f *fakeGit) Push(_ context.Context, _ string, _ string, _ Credential) erro
 }
 func (f *fakeGit) Diff(_ context.Context, _ string, _ string) (string, error) {
 	return f.diff, nil
+}
+
+func (f *fakeGit) NumStat(_ context.Context, _ string, _ string) (int, int, int, error) {
+	if f.numStatErr != nil {
+		return 0, 0, 0, f.numStatErr
+	}
+	return f.numStatFiles, f.numStatAdditions, f.numStatDeletions, nil
 }
 
 type fakeBackend struct {
@@ -274,6 +284,28 @@ func TestRunnerStripsThePlatformBriefBeforeMeasuringWork(t *testing.T) {
 	}
 }
 
+// A count that cannot be read must not fail a task whose work is already
+// committed: the pull request body renders without the stats line.
+func TestRunnerRunSucceedsWithoutADiffStat(t *testing.T) {
+	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n", numStatErr: errors.New("unexpected numstat row")}
+	rep := &fakeReporter{}
+	r := New(git, &fakeBackend{res: provider.Result{Status: "completed", Output: "done"}}, rep, t.TempDir())
+
+	if err := r.Run(context.Background(), testTask()); err != nil {
+		t.Fatalf("Run() error = %v, want the task to survive a failed count", err)
+	}
+	if !git.pushed {
+		t.Error("the work must still be pushed")
+	}
+	last := rep.reports[len(rep.reports)-1]
+	if last.Status != v1.TaskReportSucceeded {
+		t.Fatalf("status = %s, want succeeded", last.Status)
+	}
+	if last.Summary == nil || last.Summary.Changes != nil {
+		t.Errorf("summary = %+v, want no stats rather than a failed task", last.Summary)
+	}
+}
+
 func TestRunnerRunNoChangesDiscardsBranch(t *testing.T) {
 	git := &fakeGit{}
 	rep := &fakeReporter{}
@@ -381,7 +413,10 @@ func TestRunnerStartsANewLineWithoutAGivenBranch(t *testing.T) {
 }
 
 func TestRunnerRunSuccess(t *testing.T) {
-	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n"}
+	git := &fakeGit{
+		dirty: true, diff: "diff --git a/x b/x\n+x\n",
+		numStatFiles: 3, numStatAdditions: 12, numStatDeletions: 4,
+	}
 	backend := &fakeBackend{
 		msgs: []provider.Message{{Type: provider.MessageText, Content: "working"}},
 		res:  provider.Result{Status: "completed", Output: "done"},
@@ -406,6 +441,15 @@ func TestRunnerRunSuccess(t *testing.T) {
 	last := rep.reports[len(rep.reports)-1]
 	if last.Status != v1.TaskReportSucceeded || last.Summary == nil || last.Summary.Branch == "" {
 		t.Errorf("last report = %+v, want succeeded with branch", last)
+	}
+	// The pull request body is built from this count, so it has to reach the
+	// report as git counted it.
+	stats := last.Summary.Changes
+	if stats == nil || stats.Files != 3 || stats.Additions != 12 || stats.Deletions != 4 {
+		t.Errorf("diff stat = %+v, want 3 files +12 −4", stats)
+	}
+	if last.Summary.Diff == "" {
+		t.Error("want the diff kept for the task result")
 	}
 }
 

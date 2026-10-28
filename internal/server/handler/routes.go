@@ -44,6 +44,7 @@ func SetupRoutes(cfg config.Config, pool *pgxpool.Pool) *gin.Engine {
 	githubSvc := service.NewGitHubAppService(s, cfg, memory.NewPendingInstallationStore())
 	prSvc := service.NewPullRequestService(s)
 	taskSvc := service.NewTaskService(s, githubSvc)
+	taskSvc.SetFrontendURL(cfg.FrontendURL)
 	// One relationship, three writers: the task lifecycle records the PR it
 	// opens, the webhook syncs the ones GitHub reports, and the console will
 	// link and unlink by hand.

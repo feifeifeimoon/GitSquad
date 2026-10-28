@@ -177,6 +177,15 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 	if err != nil {
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("diff: %w", err))
 	}
+	// The work is committed and about to be pushed: a count that cannot be read
+	// is not worth failing the task over, and the pull request body renders
+	// without it.
+	var changes *v1.TaskDiffStat
+	if files, additions, deletions, err := r.git.NumStat(ctx, wsDir, "origin/"+defaultBranch); err != nil {
+		slog.Warn("count changes", "error", err, "task", task.ID)
+	} else {
+		changes = &v1.TaskDiffStat{Files: files, Additions: additions, Deletions: deletions}
+	}
 	if err := r.git.Push(ctx, wsDir, branch, cred); err != nil {
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("push: %w", err))
 	}
@@ -187,7 +196,8 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 			Output:     res.Output,
 			Branch:     branch,
 			BaseBranch: defaultBranch,
-			DiffStat:   diffStat(diff),
+			Changes:    changes,
+			Diff:       truncateDiff(diff),
 		},
 		Usage: usage,
 	})
@@ -304,7 +314,10 @@ func progressFromMessage(m provider.Message) *v1.TaskProgress {
 	return &v1.TaskProgress{Type: string(m.Type), Content: m.Content, Tool: m.Tool, Input: m.Input, Output: m.Output}
 }
 
-func diffStat(diff string) string {
+// truncateDiff bounds the diff that travels with a report. It is context for a
+// human reading the task, not something to render, so a prefix plus an ellipsis
+// is enough.
+func truncateDiff(diff string) string {
 	const max = 2000
 	if len(diff) > max {
 		return diff[:max] + "\n…"

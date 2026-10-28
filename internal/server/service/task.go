@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -44,10 +45,26 @@ type TaskService struct {
 	waker        DaemonWaker
 	pullRequests *PullRequestService
 	reviews      *ReviewService
+	frontendURL  string
 }
 
 func NewTaskService(s *store.Store, github GitHubGateway) *TaskService {
 	return &TaskService{store: s, github: github}
+}
+
+// SetFrontendURL wires the console base URL used to link a pull request back to
+// its issue. An empty value leaves the link out rather than emitting a wrong one.
+func (s *TaskService) SetFrontendURL(u string) {
+	s.frontendURL = strings.TrimRight(strings.TrimSpace(u), "/")
+}
+
+// issueURL is the console page of an issue, or "" when the server does not know
+// its own frontend URL.
+func (s *TaskService) issueURL(slug, key string) string {
+	if s.frontendURL == "" || slug == "" || key == "" {
+		return ""
+	}
+	return s.frontendURL + "/" + url.PathEscape(slug) + "/issues/" + url.PathEscape(key)
 }
 
 // SetPullRequests wires the issue ↔ PR relationship in; nil disables it.
@@ -534,8 +551,8 @@ func (s *TaskService) handleCompleted(ctx context.Context, task db.Task, report 
 			return s.finishCompleted(ctx, task, full, result)
 		}
 
-		title := full.Issue.Key + ": changes by " + full.Agent.Name
-		body := fmt.Sprintf("Closes %s\n\nAutomated changes by %s.", full.Issue.Key, full.Agent.Name)
+		title := pullRequestTitle(full)
+		body := pullRequestBody(full, summary, s.issueURL(ws.Slug, full.Issue.Key))
 		prNum, err := s.github.CreatePullRequest(ctx, ws.InstallationID, ws.RepoOwner, ws.RepoName, branch, base, title, body)
 		if err != nil {
 			// The task is already terminal; surface the write-back failure
