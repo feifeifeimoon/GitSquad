@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -60,16 +61,31 @@ func (r *Runner) runReview(ctx context.Context, task v1.Task) error {
 	}
 	res := <-sess.Result
 	usage := taskUsage(r.backend.Kind(), res.Usage)
-	if res.Status != "completed" {
+
+	// Read the deliverable before looking at the status. agy keeps its process
+	// alive while a command it backgrounded is unfinished, so a run killed on the
+	// deadline can still have written a complete review.json — and that file is
+	// what the task existed to produce. It can only be this run's: PrepareReview
+	// clears the previous one.
+	review, summary := readReviewResult(wsDir, res.Output)
+	if review == nil && res.Status != "completed" {
 		errMsg := res.Error
 		if errMsg == "" {
 			errMsg = res.Status
 		}
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
-
-	review, summary := readReviewResult(wsDir, res.Output)
 	if review != nil {
+		if res.Status != "completed" {
+			errMsg := res.Error
+			if errMsg == "" {
+				errMsg = res.Status
+			}
+			slog.Warn("review delivered by a run that ended abnormally",
+				"task", task.ID, "status", res.Status, "error", errMsg)
+			summary = strings.TrimSpace(summary + "\n\n---\n\n_This review was finished before the run ended: " +
+				fmt.Sprintf("provider %s: %s", res.Status, errMsg) + "_")
+		}
 		review.HeadSHA = sha
 	}
 	defaultBranch := task.Repo.DefaultBranch
@@ -77,8 +93,12 @@ func (r *Runner) runReview(ctx context.Context, task v1.Task) error {
 		defaultBranch, _ = r.git.DefaultBranch(ctx, wsDir)
 	}
 	// Restores tracked CLAUDE.md/AGENTS.md the neutralization moved aside and
-	// discards anything the reviewer wrote into the worktree.
-	_ = r.git.ResetToDefault(ctx, wsDir, defaultBranch)
+	// discards anything the reviewer wrote into the worktree. A failure here is
+	// not worth failing a finished review over, but it must not pass silently:
+	// the next task on this workspace starts from whatever this leaves.
+	if err := r.git.ResetToDefault(ctx, wsDir, defaultBranch); err != nil {
+		slog.Warn("reset review checkout", "error", err)
+	}
 
 	return r.reporter.Report(ctx, task.ID, v1.TaskReport{
 		Status: v1.TaskReportSucceeded,
@@ -94,6 +114,13 @@ func (r *Runner) runReview(ctx context.Context, task v1.Task) error {
 // detach to the base branch tip and review the unchanged code instead of the
 // pull request.
 func (r *Runner) checkoutPullRequest(ctx context.Context, dir string, pr *v1.TaskPullRequestContext, cred Credential) (string, error) {
+	// A review begins by discarding whatever the previous task left behind. The
+	// checkout is shared per workspace and a failed run skips its own cleanup, so
+	// without this one dirty tracked file — the platform's own brief, usually —
+	// fails every review of that workspace from then on.
+	if err := r.git.ResetWorktree(ctx, dir); err != nil {
+		return "", fmt.Errorf("clean checkout: %w", err)
+	}
 	if err := r.git.FetchBranch(ctx, dir, pr.BaseBranch, cred); err != nil {
 		return "", fmt.Errorf("fetch base branch: %w", err)
 	}

@@ -29,6 +29,12 @@ type GitOps interface {
 	DefaultBranch(ctx context.Context, dst string) (string, error)
 	// HasBranch reports whether origin/<branch> exists in the checkout.
 	HasBranch(ctx context.Context, dst, branch string) error
+	// ResetWorktree discards every uncommitted change so the checkout can switch
+	// refs again, whatever state a previous task left it in.
+	ResetWorktree(ctx context.Context, dst string) error
+	// RestoreTracked puts the named paths back to their committed state, skipping
+	// names the repository does not track.
+	RestoreTracked(ctx context.Context, dst string, paths ...string) error
 	// ResetToDefault puts a reused checkout back on the default branch at
 	// origin's tip, discarding whatever a previous task left behind.
 	ResetToDefault(ctx context.Context, dst, defaultBranch string) error
@@ -89,8 +95,13 @@ func gitExec(ctx context.Context, dir string, env []string, args ...string) (str
 
 func (g *GitCLI) CloneOrFetch(ctx context.Context, dst, remoteURL string, cred Credential) error {
 	if isGitRepo(dst) {
-		_, err := g.Exec(ctx, dst, cred.Env(), "fetch", "--prune", "origin")
-		return err
+		if _, err := g.Exec(ctx, dst, cred.Env(), "fetch", "--prune", "origin"); err != nil {
+			return err
+		}
+		// A checkout cloned before an exclude was added never picks it up
+		// otherwise, and the platform's own context files then count as the
+		// task's work.
+		return writeGitExcludes(dst)
 	}
 	if _, err := g.Exec(ctx, ".", cred.Env(), "clone", remoteURL, dst); err != nil {
 		return err
@@ -123,6 +134,12 @@ func (g *GitCLI) HeadSHA(ctx context.Context, dst string) (string, error) {
 // commit — and because `git clean -fd` spares ignored files, a reused checkout
 // keeps them until the next Prepare rewrites them.
 var platformExcludes = []string{"CLAUDE.md", "AGENTS.md", ".gitsquad/", ".claude/", ".agents/"}
+
+// platformPaths is platformExcludes without the platform-only .gitsquad dir and
+// without the brief files: the paths a repository can track but has no reason
+// to keep a changed copy of. `git clean` keeps a tracked file out of nothing —
+// the exclude has no say over it — so these have to be reverted explicitly.
+var platformPaths = []string{".claude", ".agents"}
 
 func writeGitExcludes(dst string) error {
 	path := filepath.Join(dst, ".git", "info", "exclude")
@@ -158,16 +175,51 @@ func (g *GitCLI) HasBranch(ctx context.Context, dst, branch string) error {
 	return err
 }
 
-// ResetToDefault returns a reused checkout to a clean default branch. It is
-// what makes an analysis/design task leave no branch (and no leftovers) behind.
-func (g *GitCLI) ResetToDefault(ctx context.Context, dst, defaultBranch string) error {
-	if _, err := g.Exec(ctx, dst, nil, "checkout", defaultBranch); err != nil {
-		return err
-	}
-	if _, err := g.Exec(ctx, dst, nil, "reset", "--hard", "origin/"+defaultBranch); err != nil {
+// ResetWorktree discards everything a task left uncommitted, tracked or not.
+// Every ref switch runs it first: `git checkout` refuses to move at all while a
+// tracked file the target also touches is dirty, so one CLAUDE.md/AGENTS.md
+// carrying a platform brief would fail every later task on the workspace.
+func (g *GitCLI) ResetWorktree(ctx context.Context, dst string) error {
+	if _, err := g.Exec(ctx, dst, nil, "reset", "--hard"); err != nil {
 		return err
 	}
 	_, err := g.Exec(ctx, dst, nil, "clean", "-fd")
+	return err
+}
+
+// RestoreTracked puts the named paths back to their committed state. It checks
+// out from HEAD rather than from the index: `git checkout -- <path>` copies the
+// index into the worktree, and an agent that ran `git add` leaves the platform's
+// own brief staged — restoring that would put the brief back for commit.
+func (g *GitCLI) RestoreTracked(ctx context.Context, dst string, paths ...string) error {
+	if len(paths) == 0 {
+		return nil
+	}
+	out, err := g.Exec(ctx, dst, nil, append([]string{"ls-files", "--"}, paths...)...)
+	if err != nil {
+		return err
+	}
+	for _, path := range strings.Split(strings.TrimSpace(out), "\n") {
+		if path = strings.TrimSpace(path); path == "" {
+			continue
+		}
+		if _, err := g.Exec(ctx, dst, nil, "checkout", "HEAD", "--", path); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ResetToDefault returns a reused checkout to a clean default branch. It is
+// what makes an analysis/design task leave no branch (and no leftovers) behind.
+func (g *GitCLI) ResetToDefault(ctx context.Context, dst, defaultBranch string) error {
+	if err := g.ResetWorktree(ctx, dst); err != nil {
+		return err
+	}
+	if _, err := g.Exec(ctx, dst, nil, "checkout", defaultBranch); err != nil {
+		return err
+	}
+	_, err := g.Exec(ctx, dst, nil, "reset", "--hard", "origin/"+defaultBranch)
 	return err
 }
 
@@ -176,10 +228,10 @@ func (g *GitCLI) ResetToDefault(ctx context.Context, dst, defaultBranch string) 
 // using -B against origin/<branch> both creates it and picks up whatever the
 // previous task pushed.
 func (g *GitCLI) ResetToBranch(ctx context.Context, dst, branch string) error {
-	if _, err := g.Exec(ctx, dst, nil, "checkout", "-B", branch, "origin/"+branch); err != nil {
+	if err := g.ResetWorktree(ctx, dst); err != nil {
 		return err
 	}
-	_, err := g.Exec(ctx, dst, nil, "clean", "-fd")
+	_, err := g.Exec(ctx, dst, nil, "checkout", "-B", branch, "origin/"+branch)
 	return err
 }
 

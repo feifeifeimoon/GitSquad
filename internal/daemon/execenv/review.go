@@ -16,6 +16,12 @@ func PrepareReview(workDir string, task v1.Task) (*Env, error) {
 	if err := os.MkdirAll(workDir, 0o755); err != nil {
 		return nil, fmt.Errorf("create workdir: %w", err)
 	}
+	// A previous review's result must not survive into this one. The checkout is
+	// reused and `git clean` spares the ignored .gitsquad/, so a reviewer that
+	// writes nothing would otherwise have the old findings posted as its own.
+	if err := os.Remove(filepath.Join(workDir, ".gitsquad", "review.json")); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("clear previous review: %w", err)
+	}
 	if err := writeReviewRuntimeConfig(workDir, task.Agent.Provider, renderReviewBrief(task)); err != nil {
 		return nil, err
 	}

@@ -3,6 +3,9 @@ package runner
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon/provider"
@@ -25,8 +28,23 @@ type fakeGit struct {
 	// resetToDefault / resetToBranch record which starting point the task used.
 	resetToDefault bool
 	resetToBranch  string
+	// resetWorktree / restored record the cleanup the platform does itself.
+	resetWorktree bool
+	restored      []string
 	// calls records the order of the review checkout's git operations.
 	calls []string
+}
+
+func (f *fakeGit) ResetWorktree(_ context.Context, _ string) error {
+	f.resetWorktree = true
+	f.calls = append(f.calls, "reset-worktree")
+	return nil
+}
+
+func (f *fakeGit) RestoreTracked(_ context.Context, _ string, paths ...string) error {
+	f.restored = append(f.restored, paths...)
+	f.calls = append(f.calls, "restore")
+	return nil
 }
 
 func (f *fakeGit) CloneOrFetch(_ context.Context, _ string, _ string, _ Credential) error {
@@ -71,6 +89,7 @@ func (f *fakeGit) HasBranch(_ context.Context, _ string, branch string) error {
 	return nil
 }
 func (f *fakeGit) HasChanges(_ context.Context, _ string, _ string) (bool, error) {
+	f.calls = append(f.calls, "has-changes")
 	return f.dirty || f.ahead, nil
 }
 func (f *fakeGit) DiscardBranch(_ context.Context, _ string, branch, _ string) error {
@@ -98,10 +117,16 @@ type fakeBackend struct {
 	msgs []provider.Message
 	res  provider.Result
 	err  error
+	// onExecute runs inside Execute, standing in for what the agent does to the
+	// prepared workdir while the provider runs.
+	onExecute func(dir string)
 }
 
 func (f *fakeBackend) Kind() string { return "claude" }
-func (f *fakeBackend) Execute(_ context.Context, _ string, _ provider.ExecOptions) (*provider.Session, error) {
+func (f *fakeBackend) Execute(_ context.Context, _ string, opts provider.ExecOptions) (*provider.Session, error) {
+	if f.onExecute != nil {
+		f.onExecute(opts.Cwd)
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -182,6 +207,73 @@ func TestRunnerRunConvergesOnEveryAgentBehaviour(t *testing.T) {
 
 // Nothing to deliver: the empty branch is dropped so a reused checkout does not
 // accumulate one per read-only task, and the agent's text is the deliverable.
+// The brief the platform writes is not the task's work: a repository that
+// tracks CLAUDE.md/AGENTS.md would otherwise commit the prompt. Only the
+// platform's block is stripped, so an edit the agent made to that file survives;
+// platform-owned directories are still restored before the change check.
+func TestRunnerStripsThePlatformBriefBeforeMeasuringWork(t *testing.T) {
+	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n"}
+	rep := &fakeReporter{}
+	root := t.TempDir()
+	backend := &fakeBackend{
+		res: provider.Result{Status: "completed", Output: "done"},
+		onExecute: func(dir string) {
+			brief := filepath.Join(dir, "CLAUDE.md")
+			f, err := os.OpenFile(brief, os.O_APPEND|os.O_WRONLY, 0o644)
+			if err != nil {
+				t.Fatalf("open brief: %v", err)
+			}
+			if _, err := f.WriteString("\nagent note\n"); err != nil {
+				t.Fatalf("append to brief: %v", err)
+			}
+			if err := f.Close(); err != nil {
+				t.Fatalf("close brief: %v", err)
+			}
+		},
+	}
+	r := New(git, backend, rep, root)
+
+	task := testTask()
+	if err := r.Run(context.Background(), task); err != nil {
+		t.Fatalf("Run() error = %v", err)
+	}
+
+	b, err := os.ReadFile(filepath.Join(root, "workspaces", task.WorkspaceID.String(), "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read brief: %v", err)
+	}
+	if strings.Contains(string(b), "BEGIN GITSQUAD-RUNTIME") {
+		t.Errorf("the platform brief is still in the checkout:\n%s", b)
+	}
+	if !strings.Contains(string(b), "agent note") {
+		t.Errorf("the agent's own edit was discarded:\n%s", b)
+	}
+
+	var restored bool
+	for _, name := range git.restored {
+		if name == ".claude" {
+			restored = true
+		}
+	}
+	if !restored {
+		t.Fatalf("restored = %v, want the platform-owned directories", git.restored)
+	}
+	restoreAt, changesAt := -1, -1
+	for i, call := range git.calls {
+		switch call {
+		case "restore":
+			if restoreAt < 0 {
+				restoreAt = i
+			}
+		case "has-changes":
+			changesAt = i
+		}
+	}
+	if restoreAt < 0 || changesAt < 0 || restoreAt > changesAt {
+		t.Fatalf("calls = %v, want the restore before the change check", git.calls)
+	}
+}
+
 func TestRunnerRunNoChangesDiscardsBranch(t *testing.T) {
 	git := &fakeGit{}
 	rep := &fakeReporter{}

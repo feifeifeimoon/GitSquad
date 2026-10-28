@@ -133,6 +133,17 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
 
+	// The brief the agent just worked beside is not the task's work. For a
+	// repository that tracks CLAUDE.md/AGENTS.md the exclude does not apply, so
+	// only the platform's own block is stripped — restoring the whole file from
+	// HEAD would also discard an edit the agent made to it legitimately.
+	if err := execenv.StripBrief(wsDir, task.Agent.Provider); err != nil {
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("strip platform brief: %w", err))
+	}
+	if err := r.git.RestoreTracked(ctx, wsDir, platformPaths...); err != nil {
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("restore platform files: %w", err))
+	}
+
 	changed, err := r.git.HasChanges(ctx, wsDir, changeBase)
 	if err != nil {
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("check changes: %w", err))
