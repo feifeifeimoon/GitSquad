@@ -158,6 +158,14 @@ type TaskProgress struct {
 	Output  string         `json:"output,omitempty"` // tool_result 的输出
 }
 
+// TaskDiffStat is the change as git counts it. The pull request body summarises
+// it, and it replaces the truncated diff that used to travel under this name.
+type TaskDiffStat struct {
+	Files     int `json:"files"`
+	Additions int `json:"additions"`
+	Deletions int `json:"deletions"`
+}
+
 // TaskSummary carries what a finished task produced.
 //
 // Output is the agent's own final text and is the primary deliverable: for
@@ -172,10 +180,16 @@ type TaskSummary struct {
 	// value in the task context is a snapshot taken at dispatch time, so a
 	// repository that renamed its default branch in between would otherwise
 	// produce a PR against a branch that no longer exists.
-	BaseBranch  string `json:"base_branch,omitempty"`
-	CommitSHA   string `json:"commit_sha,omitempty"`
-	DiffStat    string `json:"diff_stat,omitempty"`
-	TestResults string `json:"test_results,omitempty"`
+	BaseBranch string `json:"base_branch,omitempty"`
+	CommitSHA  string `json:"commit_sha,omitempty"`
+	// DiffStat is deprecated: it was a string that actually carried a truncated
+	// diff. It stays declared so a report from a daemon released before
+	// TaskDiffStat existed still decodes — changing a field's type turns every
+	// in-flight report into a 400. Nothing new reads it; Changes replaced it.
+	DiffStat    string        `json:"diff_stat,omitempty"`
+	Changes     *TaskDiffStat `json:"changes,omitempty"`
+	Diff        string        `json:"diff,omitempty"`
+	TestResults string        `json:"test_results,omitempty"`
 	// Review is set by a review task: the summary plus the inline comments.
 	Review *ReviewResult `json:"review,omitempty"`
 }

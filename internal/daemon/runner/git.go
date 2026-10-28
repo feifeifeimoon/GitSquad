@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -58,6 +59,9 @@ type GitOps interface {
 	DiscardBranch(ctx context.Context, dst, branch, fallback string) error
 	// Diff returns the unified diff of base...HEAD.
 	Diff(ctx context.Context, dst, base string) (string, error)
+	// NumStat counts base...HEAD as git does: files touched, lines added and
+	// removed. Binary files count as a file and no lines.
+	NumStat(ctx context.Context, dst, base string) (files, additions, deletions int, err error)
 }
 
 // GitHubCloneURL builds the unauthenticated HTTPS clone URL for a repo.
@@ -302,6 +306,37 @@ func (g *GitCLI) Push(ctx context.Context, dst, branch string, cred Credential) 
 
 func (g *GitCLI) Diff(ctx context.Context, dst, base string) (string, error) {
 	return g.Exec(ctx, dst, nil, "diff", base+"...HEAD")
+}
+
+func (g *GitCLI) NumStat(ctx context.Context, dst, base string) (int, int, int, error) {
+	out, err := g.Exec(ctx, dst, nil, "diff", "--numstat", base+"...HEAD")
+	if err != nil {
+		return 0, 0, 0, err
+	}
+	return parseNumStat(out)
+}
+
+// parseNumStat totals git's "added\tdeleted\tpath" rows. A binary file reports
+// "-" for both counts: it is still a changed file, just not a counted one.
+func parseNumStat(out string) (files, additions, deletions int, err error) {
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line = strings.TrimSpace(line); line == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 3 {
+			return 0, 0, 0, fmt.Errorf("unexpected numstat row: %q", line)
+		}
+		files++
+		added, aerr := strconv.Atoi(fields[0])
+		deleted, derr := strconv.Atoi(fields[1])
+		if aerr != nil || derr != nil {
+			continue
+		}
+		additions += added
+		deletions += deleted
+	}
+	return files, additions, deletions, nil
 }
 
 // isGitRepo reports whether dir is a git working tree (contains a .git).

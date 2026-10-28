@@ -71,12 +71,14 @@ func (s *PullRequestService) LinkCreated(ctx context.Context, task db.Task, full
 	}
 	issueID := full.Issue.ID
 	_, err := s.store.RecordPullRequest(ctx, db.InsertPullRequestParams{
-		WorkspaceID:     task.WorkspaceID,
-		IssueID:         &issueID,
-		RepoOwner:       full.Repo.Owner,
-		RepoName:        full.Repo.Name,
-		Number:          int32(prNum),
-		Title:           full.Issue.Key + ": changes by " + full.Agent.Name,
+		WorkspaceID: task.WorkspaceID,
+		IssueID:     &issueID,
+		RepoOwner:   full.Repo.Owner,
+		RepoName:    full.Repo.Name,
+		Number:      int32(prNum),
+		// The same title CreatePullRequest sent, so our row and GitHub agree
+		// until the next webhook refresh.
+		Title:           pullRequestTitle(full),
 		Url:             prURL,
 		State:           "open",
 		Draft:           false,
