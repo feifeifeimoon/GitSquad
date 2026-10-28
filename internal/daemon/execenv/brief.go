@@ -102,3 +102,52 @@ func replaceMarkerBlock(content, block string) string {
 	}
 	return content + "\n\n" + block
 }
+
+// StripBrief removes the managed brief that Prepare injected into the runtime
+// config file for provider, and nothing else. It is how the platform keeps its
+// own prompt out of a task's diff for a repository that tracks CLAUDE.md or
+// AGENTS.md — .git/info/exclude has no say over a tracked file — while leaving
+// an edit the agent made to that file in place.
+func StripBrief(workDir, provider string) error {
+	path := filepath.Join(workDir, runtimeConfigPath(provider))
+	content, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("read runtime config: %w", err)
+	}
+	stripped, found := stripMarkerBlock(string(content))
+	if !found {
+		return nil
+	}
+	if err := os.WriteFile(path, []byte(stripped), 0o644); err != nil {
+		return fmt.Errorf("write runtime config: %w", err)
+	}
+	return nil
+}
+
+// stripMarkerBlock removes the managed block, along with the blank-line
+// separator replaceMarkerBlock joined it with, so stripping a file the platform
+// appended to restores it byte for byte.
+func stripMarkerBlock(content string) (string, bool) {
+	start := strings.Index(content, runtimeMarkerBegin)
+	if start < 0 {
+		return content, false
+	}
+	rel := strings.Index(content[start:], runtimeMarkerEnd)
+	if rel < 0 {
+		return content, false
+	}
+	end := start + rel + len(runtimeMarkerEnd)
+
+	head, tail := content[:start], content[end:]
+	if strings.TrimSpace(tail) == "" {
+		// Appended at the end: drop the separator replaceMarkerBlock joined the
+		// block with, so a tracked file matches its committed bytes again.
+		return strings.TrimSuffix(head, "\n\n"), true
+	}
+	// Something follows the block — the agent wrote into the file. Keep a single
+	// newline at the seam so the remainder reads as the file it would have been.
+	return strings.TrimRight(head, "\n") + "\n" + strings.TrimLeft(tail, "\n"), true
+}

@@ -3,6 +3,9 @@ package runner
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/feifeifeimoon/GitSquad/internal/daemon/provider"
@@ -114,10 +117,16 @@ type fakeBackend struct {
 	msgs []provider.Message
 	res  provider.Result
 	err  error
+	// onExecute runs inside Execute, standing in for what the agent does to the
+	// prepared workdir while the provider runs.
+	onExecute func(dir string)
 }
 
 func (f *fakeBackend) Kind() string { return "claude" }
-func (f *fakeBackend) Execute(_ context.Context, _ string, _ provider.ExecOptions) (*provider.Session, error) {
+func (f *fakeBackend) Execute(_ context.Context, _ string, opts provider.ExecOptions) (*provider.Session, error) {
+	if f.onExecute != nil {
+		f.onExecute(opts.Cwd)
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -198,26 +207,56 @@ func TestRunnerRunConvergesOnEveryAgentBehaviour(t *testing.T) {
 
 // Nothing to deliver: the empty branch is dropped so a reused checkout does not
 // accumulate one per read-only task, and the agent's text is the deliverable.
-// The brief is written into the checkout the agent works in. When the
-// repository tracks CLAUDE.md/AGENTS.md, that write has to be undone before the
-// platform decides whether the task produced anything — otherwise the prompt is
-// committed and pushed as the change.
-func TestRunnerRestoresPlatformFilesBeforeMeasuringWork(t *testing.T) {
+// The brief the platform writes is not the task's work: a repository that
+// tracks CLAUDE.md/AGENTS.md would otherwise commit the prompt. Only the
+// platform's block is stripped, so an edit the agent made to that file survives;
+// platform-owned directories are still restored before the change check.
+func TestRunnerStripsThePlatformBriefBeforeMeasuringWork(t *testing.T) {
 	git := &fakeGit{dirty: true, diff: "diff --git a/x b/x\n+x\n"}
 	rep := &fakeReporter{}
-	r := New(git, &fakeBackend{res: provider.Result{Status: "completed", Output: "done"}}, rep, t.TempDir())
+	root := t.TempDir()
+	backend := &fakeBackend{
+		res: provider.Result{Status: "completed", Output: "done"},
+		onExecute: func(dir string) {
+			brief := filepath.Join(dir, "CLAUDE.md")
+			f, err := os.OpenFile(brief, os.O_APPEND|os.O_WRONLY, 0o644)
+			if err != nil {
+				t.Fatalf("open brief: %v", err)
+			}
+			if _, err := f.WriteString("\nagent note\n"); err != nil {
+				t.Fatalf("append to brief: %v", err)
+			}
+			if err := f.Close(); err != nil {
+				t.Fatalf("close brief: %v", err)
+			}
+		},
+	}
+	r := New(git, backend, rep, root)
 
-	if err := r.Run(context.Background(), testTask()); err != nil {
+	task := testTask()
+	if err := r.Run(context.Background(), task); err != nil {
 		t.Fatalf("Run() error = %v", err)
 	}
+
+	b, err := os.ReadFile(filepath.Join(root, "workspaces", task.WorkspaceID.String(), "CLAUDE.md"))
+	if err != nil {
+		t.Fatalf("read brief: %v", err)
+	}
+	if strings.Contains(string(b), "BEGIN GITSQUAD-RUNTIME") {
+		t.Errorf("the platform brief is still in the checkout:\n%s", b)
+	}
+	if !strings.Contains(string(b), "agent note") {
+		t.Errorf("the agent's own edit was discarded:\n%s", b)
+	}
+
 	var restored bool
 	for _, name := range git.restored {
-		if name == "AGENTS.md" {
+		if name == ".claude" {
 			restored = true
 		}
 	}
 	if !restored {
-		t.Fatalf("restored = %v, want the platform's own context files", git.restored)
+		t.Fatalf("restored = %v, want the platform-owned directories", git.restored)
 	}
 	restoreAt, changesAt := -1, -1
 	for i, call := range git.calls {

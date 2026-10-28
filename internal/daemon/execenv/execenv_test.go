@@ -146,6 +146,64 @@ func TestPrepareReviewClearsPreviousResult(t *testing.T) {
 	}
 }
 
+// Stripping the brief has to give the file back exactly as it was: a repository
+// that tracks CLAUDE.md would otherwise see a whitespace-only diff, and an edit
+// the agent made has to survive.
+func TestStripBriefRestoresThePreparedFile(t *testing.T) {
+	dir := t.TempDir()
+	user := "# My Repo\n\nCustom instructions here."
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), []byte(user), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Prepare(dir, testParams()); err != nil {
+		t.Fatalf("Prepare: %v", err)
+	}
+	// What the agent writes into the same file, outside the managed block.
+	prepared, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "CLAUDE.md"), append(prepared, []byte("\nagent note\n")...), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := StripBrief(dir, "claude"); err != nil {
+		t.Fatalf("StripBrief: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "CLAUDE.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(b); got != user+"\nagent note\n" {
+		t.Errorf("CLAUDE.md = %q, want the brief gone and the agent's edit kept", got)
+	}
+}
+
+func TestStripBriefWithoutABlockChangesNothing(t *testing.T) {
+	dir := t.TempDir()
+	user := "# My Repo\n"
+	if err := os.WriteFile(filepath.Join(dir, "AGENTS.md"), []byte(user), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := StripBrief(dir, "agy"); err != nil {
+		t.Fatalf("StripBrief: %v", err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "AGENTS.md"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(b) != user {
+		t.Errorf("AGENTS.md = %q, want it untouched", b)
+	}
+}
+
+// The provider that did not write a runtime config leaves no file to strip.
+func TestStripBriefToleratesAMissingFile(t *testing.T) {
+	if err := StripBrief(t.TempDir(), "claude"); err != nil {
+		t.Errorf("StripBrief on a missing file: %v", err)
+	}
+}
+
 // The platform owns git: commit, push and the pull request. Telling the agent
 // to push as well made the two owners collide — an agent that followed the
 // brief left nothing for the platform to commit, and its `git commit` failed

@@ -133,10 +133,13 @@ func (r *Runner) Run(ctx context.Context, task v1.Task) error {
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
 
-	// The brief was written into the checkout the agent just worked in. For a
+	// The brief the agent just worked beside is not the task's work. For a
 	// repository that tracks CLAUDE.md/AGENTS.md the exclude does not apply, so
-	// the write has to be reverted here — otherwise it is measured as this
-	// task's work and pushed as a pull request containing only the prompt.
+	// only the platform's own block is stripped — restoring the whole file from
+	// HEAD would also discard an edit the agent made to it legitimately.
+	if err := execenv.StripBrief(wsDir, task.Agent.Provider); err != nil {
+		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("strip platform brief: %w", err))
+	}
 	if err := r.git.RestoreTracked(ctx, wsDir, platformPaths...); err != nil {
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("restore platform files: %w", err))
 	}

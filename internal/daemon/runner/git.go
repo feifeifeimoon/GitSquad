@@ -135,11 +135,11 @@ func (g *GitCLI) HeadSHA(ctx context.Context, dst string) (string, error) {
 // keeps them until the next Prepare rewrites them.
 var platformExcludes = []string{"CLAUDE.md", "AGENTS.md", ".gitsquad/", ".claude/", ".agents/"}
 
-// platformPaths is platformExcludes without the platform-only .gitsquad dir:
-// the paths that can exist in the repository itself. `git clean` keeps a
-// tracked file out of nothing — the exclude has no say over it — so a brief
-// written into one of these has to be reverted explicitly.
-var platformPaths = []string{"CLAUDE.md", "AGENTS.md", ".claude", ".agents"}
+// platformPaths is platformExcludes without the platform-only .gitsquad dir and
+// without the brief files: the paths a repository can track but has no reason
+// to keep a changed copy of. `git clean` keeps a tracked file out of nothing —
+// the exclude has no say over it — so these have to be reverted explicitly.
+var platformPaths = []string{".claude", ".agents"}
 
 func writeGitExcludes(dst string) error {
 	path := filepath.Join(dst, ".git", "info", "exclude")
@@ -187,10 +187,10 @@ func (g *GitCLI) ResetWorktree(ctx context.Context, dst string) error {
 	return err
 }
 
-// RestoreTracked puts the named paths back to their committed state. A
-// repository that tracks its own AGENTS.md/CLAUDE.md is not protected by the
-// exclude, so without this the platform's brief is measured as the task's work
-// and committed — a pull request containing nothing but the prompt.
+// RestoreTracked puts the named paths back to their committed state. It checks
+// out from HEAD rather than from the index: `git checkout -- <path>` copies the
+// index into the worktree, and an agent that ran `git add` leaves the platform's
+// own brief staged — restoring that would put the brief back for commit.
 func (g *GitCLI) RestoreTracked(ctx context.Context, dst string, paths ...string) error {
 	if len(paths) == 0 {
 		return nil
@@ -203,7 +203,7 @@ func (g *GitCLI) RestoreTracked(ctx context.Context, dst string, paths ...string
 		if path = strings.TrimSpace(path); path == "" {
 			continue
 		}
-		if _, err := g.Exec(ctx, dst, nil, "checkout", "--", path); err != nil {
+		if _, err := g.Exec(ctx, dst, nil, "checkout", "HEAD", "--", path); err != nil {
 			return err
 		}
 	}

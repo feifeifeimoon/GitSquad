@@ -61,16 +61,31 @@ func (r *Runner) runReview(ctx context.Context, task v1.Task) error {
 	}
 	res := <-sess.Result
 	usage := taskUsage(r.backend.Kind(), res.Usage)
-	if res.Status != "completed" {
+
+	// Read the deliverable before looking at the status. agy keeps its process
+	// alive while a command it backgrounded is unfinished, so a run killed on the
+	// deadline can still have written a complete review.json — and that file is
+	// what the task existed to produce. It can only be this run's: PrepareReview
+	// clears the previous one.
+	review, summary := readReviewResult(wsDir, res.Output)
+	if review == nil && res.Status != "completed" {
 		errMsg := res.Error
 		if errMsg == "" {
 			errMsg = res.Status
 		}
 		return r.fail(ctx, task, usage, res.Output, fmt.Errorf("provider %s: %s", res.Status, errMsg))
 	}
-
-	review, summary := readReviewResult(wsDir, res.Output)
 	if review != nil {
+		if res.Status != "completed" {
+			errMsg := res.Error
+			if errMsg == "" {
+				errMsg = res.Status
+			}
+			slog.Warn("review delivered by a run that ended abnormally",
+				"task", task.ID, "status", res.Status, "error", errMsg)
+			summary = strings.TrimSpace(summary + "\n\n---\n\n_This review was finished before the run ended: " +
+				fmt.Sprintf("provider %s: %s", res.Status, errMsg) + "_")
+		}
 		review.HeadSHA = sha
 	}
 	defaultBranch := task.Repo.DefaultBranch

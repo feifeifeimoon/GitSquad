@@ -228,8 +228,9 @@ func TestGitCLIResetToDefaultRecoversDetachedDirty(t *testing.T) {
 }
 
 // Excluding the platform's context files only covers untracked ones. A
-// repository that tracks AGENTS.md has to have its copy restored, or the brief
-// is committed as the task's work — a pull request containing only the prompt.
+// repository that tracks AGENTS.md has to have its copy restored, and the restore
+// has to come from HEAD: `git checkout -- <path>` copies the index, so an agent
+// that ran `git add` would hand the platform's own brief back for commit.
 func TestGitCLIRestoreTracked(t *testing.T) {
 	if _, err := exec.LookPath("git"); err != nil {
 		t.Skip("git not available")
@@ -240,6 +241,8 @@ func TestGitCLIRestoreTracked(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dst, "AGENTS.md"), []byte("brief\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
+	// The agent staged it — the trap a plain `checkout --` falls into.
+	runGit(t, dst, "add", "AGENTS.md")
 	if err := os.WriteFile(filepath.Join(dst, "CLAUDE.md"), []byte("brief\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -247,7 +250,7 @@ func TestGitCLIRestoreTracked(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := g.RestoreTracked(ctx, dst, platformPaths...); err != nil {
+	if err := g.RestoreTracked(ctx, dst, "AGENTS.md", "CLAUDE.md", ".claude", ".agents"); err != nil {
 		t.Fatalf("RestoreTracked: %v", err)
 	}
 	got, err := os.ReadFile(filepath.Join(dst, "AGENTS.md"))
@@ -257,6 +260,9 @@ func TestGitCLIRestoreTracked(t *testing.T) {
 	// core.autocrlf rewrites the line endings on checkout on Windows.
 	if text := strings.ReplaceAll(string(got), "\r\n", "\n"); text != "# repo instructions\n" {
 		t.Errorf("AGENTS.md = %q, want the committed content back", text)
+	}
+	if status := strings.TrimSpace(runGit(t, dst, "status", "--porcelain", "AGENTS.md")); status != "" {
+		t.Errorf("status = %q, want nothing staged or modified", status)
 	}
 	if _, err := os.Stat(filepath.Join(dst, "CLAUDE.md")); err != nil {
 		t.Errorf("an untracked CLAUDE.md is not the platform's to delete: %v", err)
