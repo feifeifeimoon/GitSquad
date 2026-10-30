@@ -207,7 +207,7 @@ function Fact({
   const [copied, setCopied] = useState(false);
   return (
     <div className="min-w-0">
-      <dt className="font-mono text-caption font-semibold uppercase tracking-wide text-mute">
+      <dt className="text-caption text-mute">
         {label}
       </dt>
       <dd className="mt-1 flex min-w-0 items-center gap-1.5">
@@ -291,7 +291,7 @@ function RuntimeCard({
       </div>
 
       <div className="border-t border-hairline px-4 py-3">
-        <p className="mb-2 font-mono text-caption font-semibold uppercase tracking-wide text-mute">
+        <p className="mb-2 text-caption text-mute">
           Agents ({runtime.agents.length})
         </p>
         {runtime.agents.length === 0 ? (

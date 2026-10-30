@@ -91,7 +91,7 @@ export default function WorkspaceSkillsPage() {
         }
       />
 
-      <div className="flex-1 px-8 pb-8 pt-6">
+      <div className="flex-1 px-8 pb-8 pt-2">
         {loading ? (
           <div className="space-y-3">
             {Array.from({ length: 3 }).map((_, i) => (

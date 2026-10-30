@@ -60,7 +60,10 @@ export function AgentStatusBadge({
       )}
     >
       <Dot tone={status} />
-      <span className="truncate">{AGENT_STATUS_LABEL[status]}</span>
+      {/* The state word never truncates: a dot alone cannot carry the status,
+          and "Ru…" beside a task title is not a label. The task detail is the
+          part that gives way. */}
+      <span className="shrink-0">{AGENT_STATUS_LABEL[status]}</span>
       {detail && (
         <span className="truncate font-normal text-mute">{detail}</span>
       )}

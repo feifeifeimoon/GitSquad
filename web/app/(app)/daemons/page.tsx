@@ -133,15 +133,15 @@ export default function DaemonsPage() {
     return (
       <div className="flex h-full flex-col">
         <PageToolbarSkeleton
+          leading={<Skeleton className="h-8 w-56" />}
           actions={
             <>
-              <Skeleton className="h-8 w-56" />
               <Skeleton className="h-8 w-16" />
               <Skeleton className="h-8 w-32" />
             </>
           }
         />
-        <div className="grid grid-cols-1 gap-3 px-8 py-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 px-8 pb-6 pt-2 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <div
               key={i}
@@ -170,17 +170,19 @@ export default function DaemonsPage() {
   return (
     <div className="flex h-full flex-col">
       <PageToolbar
+        leading={
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-mute" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search daemons…"
+              className="h-8 w-56 pl-8"
+            />
+          </div>
+        }
         actions={
           <>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-mute" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search daemons…"
-                className="h-8 w-56 pl-8"
-              />
-            </div>
             <ViewSwitcher view={view} onChange={setView} />
             <Button onClick={() => setShowConnect(true)}>
               <Plus className="size-4" />
@@ -191,7 +193,7 @@ export default function DaemonsPage() {
       />
 
       {error ? (
-        <div className="px-8 py-6">
+        <div className="px-8 pb-6 pt-2">
           <ErrorState what="your daemons" error={error} onRetry={refresh} />
         </div>
       ) : (daemons ?? []).length === 0 ? (
@@ -220,7 +222,7 @@ export default function DaemonsPage() {
           <EmptyDescription>Try a different search term.</EmptyDescription>
         </Empty>
       ) : view === "cards" ? (
-        <div className="grid grid-cols-1 gap-3 px-8 py-6 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 px-8 pb-6 pt-2 sm:grid-cols-2 lg:grid-cols-3">
           {sorted.map((d) => (
             <DaemonCard
               key={d.id}
@@ -319,7 +321,7 @@ function DaemonCard({
       </p>
 
       <div className="mt-3 border-t border-hairline pt-3">
-        <p className="mb-2 font-mono text-caption font-semibold uppercase text-mute">
+        <p className="mb-2 text-caption text-mute">
           Runtimes
         </p>
         <RuntimeChips runtimes={daemon.runtimes} />
@@ -349,7 +351,7 @@ function DaemonTable({
   onConfirmDelete: (id: string) => void;
 }) {
   return (
-    <div className="px-8 py-6">
+    <div className="px-8 pb-6 pt-2">
       <div className="overflow-hidden rounded-lg border border-hairline bg-canvas shadow-level-2">
         <table className="w-full border-collapse text-copy">
           <thead>
