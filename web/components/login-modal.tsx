@@ -61,7 +61,7 @@ export function LoginModal({ mode, open, onClose, error, returnURL }: LoginModal
       </div>
 
       {/* Heading */}
-      <h2 className="text-display font-semibold tracking-[-0.01em] text-ink">
+      <h2 className="text-display font-semibold text-ink">
         Welcome back
       </h2>
       <p className="mt-2 text-copy text-body">

@@ -1,7 +1,7 @@
 ---
 version: alpha
 name: gitsquad-design-system
-description: The design language for the GitSquad web console — a stark ink-on-canvas engineering surface, broken at hero scale by a mesh gradient in the brand's own colours (the mark's navy and cyan, the banner's blue and amber) that is the entire decorative system, paired with a geometric sans for narrative text and a monospaced face for technical labels, status data, and code.
+description: The design language for the GitSquad web console — a stark ink-on-canvas engineering surface, broken at hero scale by a mesh gradient in the brand's own colours (the mark's navy and cyan, the banner's blue and amber) that is the entire decorative system, paired with a humanist sans for narrative text and a monospaced face for technical labels, status data, and code.
 
 colors:
   primary: "#171717"
@@ -62,61 +62,88 @@ colors:
 
 typography:
   display-xl:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 48px
     fontWeight: 600
     lineHeight: 48px
     letterSpacing: -2.4px
   display-lg:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 32px
     fontWeight: 600
     lineHeight: 40px
     letterSpacing: -1.28px
   display-md:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
-    fontSize: 24px
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
+    fontSize: 28px
     fontWeight: 600
-    lineHeight: 32px
-    letterSpacing: -0.96px
-  display-sm:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    lineHeight: 34px
+    letterSpacing: -0.56px
+  figure:
+    # The one role above display: the single figure a page leads with (the
+    # usage total). It was a `text-[40px]` with its own tracking before it had
+    # a name.
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
+    fontSize: 40px
+    fontWeight: 600
+    lineHeight: 44px
+    letterSpacing: -1.2px
+  title:
+    # Was `display-sm` in this block, which nothing in the code ever used: the
+    # console's 20px step is a title, not a small display.
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 20px
     fontWeight: 600
     lineHeight: 28px
-    letterSpacing: -0.6px
+    letterSpacing: -0.28px
+  title-sm:
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
+    fontSize: 16px
+    fontWeight: 600
+    lineHeight: 22px
+    letterSpacing: -0.13px
   body-lg:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 18px
     fontWeight: 400
     lineHeight: 28px
   body-md:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 16px
     fontWeight: 400
     lineHeight: 24px
   body-md-strong:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 16px
     fontWeight: 500
     lineHeight: 24px
   body-sm:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    # Untracked. The old -0.28px was tuned for Geist at this size; IBM Plex Sans
+    # is already narrow, and negative spacing on it reads cramped.
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 14px
     fontWeight: 400
     lineHeight: 20px
-    letterSpacing: -0.28px
+    letterSpacing: 0px
   body-sm-strong:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 14px
     fontWeight: 500
     lineHeight: 20px
-    letterSpacing: -0.28px
+    letterSpacing: 0px
   caption:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 12px
     fontWeight: 400
     lineHeight: 16px
+  micro:
+    # Inline meta inside a dense card — issue key, comment count, relative time.
+    # The smallest role, and the only one set with positive tracking.
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
+    fontSize: 11px
+    fontWeight: 400
+    lineHeight: 16px
+    letterSpacing: 0.088px
   caption-mono:
     fontFamily: Geist Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, monospace
     fontSize: 12px
@@ -124,25 +151,28 @@ typography:
     lineHeight: 16px
   label:
     # The console's own step between caption and body, and the one role here
-    # that has no counterpart in the marketing scale: section headings, board
-    # column labels, form field labels. The sidebar's nav rows were here too and
+    # that has no counterpart in the marketing scale: the dense heading — board
+    # column labels, panel and toolbar headings, form field labels. It is set at
+    # 600 wherever it heads something, and that weight is what keeps it apart
+    # from the 12px caption beside it. The sidebar's nav rows were here too and
     # are `body-sm` now — see `app-shell-nav-row`.
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 13px
-    fontWeight: 400
+    fontWeight: 600
     lineHeight: 18px
+    letterSpacing: 0px
   code:
     fontFamily: Geist Mono, ui-monospace, SFMono-Regular, Menlo, Monaco, monospace
     fontSize: 13px
     fontWeight: 400
     lineHeight: 20px
   button-md:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 14px
     fontWeight: 500
     lineHeight: 20px
   button-lg:
-    fontFamily: Geist, Inter, system-ui, -apple-system, sans-serif
+    fontFamily: IBM Plex Sans, system-ui, -apple-system, sans-serif
     fontSize: 16px
     fontWeight: 500
     lineHeight: 24px
@@ -417,11 +447,11 @@ components:
 
 GitSquad is a multi-agent orchestration product: a console where a developer watches autonomous agents pick up GitHub issues, work in a repository, and report back. The interface has to carry a lot of machine state — agent reachability, task progress, token spend, live logs — without turning into a dashboard of competing widgets. The design language answers that with restraint: a near-white `{colors.canvas-soft}` body, ink-near-black `{colors.ink}` text, a quiet gray ladder that gives every divider and disabled state its own deliberate step, and exactly one loud element — the mesh gradient — which appears at hero scale only and nowhere else.
 
-Type carries the second half of the job. Headlines are set in a geometric sans at weight 600 with aggressive negative tracking; everything that reports machine state — statuses, token counts, log lines, model identifiers, keyboard hints — is set in a monospaced face at 12–13 px. That split is the information architecture: narrative text is sans, telemetry is mono. A reader can tell at a glance which words are the product talking and which are the machine talking.
+Type carries the second half of the job. Headlines are set in a humanist sans at weight 600 with negative tracking; everything that reports machine state — statuses, token counts, log lines, model identifiers, keyboard hints — is set in a monospaced face at 12–13 px. That split is the information architecture: narrative text is sans, telemetry is mono. A reader can tell at a glance which words are the product talking and which are the machine talking.
 
 Surfaces use a four-step ladder: `{colors.canvas}` for cards and dialogs, `{colors.canvas-soft}` for the page body, `{colors.canvas-soft-2}` for inset regions (sidebar hovers, code blocks, table headers), and `{colors.primary}` for the polarity-flipped dark band. Elevation is built from stacked small shadows plus an inset hairline ring, never a single heavy drop-shadow — cards sit *on* the page rather than floating above it.
 
-> **Provenance.** This visual language is an interpretation of the design language Vercel publishes on its marketing site — the surface ladder, the ink-primary CTA, the stacked-shadow elevation levels and the Geist type family all originate there. GitSquad adapts it to a console rather than a marketing site. The token names below are GitSquad's own (`web/app/globals.css` is the source of truth); nothing here should be read as an official Vercel specification.
+> **Provenance.** This visual language is an interpretation of the design language Vercel publishes on its marketing site — the surface ladder, the ink-primary CTA, the stacked-shadow elevation levels and the Geist Mono type family all originate there. GitSquad adapts it to a console rather than a marketing site, and the text face is now IBM Plex Sans (see *Typography*). The token names below are GitSquad's own (`web/app/globals.css` is the source of truth); nothing here should be read as an official Vercel specification.
 >
 > The hero's gradient used to come from there too, as a set of five pastels. It no longer does: the four lights are now sampled from GitSquad's own icon and banner (see *Primitives & Gradient*), which is the one part of this language that is not an interpretation of somebody else's.
 
@@ -429,7 +459,7 @@ Surfaces use a four-step ladder: `{colors.canvas}` for cards and dialogs, `{colo
 - A single ink primary `{colors.primary}` carries every affirmative action. There is no sixth accent colour and no green "success" hue — `{colors.success}` aliases the link blue.
 - The mesh gradient (the mark's navy and cyan, the banner's blue and amber) is the only decorative chrome, and it appears at hero scale only, over a blueprint grid.
 - Status is never communicated by colour alone. Every status renders as a dot plus a written label so it survives colour-blindness and grayscale.
-- Every machine-reported value is set in `{typography.caption-mono}` or `{typography.code}`; every narrative sentence is set in the geometric sans.
+- Every machine-reported value is set in `{typography.caption-mono}` or `{typography.code}`; every narrative sentence is set in the humanist sans.
 - Elevation is stacked (three or four small offsets at 4–12 % black) with an inset hairline ring, never one heavy drop-shadow.
 - Radius is a two-scale system: 6 px `{rounded.sm}` for in-app controls and 100 % pill for marketing CTAs. The two scales coexist deliberately and are never mixed on one screen.
 - Surfaces are cycled `{colors.canvas-soft}` → `{colors.canvas}` → `{colors.primary}`; the polarity-flipped dark band is the primary depth cue between sections.
@@ -516,43 +546,46 @@ Permanently-dark surfaces — the marketing showcase band, the terminal aside in
 ## Typography
 
 ### Font Family
-Two faces carry the entire system, both loaded through `next/font/google` in `web/app/layout.tsx` and exposed to CSS as `--font-geist-sans` and `--font-geist-mono` (mapped to `--font-sans`, `--font-mono` and `--font-heading` in `globals.css`):
+Two faces carry the entire system, both loaded through `next/font/google` in `web/app/layout.tsx` and exposed to CSS as `--font-plex-sans` and `--font-geist-mono` (mapped to `--font-sans`, `--font-mono` and `--font-heading` in `globals.css`). `web/THIRD-PARTY-FONTS.md` carries both notices, which is what self-hosting the files at build time obliges us to ship:
 
-1. **Geist** — every display, body, button, link and label. Weights 400 / 500 / 600 are the working set; 700 or heavier never appears. Display sizes are tracked aggressively negative (`-0.04em` on the hero), body text stays neutral or slightly negative, and `body` sets `font-feature-settings: "ss01", "ss02"` to switch on Geist's geometric alternates.
-2. **Geist Mono** — statuses, token counts, model identifiers, log lines, inline code, code blocks and keyboard hints. Weight 400 at 12–13 px, neutral tracking. `{typography.code}` is the only place mono appears above 13 px.
+1. **IBM Plex Sans** — every display, body, button, link and label. Weights 400 / 500 / 600 are the working set; 700 or heavier never appears. It was drawn for IBM's product UI rather than for marketing, which is the job most of this interface does: it is humanist where Geist was geometric — a curled `y`, an angled terminal, a double-storey `a` with a rounder bowl — so at 11–13 px the letterforms still have something to say. It sets about 6 % narrower than Geist at the same size, which is density the console gets for free.
+2. **Geist Mono** — statuses, token counts, model identifiers, log lines, inline code, code blocks and keyboard hints. Weight 400 at 12–13 px, neutral tracking. `{typography.code}` is the only place mono appears above 13 px. It is unchanged by the sans swap: changing it would change what "machine" looks like, which is a different decision.
 
-Both faces are open source under the SIL Open Font License and are fetched at build time; there is no self-hosted font binary and no proprietary face in the system.
+Both faces are open source under the SIL Open Font License and are fetched at build time; there is no font binary in the repository and no proprietary face in the system. Italics are synthesised — neither face is loaded with an italic cut, and no surface relies on italic for meaning.
 
 ### Type Scale
 
 The frontmatter above names the roles; this table maps each role to the Tailwind utility actually used in the codebase, since the console is built with Tailwind v4 rather than with raw pixel values.
 
-The console names sizes by **role**, not by Tailwind's `text-sm`/`text-base` ramp: `--text-*` in `@theme`, each with a paired line-height. `components/ui/*` (vendored shadcn) keeps Tailwind's own names so it stays diffable against the registry; app code uses the roles. `copy` rather than `body` for the 14px step because `text-body` is already the body *colour*.
+The console names sizes by **role**, not by Tailwind's `text-sm`/`text-base` ramp: `--text-*` in `@theme`, each with a paired line-height **and its own tracking**. Tracking is part of the role, not a per-component decision: display type needs negative spacing to read as display type, and 11 px text needs a little positive spacing to stay open. Leaving it to callers produced eleven different `tracking-[…]` values doing the same job. `components/ui/*` (vendored shadcn) keeps Tailwind's own names so it stays diffable against the registry; app code uses the roles. `copy` rather than `body` for the 14px step because `text-body` is already the body *colour*.
 
-| Role | Utility | Size / Line-height | Use |
-|---|---|---|---|
-| `{typography.display-xl}` | `text-4xl sm:text-5xl lg:text-6xl` | 36→60px / 600 / `-0.04em` | Marketing hero headline only. `leading-[1.05]`. |
-| `{typography.display-lg}` | `text-3xl sm:text-4xl` | 30→36px / 600 / `-0.04em` | Section headlines in marketing bands. |
-| `{typography.display-md}` | `text-display` | 26px / 32px | The headline figure — a usage total. |
-| `{typography.title}` | `text-title` | 19px / 26px | Page title (`PageHeader`), and the issue title on its own page. |
-| `{typography.title-sm}` | `text-title-sm` | 16px / 22px | Dialog titles, KPI values, marketing card headings (`text-base`, same size). |
-| `{typography.body-lg}` | `text-lg` | 18px / 400 | Marketing lead paragraph under a section headline. |
-| `{typography.body-md}` | `text-base` | 16px / 400 | Default paragraph, marketing body, rendered markdown headings. |
-| `{typography.copy}` | `text-copy` | 14px / 20px | The console's body size — table cells, card copy, descriptions. |
-| `{typography.label}` | `text-label` | 13px / 18px | Section headings (`SectionHeading`), board column labels, form field labels. |
-| `{typography.caption}` | `text-caption` | 12px / 16px | Badges, table column headings, dense metadata, KPI labels. |
-| `{typography.micro}` | `text-micro` | 11px / 16px | Card meta — issue key, comment count, relative time. |
-| `{typography.code}` | `font-mono text-[13px]` | 13px / 400 | Inline code and code blocks. |
-| `{typography.button-md}` | `text-copy font-medium` | 14px / 500 | In-app button labels (sizes `sm` / `default` / `lg`). |
-| `{typography.button-lg}` | `text-base font-medium` | 16px / 500 | Marketing pill CTAs (size `pill`). |
+| Role | Utility | Size / Line-height | Tracking | Use |
+|---|---|---|---|---|
+| `{typography.display-xl}` | `text-4xl sm:text-5xl lg:text-6xl` | 36→60px / 600 | `-0.04em` | Marketing hero headline only. `leading-[1.05]`. |
+| `{typography.display-lg}` | `text-3xl sm:text-4xl` | 30→36px / 600 | `-0.04em` | Section headlines in marketing bands. |
+| `{typography.figure}` | `text-figure` | 40px / 44px | `-0.03em` | The one figure a page leads with — the usage total. |
+| `{typography.display-md}` | `text-display` | 28px / 34px | `-0.02em` | The page's subject: the issue title on its page, a workspace's name, a detail page's heading. |
+| `{typography.title}` | `text-title` | 20px / 28px | `-0.014em` | The page title in the shell bar, error and empty-page headlines. |
+| `{typography.title-sm}` | `text-title-sm` | 16px / 22px | `-0.008em` | Dialog titles, KPI values, marketing card headings (`text-base`, same size). |
+| `{typography.body-lg}` | `text-lg` | 18px / 400 | `0` | Marketing lead paragraph under a section headline. |
+| `{typography.body-md}` | `text-base` | 16px / 400 | `0` | Default paragraph, marketing body, rendered markdown headings. |
+| `{typography.copy}` | `text-copy` | 14px / 20px | `0` | The console's body size — table cells, card copy, descriptions. |
+| `{typography.label}` | `text-label` | 13px / 18px | `0` | The dense heading: board column labels, panel and toolbar headings, form field labels. |
+| `{typography.caption}` | `text-caption` | 12px / 16px | `0` | Badges, table column headings, dense metadata, KPI labels. |
+| `{typography.micro}` | `text-micro` | 11px / 16px | `+0.008em` | Card meta — issue key, comment count, relative time. |
+| `{typography.code}` | `font-mono text-[13px]` | 13px / 400 | `0` | Inline code and code blocks. |
+| `{typography.button-md}` | `text-copy font-medium` | 14px / 500 | `0` | In-app button labels (sizes `sm` / `default` / `lg`). |
+| `{typography.button-lg}` | `text-base font-medium` | 16px / 500 | `0` | Marketing pill CTAs (size `pill`). |
 
 The page used to have two sizes and no hierarchy: a page title and a sidebar nav row were the same 14px at the same weight, so nothing led. Title, section, body and meta are four steps now, and the step is carried by size *and* colour *and* weight — never by one alone.
 
-The nav row has since gone back to `{typography.body-sm}` (14px) at 13px's expense, because the hierarchy no longer rests on it: the page title is `{typography.title}` (19px) in the bar above, so the sidebar can be the size its reference console sets it at. What did *not* come back is the old failure — the row is a destination, not a heading, and the two no longer compete.
+The nav row has since gone back to `{typography.body-sm}` (14px) at 13px's expense, because the hierarchy no longer rests on it: the page title is `{typography.title}` (20px) in the bar above, so the sidebar can be the size its reference console sets it at. What did *not* come back is the old failure — the row is a destination, not a heading, and the two no longer compete.
+
+**The ladder is 11 / 12 / 13 / 14 / 16 / 20 / 28 / 40.** The four bottom steps sit close by design, and each is held apart by something other than size: `micro` is inline meta inside a dense card, `caption` is a label or a badge, `label` is a heading at 600 in ink, `copy` is a paragraph in body colour. Anything that needs a step the ladder does not have is a new role, argued for here — not a `text-[15px]`. The one deliberate exception is a two-letter avatar monogram, which is a glyph sized optically to its 16px circle (9px) rather than reading text.
 
 ### Principles
 - **Weight 600 is the display ceiling.** The sans never appears at 700+. The interface reads as calm partly because of this.
-- **Negative tracking is part of the voice.** Display sizes use `-0.04em` down to `-0.015em`. Reverting to default tracking makes the headline look generic.
+- **Negative tracking is part of the voice.** It runs from `-0.04em` at marketing display size to `-0.008em` at 16px, and it lives in the role token rather than in component classes, so the same heading is set the same way on every page. Reverting to default tracking makes the headline look generic.
 - **Sentence-case headlines, period-terminated.** "Your autonomous developer team on GitHub." — the full stop is part of the voice, not a typo.
 - **Mono is the voice of the machine.** Statuses, counts, ids, logs and code. A narrative sentence is never set in mono — and neither is a label. Table column headings and KPI labels are sentence case in the sans face: mono uppercase is how you say "this is an identifier", and "Total tokens" is not one.
 - **Uppercase is reserved for `{typography.caption}` labels only** — sidebar section headers ("Workspace", "Account"). Headlines are never all-caps.

@@ -51,7 +51,7 @@ export function UsageKpis({
         <div className="min-w-0">
           <p className="text-caption text-mute">{hero.label}</p>
           <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
-            <p className="text-[40px] leading-none font-semibold tracking-[-0.035em] tabular-nums text-ink">
+            <p className="text-figure leading-none font-semibold tabular-nums text-ink">
               {hero.value}
             </p>
             {hero.delta && (
@@ -79,7 +79,7 @@ export function UsageKpis({
           <div key={stat.label} className="min-w-0 px-5 py-3.5">
             <p className="text-caption text-mute">{stat.label}</p>
             <div className="mt-1.5 flex flex-wrap items-baseline gap-2">
-              <p className="text-title font-semibold tracking-[-0.01em] tabular-nums text-ink">
+              <p className="text-title font-semibold tabular-nums text-ink">
                 {stat.value}
               </p>
               {stat.delta && (

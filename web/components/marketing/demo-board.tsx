@@ -369,7 +369,7 @@ export function DemoBoard() {
               <span className="font-mono text-caption text-mute">{selected.run.runtime}</span>
             </div>
 
-            <div className="mt-3 space-y-1 font-mono text-[11px] leading-5">
+            <div className="mt-3 space-y-1 font-mono text-micro leading-5">
               {selected.log.map((line) => (
                 <p key={`${line.op}-${line.text}`} className="grid grid-cols-[3.25rem_minmax(0,1fr)] gap-2">
                   <span className="text-mute">{line.op}</span>
@@ -482,7 +482,7 @@ function DemoCard({
         <span className="ml-auto flex shrink-0 items-center gap-1.5">
           <AgentStack agents={issue.agents} />
           {issue.pr && (
-            <Badge variant="outline" className="gap-1 font-mono text-[10px]">
+            <Badge variant="outline" className="gap-1 font-mono text-micro">
               <GitPullRequest className="size-3" />#{issue.pr.number}
             </Badge>
           )}

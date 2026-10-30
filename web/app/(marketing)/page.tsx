@@ -224,7 +224,7 @@ function ClaimVisual({ index }: { index: number }) {
 
   if (index === 1) {
     return (
-      <ClaimWell className="space-y-1 font-mono text-[11px] leading-5 text-body">
+      <ClaimWell className="space-y-1 font-mono text-micro leading-5 text-body">
         <p>
           <span className="text-mute">$ </span>gitsquad daemon login
         </p>
@@ -237,7 +237,7 @@ function ClaimVisual({ index }: { index: number }) {
   }
 
   return (
-    <ClaimWell className="space-y-1 font-mono text-[11px] leading-5">
+    <ClaimWell className="space-y-1 font-mono text-micro leading-5">
       <p className="grid grid-cols-[2.5rem_4rem_minmax(0,1fr)] gap-2">
         <span className="text-mute">16:27</span>
         <span className="text-body">coder</span>
@@ -286,7 +286,7 @@ function HowItWorksBand() {
               <p className="mt-2 text-pretty text-copy leading-6 text-body">
                 {step.body}
               </p>
-              <p className="mt-5 rounded-sm bg-canvas-soft px-2.5 py-1.5 font-mono text-[11px] text-body">
+              <p className="mt-5 rounded-sm bg-canvas-soft px-2.5 py-1.5 font-mono text-micro text-body">
                 {step.mono}
               </p>
             </div>

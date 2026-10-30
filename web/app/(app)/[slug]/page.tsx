@@ -194,7 +194,7 @@ export default function WorkspaceOverviewPage({
             />
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-2">
-                <h2 className="truncate text-display font-semibold tracking-[-0.01em] text-ink">
+                <h2 className="truncate text-display font-semibold text-ink">
                   {workspace.name}
                 </h2>
                 {repo && (
