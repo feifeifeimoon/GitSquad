@@ -7,29 +7,48 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: var(--font-plex-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-geist-sans);
+  --font-heading: var(--font-plex-sans);
 
   /* Typography by role, not by size. Two sizes carrying a whole console is how
      a page title ends up weighing the same as a nav item: these give a heading
      somewhere to escalate to, and keep meta text off the body size.
      `copy` rather than `body` because `text-body` is already the body *colour*,
-     and two utilities cannot share a name. */
+     and two utilities cannot share a name.
+
+     Each role carries its own tracking, because tracking is part of the role:
+     display type needs negative spacing to read as display type, and 11px text
+     needs a little positive spacing to stay open. Leaving that to callers
+     produced eleven different `tracking-[…]` values doing the same job, and the
+     same heading set two ways on two pages. */
   --text-micro: 11px;
   --text-micro--line-height: 16px;
+  --text-micro--letter-spacing: 0.008em;
   --text-caption: 12px;
   --text-caption--line-height: 16px;
+  --text-caption--letter-spacing: 0em;
   --text-label: 13px;
   --text-label--line-height: 18px;
+  --text-label--letter-spacing: 0em;
   --text-copy: 14px;
   --text-copy--line-height: 20px;
+  --text-copy--letter-spacing: 0em;
   --text-title-sm: 16px;
   --text-title-sm--line-height: 22px;
-  --text-title: 19px;
-  --text-title--line-height: 26px;
-  --text-display: 26px;
-  --text-display--line-height: 32px;
+  --text-title-sm--letter-spacing: -0.008em;
+  --text-title: 20px;
+  --text-title--line-height: 28px;
+  --text-title--letter-spacing: -0.014em;
+  --text-display: 28px;
+  --text-display--line-height: 34px;
+  --text-display--letter-spacing: -0.02em;
+  /* One role above display, for the single figure a page leads with — the usage
+     total. It was a `text-[40px]` with its own tracking, which is the kind of
+     value that survives three redesigns because nothing else names it. */
+  --text-figure: 40px;
+  --text-figure--line-height: 44px;
+  --text-figure--letter-spacing: -0.03em;
 
   /* DESIGN.md brand + surface tokens */
   --color-chrome: var(--chrome);
@@ -281,7 +300,6 @@
   }
   body {
     @apply bg-background text-foreground antialiased;
-    font-feature-settings: "ss01", "ss02";
   }
   html {
     @apply font-sans;
@@ -405,8 +423,8 @@
     box-shadow: none;
   }
   .tiptap-content > *:first-child { margin-top: 0; }
-  .tiptap-content h1 { font-size: 20px; font-weight: 600; color: var(--ink); margin: 12px 0 6px; letter-spacing: -0.3px; }
-  .tiptap-content h2 { font-size: 16px; font-weight: 600; color: var(--ink); margin: 10px 0 4px; }
+  .tiptap-content h1 { font-size: 20px; line-height: 28px; font-weight: 600; color: var(--ink); margin: 12px 0 6px; letter-spacing: -0.014em; }
+  .tiptap-content h2 { font-size: 16px; line-height: 22px; font-weight: 600; color: var(--ink); margin: 10px 0 4px; letter-spacing: -0.008em; }
   .tiptap-content h3 { font-size: 14px; font-weight: 600; color: var(--ink); margin: 8px 0 4px; }
   .tiptap-content p { margin: 4px 0; }
   .tiptap-content ul { list-style: disc; padding-left: 20px; margin: 4px 0; }

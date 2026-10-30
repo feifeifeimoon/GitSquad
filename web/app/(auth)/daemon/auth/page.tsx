@@ -81,7 +81,7 @@ function DaemonAuthContent() {
               <GitSquadMark className="size-8" />
             </div>
           </div>
-          <h1 className="text-center text-display font-semibold tracking-[-0.01em] text-ink">Device Activation</h1>
+          <h1 className="text-center text-display font-semibold text-ink">Device Activation</h1>
 
           {/* Need login */}
           {status === "need_login" && (

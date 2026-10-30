@@ -3,7 +3,7 @@
 export function CreateWorkspaceAside() {
   return (
     <aside className="hidden w-80 shrink-0 lg:block">
-      <h2 className="text-balance text-title font-semibold tracking-[-0.01em] text-ink">
+      <h2 className="text-balance text-title font-semibold text-ink">
         Your autonomous team, ready in minutes.
       </h2>
       <p className="mt-3 text-pretty text-copy leading-6 text-body">

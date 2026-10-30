@@ -19,7 +19,10 @@ export function AssigneeAvatar({
   return (
     <Avatar className={cn("shrink-0", className)}>
       {assignee.avatar_url ? <AvatarImage src={assignee.avatar_url} alt="" /> : null}
-      <AvatarFallback className="text-[9px]">
+      {/* Two initials are a glyph sized to this 16px control, not reading
+          text: at the smallest role (11px) they touch the circle on both
+          sides, so the monogram keeps its own optical size instead. */}
+      <AvatarFallback className="text-[9px] leading-none">
         {assignee.login.trim().slice(0, 2).toUpperCase()}
       </AvatarFallback>
     </Avatar>

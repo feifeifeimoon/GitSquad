@@ -172,7 +172,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
           className="flex h-16 items-center gap-2 border-b border-hairline px-5 outline-none transition-colors hover:bg-muted/40"
         >
           <GitSquadMark className="size-6 shrink-0" />
-          <span className="min-w-0 flex-1 truncate text-copy font-semibold tracking-tight">
+          <span className="min-w-0 flex-1 truncate text-copy font-semibold">
             GitSquad
           </span>
         </Link>
@@ -219,7 +219,7 @@ export default function ConsoleLayout({ children }: { children: React.ReactNode 
               landmark with nothing in it, and the flow pages draw their own. The
               cell stays so the grid keeps three columns. */}
           {title ? (
-            <h1 className="min-w-0 truncate text-title font-semibold tracking-[-0.01em] text-ink">
+            <h1 className="min-w-0 truncate text-title font-semibold text-ink">
               {title}
             </h1>
           ) : (

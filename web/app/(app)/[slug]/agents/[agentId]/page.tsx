@@ -138,7 +138,7 @@ export default function AgentDetailPage() {
             <div className="min-w-0">
               <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
                 {/* h2: the bar above the page owns the h1 ("Agents"). */}
-                <h2 className="truncate text-display font-semibold tracking-[-0.01em] text-ink">
+                <h2 className="truncate text-display font-semibold text-ink">
                   @{agent.name}
                 </h2>
                 <AgentPresenceBadge presence={presence} queued={agent.queued_count} />

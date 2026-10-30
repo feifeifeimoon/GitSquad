@@ -10,6 +10,7 @@ test("a role size and a text colour both survive the merge", () => {
   assert.equal(cn("text-label", "text-ink"), "text-label text-ink");
   assert.equal(cn("text-copy", "text-body"), "text-copy text-body");
   assert.equal(cn("text-title-sm", "text-ink"), "text-title-sm text-ink");
+  assert.equal(cn("text-figure", "text-ink"), "text-figure text-ink");
 });
 
 test("one role size still replaces another", () => {

@@ -99,7 +99,7 @@ export function IssueTitle({
             event.preventDefault();
             open();
           }}
-          className="min-w-0 cursor-text text-display font-semibold tracking-[-0.01em] text-ink"
+          className="min-w-0 cursor-text text-display font-semibold text-ink"
         >
           {title}
         </h2>
@@ -139,7 +139,7 @@ export function IssueTitle({
         }}
         // field-sizing lets the box grow with the text, so the heading stays a
         // heading instead of becoming a two-row box with a scrollbar.
-        className="min-w-0 flex-1 resize-none rounded-sm border border-hairline bg-canvas px-2 py-1 text-display font-semibold tracking-[-0.01em] text-ink outline-none focus-visible:border-hairline-strong [field-sizing:content]"
+        className="min-w-0 flex-1 resize-none rounded-sm border border-hairline bg-canvas px-2 py-1 text-display font-semibold text-ink outline-none focus-visible:border-hairline-strong [field-sizing:content]"
       />
       <span className="mt-2 flex shrink-0 items-center gap-2 text-caption text-mute">
         {saving ? (
