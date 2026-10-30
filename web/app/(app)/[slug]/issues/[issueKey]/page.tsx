@@ -76,24 +76,26 @@ export default function IssueDetailPage() {
               <Skeleton className="h-5 w-3/5" />
             </div>
             <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_15rem]">
-              <div className="min-w-0 lg:mx-auto lg:min-h-0 lg:w-[calc(100%_-_6rem)] lg:max-w-[42rem] lg:overflow-y-auto">
-                <Skeleton className="mb-5 h-8 w-4/5" />
-                <div className="space-y-2">
-                  <Skeleton className="h-3 w-full" />
-                  <Skeleton className="h-3 w-5/6" />
-                  <Skeleton className="h-3 w-2/3" />
-                </div>
-                <Skeleton className="mt-8 h-4 w-20" />
-                <div className="mt-3 space-y-3">
-                  {Array.from({ length: 2 }).map((_, i) => (
-                    <div key={i} className="flex gap-3">
-                      <Skeleton className="size-6 rounded-full" />
-                      <div className="flex-1 space-y-2">
-                        <Skeleton className="h-3 w-32" />
-                        <Skeleton className="h-16 w-full rounded-lg" />
+              <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto">
+                <div className="lg:mx-auto lg:w-[calc(100%_-_6rem)] lg:max-w-[42rem]">
+                  <Skeleton className="mb-5 h-8 w-4/5" />
+                  <div className="space-y-2">
+                    <Skeleton className="h-3 w-full" />
+                    <Skeleton className="h-3 w-5/6" />
+                    <Skeleton className="h-3 w-2/3" />
+                  </div>
+                  <Skeleton className="mt-8 h-4 w-20" />
+                  <div className="mt-3 space-y-3">
+                    {Array.from({ length: 2 }).map((_, i) => (
+                      <div key={i} className="flex gap-3">
+                        <Skeleton className="size-6 rounded-full" />
+                        <div className="flex-1 space-y-2">
+                          <Skeleton className="h-3 w-32" />
+                          <Skeleton className="h-16 w-full rounded-lg" />
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
               </div>
               <div className="min-w-0 lg:min-h-0 lg:overflow-y-auto">
@@ -154,9 +156,14 @@ export default function IssueDetailPage() {
           page's rail sits, and the middle track's leftover space becomes the
           gutter on both sides of the prose. Where the track is narrower than
           the measure that leftover would be zero and the prose would touch the
-          rail, so the column always keeps 6rem of the lane for the two gutters
+          rail, so the measure always keeps 6rem of the lane for the two gutters
           (`w-[calc(100%_-_6rem)]`) — 48px on each side, the same floor the old
-          15rem rail's `gap-x-12` gave. */}
+          15rem rail's `gap-x-12` gave. That cap and that floor sit one level
+          *inside* the scroller, which is the whole track: a scrollbar is drawn
+          at the edge of the thing it moves, so capping the scroller itself drew
+          the track through the middle of the gutter — 48px plus the lane's
+          whole leftover away from the rail, beside the prose rather than beside
+          the pane. */}
       <div className="flex-1 overflow-y-auto lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
         <div className="flex w-full flex-col px-8 py-8 lg:min-h-0 lg:flex-1">
           {/* The read-only first row, and the panel's only chrome: the issue
@@ -181,55 +188,64 @@ export default function IssueDetailPage() {
           <div className="mt-6 grid grid-cols-1 gap-y-8 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_15rem]">
             {/* The thread is the thing that scrolls, and it owns the ref the
                 activity rail measures against: the rail is the scroll viewport's
-                minimap, so the viewport has to be this box now. */}
+                minimap, so the viewport has to be this box now.
+
+                This box is the whole middle track, and its scrollbar is
+                therefore drawn against the Properties rail. The measure is
+                capped one level in, where it can be centred without moving the
+                viewport's edge. */}
             <div
               ref={scrollerRef}
-              className="min-w-0 lg:mx-auto lg:min-h-0 lg:w-[calc(100%_-_6rem)] lg:max-w-[42rem] lg:overflow-y-auto"
+              data-testid="issue-thread"
+              className="min-w-0 lg:min-h-0 lg:overflow-y-auto"
             >
-              {/* The issue's own title, at display size and editable where it
-                  is read — the body's first element, so it is what the page
-                  opens on and what the thread is below. 20px under it is
-                  multica's `mt-5` before its description. */}
-              <div className="mb-5">
-                <IssueTitle
+              <div className="lg:mx-auto lg:w-[calc(100%_-_6rem)] lg:max-w-[42rem]">
+                {/* The issue's own title, at display size and editable where it
+                    is read — the body's first element, so it is what the page
+                    opens on and what the thread is below. 20px under it is
+                    multica's `mt-5` before its description. */}
+                <div className="mb-5">
+                  <IssueTitle
+                    slug={slug}
+                    issueKey={issueKey}
+                    title={issue.title}
+                    onSaved={refresh}
+                  />
+                </div>
+
+                <IssueDescription
                   slug={slug}
                   issueKey={issueKey}
-                  title={issue.title}
+                  description={issue.description}
+                  mentionItems={agentNames}
                   onSaved={refresh}
                 />
-              </div>
 
-              <IssueDescription
-                slug={slug}
-                issueKey={issueKey}
-                description={issue.description}
-                mentionItems={agentNames}
-                onSaved={refresh}
-              />
-
-              <SectionHeading className="mb-3">Activity</SectionHeading>
-              <IssueTimeline
-                comments={issue.comments}
-                scrollerRef={scrollerRef}
-              />
-
-              {/* Docked to the bottom of the scroll viewport once the thread is
-                  taller than it — multica does the same, behind a preference.
-                  `sticky bottom-0` asks for exactly that rule with no threshold
-                  to tune: it does nothing at all until the composer's place is
-                  below the fold, which is the same thing as "there are enough
-                  comments to scroll past". The band is opaque because the
-                  comments run underneath it. */}
-              <div className="sticky bottom-0 mt-8 bg-page pb-2 pt-4">
-                {/* Keyed by the issue: the composer holds a draft, and the
-                    route can swap the issue underneath it without unmounting. */}
-                <CommentComposer
-                  key={issueKey}
-                  slug={slug}
-                  issueKey={issueKey}
-                  mentionItems={agentNames}
-                  onPosted={refresh}
+                <SectionHeading className="mb-3">Activity</SectionHeading>
+                <IssueTimeline
+                  comments={issue.comments}
+                  scrollerRef={scrollerRef}
                 />
+
+                {/* Docked to the bottom of the scroll viewport once the thread
+                    is taller than it — multica does the same, behind a
+                    preference. `sticky bottom-0` asks for exactly that rule
+                    with no threshold to tune: it does nothing at all until the
+                    composer's place is below the fold, which is the same thing
+                    as "there are enough comments to scroll past". The band is
+                    opaque because the comments run underneath it. */}
+                <div className="sticky bottom-0 mt-8 bg-page pb-2 pt-4">
+                  {/* Keyed by the issue: the composer holds a draft, and the
+                      route can swap the issue underneath it without
+                      unmounting. */}
+                  <CommentComposer
+                    key={issueKey}
+                    slug={slug}
+                    issueKey={issueKey}
+                    mentionItems={agentNames}
+                    onPosted={refresh}
+                  />
+                </div>
               </div>
             </div>
 
