@@ -546,12 +546,12 @@ Permanently-dark surfaces — the marketing showcase band, the terminal aside in
 ## Typography
 
 ### Font Family
-Two faces carry the entire system, both loaded through `next/font/google` in `web/app/layout.tsx` and exposed to CSS as `--font-plex-sans` and `--font-geist-mono` (mapped to `--font-sans`, `--font-mono` and `--font-heading` in `globals.css`). `web/THIRD-PARTY-FONTS.md` carries both notices, which is what self-hosting the files at build time obliges us to ship:
+Two faces carry the entire system, both vendored as latin variable files in `web/app/fonts/` and loaded with `next/font/local` in `web/app/layout.tsx`, exposed to CSS as `--font-plex-sans` and `--font-geist-mono` (mapped to `--font-sans`, `--font-mono` and `--font-heading` in `globals.css`). They are not fetched from Google at build time, and that is deliberate: `next/font/google` builds its `@font-face` from whatever stylesheet Google answers with, and about one response in sixty comes back with extensionless `/l/font?kit=…` URLs that Turbopack cannot resolve, failing the build with `next/font/google queries have exactly one entry` (vercel/next.js#99114). Two local files cannot answer with a different shape. `web/THIRD-PARTY-FONTS.md` carries both notices, which is what redistributing the files obliges us to ship.
 
 1. **IBM Plex Sans** — every display, body, button, link and label. Weights 400 / 500 / 600 are the working set; 700 or heavier never appears. It was drawn for IBM's product UI rather than for marketing, which is the job most of this interface does: it is humanist where Geist was geometric — a curled `y`, an angled terminal, a double-storey `a` with a rounder bowl — so at 11–13 px the letterforms still have something to say. It sets about 6 % narrower than Geist at the same size, which is density the console gets for free.
 2. **Geist Mono** — statuses, token counts, model identifiers, log lines, inline code, code blocks and keyboard hints. Weight 400 at 12–13 px, neutral tracking. `{typography.code}` is the only place mono appears above 13 px. It is unchanged by the sans swap: changing it would change what "machine" looks like, which is a different decision.
 
-Both faces are open source under the SIL Open Font License and are fetched at build time; there is no font binary in the repository and no proprietary face in the system. Italics are synthesised — neither face is loaded with an italic cut, and no surface relies on italic for meaning.
+Both faces are open source under the SIL Open Font License and travel with the repository as 72 KB of woff2; there is no proprietary face in the system. Italics are synthesised — neither face is loaded with an italic cut, and no surface relies on italic for meaning.
 
 ### Type Scale
 

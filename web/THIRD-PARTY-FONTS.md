@@ -1,14 +1,15 @@
 # Third-party fonts
 
-The console renders in two open-source typefaces. Both are downloaded and
-self-hosted by `next/font/google` at build time, so the built app ships a copy of
-each font's files — which means it also has to ship their notices. That is what
+The console renders in two open-source typefaces. Both are vendored as latin
+variable woff2 files in `web/app/fonts/` — the same bytes Google Fonts serves —
+and loaded with `next/font/local`, so the repository and the built app each ship
+a copy of them, which means they also have to ship their notices. That is what
 this file is.
 
-| Face | Where it is used | Copyright | License |
-|---|---|---|---|
-| **IBM Plex Sans** | every display, body, button, link and label | © 2017 IBM Corp. (Reserved Font Name "Plex") | SIL Open Font License 1.1 |
-| **Geist Mono** | statuses, counts, ids, log lines, inline code, keyboard hints | © 2024 The Geist Project Authors (https://github.com/vercel/geist-font.git) | SIL Open Font License 1.1 |
+| Face | Where it is used | File | Copyright | License |
+|---|---|---|---|---|
+| **IBM Plex Sans** | every display, body, button, link and label | `app/fonts/ibm-plex-sans-latin.woff2` | © 2017 IBM Corp. (Reserved Font Name "Plex") | SIL Open Font License 1.1 |
+| **Geist Mono** | statuses, counts, ids, log lines, inline code, keyboard hints | `app/fonts/geist-mono-latin.woff2` | © 2024 The Geist Project Authors (https://github.com/vercel/geist-font.git) | SIL Open Font License 1.1 |
 
 Neither face is modified: the files are served as published. The SIL OFL allows
 commercial use, embedding, modification and redistribution bundled with software;
