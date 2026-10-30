@@ -113,7 +113,7 @@ export default function WorkspacesPage() {
           leading={<Skeleton className="h-8 w-56" />}
           actions={<Skeleton className="h-8 w-32" />}
         />
-        <div className="flex-1 px-8 pb-10 pt-2">
+        <div className="flex-1 px-8 pb-8 pt-2">
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
             {Array.from({ length: 3 }).map((_, i) => (
               <Skeleton key={i} className="h-44 rounded-lg" />
@@ -147,7 +147,7 @@ export default function WorkspacesPage() {
         }
       />
 
-      <div className="flex-1 px-8 pb-10 pt-2">
+      <div className="flex-1 px-8 pb-8 pt-2">
         {loadError ? (
           <ErrorState what="your workspaces" error={loadError} onRetry={retry} />
         ) : workspaces.length === 0 ? (
@@ -222,7 +222,7 @@ export default function WorkspacesPage() {
 function SectionHead({ title, note }: { title: string; note?: string }) {
   return (
     <div className="mb-2.5 flex items-baseline gap-2">
-      <h2 className="text-title-sm font-semibold text-ink">{title}</h2>
+      <h2 className="text-label font-semibold text-ink">{title}</h2>
       {note && <span className="text-caption text-mute">{note}</span>}
     </div>
   );

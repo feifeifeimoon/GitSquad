@@ -124,7 +124,7 @@ export default function UsagePage() {
     <div className="flex h-full flex-col">
       <PageToolbar actions={<RangeSelector value={range} onChange={setRange} />} />
 
-      <div className="flex-1 px-8 pb-8 pt-6">
+      <div className="flex-1 px-8 pb-8 pt-2">
         {summaryError || seriesError ? (
           <ErrorState
             what="usage"

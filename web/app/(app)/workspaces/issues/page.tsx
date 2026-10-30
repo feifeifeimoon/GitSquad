@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/error-state";
 import { BoardColumn } from "@/components/issues/board-column";
 import { IssuesToolbar } from "@/components/issues/issues-toolbar";
+import { PageToolbar, PageToolbarSkeleton } from "@/components/page-toolbar";
 import {
   DEFAULT_SORT,
   EMPTY_FILTERS,
@@ -72,14 +73,16 @@ export default function AllIssuesPage() {
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between px-8 pb-4 pt-6">
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-8 w-52" />
-            <Skeleton className="h-8 w-20" />
-            <Skeleton className="h-8 w-20" />
-          </div>
-        </div>
-        <div className="flex flex-1 gap-3 overflow-x-auto p-8 pt-0">
+        <PageToolbarSkeleton
+          leading={
+            <>
+              <Skeleton className="h-8 w-52" />
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-8 w-20" />
+            </>
+          }
+        />
+        <div className="flex flex-1 gap-3 overflow-x-auto px-8 pb-8 pt-2">
           {ISSUE_STATUSES.map((status) => (
             <div
               key={status}
@@ -102,17 +105,19 @@ export default function AllIssuesPage() {
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-8 pb-4 pt-6">
-        <IssuesToolbar
-          issues={issues ?? []}
-          filters={filters}
-          onFiltersChange={setFilters}
-          sort={sort}
-          onSortChange={setSort}
-        />
-      </div>
+      <PageToolbar
+        leading={
+          <IssuesToolbar
+            issues={issues ?? []}
+            filters={filters}
+            onFiltersChange={setFilters}
+            sort={sort}
+            onSortChange={setSort}
+          />
+        }
+      />
 
-      <div className="flex flex-1 gap-3 overflow-x-auto p-8 pt-0">
+      <div className="flex flex-1 gap-3 overflow-x-auto px-8 pb-8 pt-2">
         {ISSUE_STATUSES.map((status) => (
           <BoardColumn
             key={status}

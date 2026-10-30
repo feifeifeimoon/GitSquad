@@ -28,6 +28,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { CreateIssueDialog } from "@/components/issues/create-issue-dialog";
 import { ErrorState } from "@/components/error-state";
+import { PageToolbar, PageToolbarSkeleton } from "@/components/page-toolbar";
 import { setApiData, useApi } from "@/lib/query";
 import { IssueCard } from "@/components/issues/board-card";
 import { BoardColumn } from "@/components/issues/board-column";
@@ -201,15 +202,17 @@ export default function WorkspaceBoardPage({
   if (loading) {
     return (
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between px-8 pb-4 pt-6">
-          <div className="flex items-center gap-2">
-            <Skeleton className="h-8 w-52" />
-            <Skeleton className="h-8 w-20" />
-            <Skeleton className="h-8 w-20" />
-          </div>
-          <Skeleton className="h-8 w-28" />
-        </div>
-        <div className="flex flex-1 gap-3 overflow-x-auto p-8 pt-0">
+        <PageToolbarSkeleton
+          leading={
+            <>
+              <Skeleton className="h-8 w-52" />
+              <Skeleton className="h-8 w-20" />
+              <Skeleton className="h-8 w-20" />
+            </>
+          }
+          actions={<Skeleton className="h-8 w-28" />}
+        />
+        <div className="flex flex-1 gap-3 overflow-x-auto px-8 pb-8 pt-2">
           {Array.from({ length: 7 }).map((_, i) => (
             <div
               key={i}
@@ -233,24 +236,28 @@ export default function WorkspaceBoardPage({
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between px-8 pb-4 pt-6">
-        <IssuesToolbar
-          issues={issues ?? []}
-          filters={filters}
-          onFiltersChange={setFilters}
-          sort={sort}
-          onSortChange={setSort}
-        />
-        <Button onClick={() => openCreate("backlog")}>
-          <Plus className="size-4" />
-          New Issue
-        </Button>
-      </div>
+      <PageToolbar
+        leading={
+          <IssuesToolbar
+            issues={issues ?? []}
+            filters={filters}
+            onFiltersChange={setFilters}
+            sort={sort}
+            onSortChange={setSort}
+          />
+        }
+        actions={
+          <Button onClick={() => openCreate("backlog")}>
+            <Plus className="size-4" />
+            New Issue
+          </Button>
+        }
+      />
 
       <div
         ref={boardRef}
         onMouseDown={onBoardMouseDown}
-        className={`flex flex-1 gap-3 overflow-x-auto p-8 pt-0 ${
+        className={`flex flex-1 gap-3 overflow-x-auto px-8 pb-8 pt-2 ${
           isPanning ? "cursor-grabbing select-none" : ""
         }`}
       >
